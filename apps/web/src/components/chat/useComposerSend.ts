@@ -59,6 +59,8 @@ import {
 import { type ChatMessage, DEFAULT_INTERACTION_MODE } from "../../types";
 import { recordPromptSent } from "../GitHubStarPrompt";
 import { stackedThreadToast, toastManager } from "../ui/toast";
+import { useUiStateStore } from "../../uiStateStore";
+import { isTemporaryConversationSendBlocked } from "../../temporaryConversationNavigation";
 import { newMessageId, newThreadId } from "~/lib/utils";
 import { useNewThreadHandler } from "../../hooks/useHandleNewThread";
 import { buildThreadRouteParams } from "../../threadRoutes";
@@ -115,6 +117,7 @@ import {
   threadContextsOutsideEnvironment,
 } from "@t3tools/shared/composerContextReferences";
 import {
+  beginFanoutSend,
   draftSendState,
   type MultipleModelTarget,
   resolveMultipleModelTargets,
@@ -372,6 +375,13 @@ export function useComposerSend(input: ComposerSendInput) {
     },
   ) => {
     e?.preventDefault();
+    if (isTemporaryConversationSendBlocked({ draftId, threadKey: routeThreadKey })) {
+      toastManager.add({
+        type: "warning",
+        title: "This temporary conversation is being discarded",
+      });
+      return;
+    }
     // What the user pressed send on; uploads below can take a while, and a redirect must not
     // decline approvals for a draft that changed meanwhile.
     const promptAtSend = promptRef.current;
@@ -823,6 +833,23 @@ export function useComposerSend(input: ComposerSendInput) {
       multipleTargets.push(resolved);
     }
 
+    if (isTemporaryConversationSendBlocked({ draftId, threadKey: routeThreadKey })) {
+      toastManager.add({
+        type: "warning",
+        title: "This temporary conversation is being discarded",
+      });
+      return;
+    }
+    if (
+      multipleModelSelections !== null &&
+      useUiStateStore.getState().temporaryThreadKeys.includes(routeThreadKey)
+    ) {
+      toastManager.add({
+        type: "warning",
+        title: "Multiple-model sends are unavailable for temporary conversations",
+      });
+      return;
+    }
     sendInFlightRef.current = true;
     const sendGeneration = ++composerSendGenerationRef.current;
     const attachmentCapabilitiesBeforeUpload = readLiveAttachmentCapabilities();
@@ -1060,20 +1087,25 @@ export function useComposerSend(input: ComposerSendInput) {
       usesAttachmentUploads: turnUsesAttachmentUploads,
     });
     if (multipleModelSelections !== null) {
-      await sendToMultipleModels({
-        threadId: threadIdForSend,
-        project: activeProject,
-        branch: activeThreadBranch!,
-        selections: multipleModelSelections,
-        targets: multipleTargets,
-        sendSnapshot,
-        createdAt: messageCreatedAt,
-        attachmentsPromise: turnAttachmentsPromise,
-        usesAttachmentUploads: turnUsesAttachmentUploads,
-        readFileBlockReason: () => readLiveAttachmentCapabilities().fileBlockReason,
-        buildOutgoingMessageContext,
-        isCurrentSend: () => composerSendGenerationRef.current === sendGeneration,
-      });
+      const finishFanout = beginFanoutSend(routeThreadKey);
+      try {
+        await sendToMultipleModels({
+          threadId: threadIdForSend,
+          project: activeProject,
+          branch: activeThreadBranch!,
+          selections: multipleModelSelections,
+          targets: multipleTargets,
+          sendSnapshot,
+          createdAt: messageCreatedAt,
+          attachmentsPromise: turnAttachmentsPromise,
+          usesAttachmentUploads: turnUsesAttachmentUploads,
+          readFileBlockReason: () => readLiveAttachmentCapabilities().fileBlockReason,
+          buildOutgoingMessageContext,
+          isCurrentSend: () => composerSendGenerationRef.current === sendGeneration,
+        });
+      } finally {
+        finishFanout();
+      }
       return;
     }
     const optimisticAttachments = optimisticMessageAttachments(composerAttachmentsSnapshot);

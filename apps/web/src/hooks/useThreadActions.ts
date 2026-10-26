@@ -341,6 +341,7 @@ export function useThreadActions() {
   );
   const clearTerminalUiState = useTerminalUiStateStore((state) => state.clearTerminalUiState);
   const markThreadVisited = useUiStateStore((state) => state.markThreadVisited);
+  const setTemporaryThread = useUiStateStore((state) => state.setTemporaryThread);
   const router = useRouter();
   const handleNewThread = useNewThreadHandler();
 
@@ -438,7 +439,11 @@ export function useThreadActions() {
 
   const deleteThread = async (
     target: ScopedThreadRef,
-    opts: { deletedThreadKeys?: ReadonlySet<string> } = {},
+    opts: {
+      deletedThreadKeys?: ReadonlySet<string>;
+      navigateToFallback?: boolean;
+      deleteWorktree?: boolean;
+    } = {},
   ) => {
     const permissionFailure = threadOperationFailure(target);
     if (permissionFailure) return permissionFailure;
@@ -479,6 +484,7 @@ export function useThreadActions() {
         refreshArchivedThreadsForEnvironment(target.environmentId);
         clearTerminalUiState(target);
         clearDeletedThreadPanelState(target);
+        setTemporaryThread(scopedThreadKey(target), false);
       }
       return result;
     }
@@ -533,6 +539,7 @@ export function useThreadActions() {
     const localApi = readLocalApi();
     let canDeleteWorktree = false;
     if (
+      opts.deleteWorktree !== false &&
       orphanedWorktreePath !== null &&
       threadProject !== null &&
       !isScratchProject(threadProject, environmentConfig?.scratchWorkspaceRoot) &&
@@ -547,9 +554,12 @@ export function useThreadActions() {
     }
     let shouldDeleteWorktree = false;
     const environmentSettings = environmentConfig?.settings;
-    const automaticWorktreeCleanup = environmentSettings
-      ? resolveWorktreeCleanup(environmentSettings, thread.projectId).worktreeOnDelete
-      : false;
+    const automaticWorktreeCleanup =
+      opts.deleteWorktree === false
+        ? false
+        : environmentSettings
+          ? resolveWorktreeCleanup(environmentSettings, thread.projectId).worktreeOnDelete
+          : false;
     if (canDeleteWorktree && localApi && !automaticWorktreeCleanup) {
       const confirmationResult = await settlePromise(() =>
         localApi.dialogs.confirm(
@@ -578,6 +588,7 @@ export function useThreadActions() {
     const deletedThreadIds = deletedIds ?? new Set<ThreadId>();
     const currentRouteThreadRef = getCurrentRouteThreadRef();
     const shouldNavigateToFallback =
+      opts.navigateToFallback !== false &&
       currentRouteThreadRef?.threadId === threadRef.threadId &&
       currentRouteThreadRef.environmentId === threadRef.environmentId;
     const fallbackThreadId = getFallbackThreadIdAfterDelete({
@@ -613,6 +624,7 @@ export function useThreadActions() {
     );
     clearTerminalUiState(threadRef);
     clearDeletedThreadPanelState(threadRef);
+    setTemporaryThread(scopedThreadKey(threadRef), false);
 
     if (shouldNavigateToFallback) {
       const fallbackThread = fallbackThreadId

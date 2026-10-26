@@ -45,6 +45,8 @@ const state = vi.hoisted(() => ({
   localEffects: [] as string[],
   confirm: vi.fn<(message: string) => Promise<boolean>>(),
   toasts: [] as string[],
+  currentRoute: null as { environmentId: string; threadId: string } | null,
+  navigationCalls: [] as unknown[],
   afterRequest: undefined as ((action: string) => void) | undefined,
   sessionLookupFails: false,
 }));
@@ -55,7 +57,13 @@ vi.mock("react", () => ({
   useRef: (current: unknown) => ({ current }),
 }));
 vi.mock("@tanstack/react-router", () => ({
-  useRouter: () => ({ state: { location: { href: "/" }, matches: [] }, navigate: async () => {} }),
+  useRouter: () => ({
+    state: {
+      location: { href: "/" },
+      matches: state.currentRoute ? [{ params: state.currentRoute }] : [],
+    },
+    navigate: async (...args: unknown[]) => state.navigationCalls.push(args),
+  }),
 }));
 vi.mock("../state/session", () => ({
   environmentSession: { sessionStateAtom: "session" },
@@ -156,6 +164,8 @@ vi.mock("../uiStateStore", () => ({
   useUiStateStore: (select: (store: unknown) => unknown) =>
     select({
       markThreadVisited: () => state.localEffects.push("mark-visited"),
+      setTemporaryThread: (threadKey: string, temporary: boolean) =>
+        state.localEffects.push(`temporary:${threadKey}:${temporary}`),
     }),
 }));
 vi.mock("../lib/archivedThreadsState", () => ({
@@ -169,7 +179,7 @@ vi.mock("../localApi", () => ({
   readLocalApi: () => ({ dialogs: { confirm: state.confirm } }),
 }));
 vi.mock("../threadRoutes", () => ({
-  resolveThreadRouteRef: () => null,
+  resolveThreadRouteRef: () => state.currentRoute,
   buildThreadRouteParams: (ref: ScopedThreadRef) => ref,
 }));
 vi.mock("../components/ui/toast", () => ({
@@ -274,6 +284,8 @@ beforeEach(() => {
   state.localEffects = [];
   state.confirm.mockReset().mockResolvedValue(true);
   state.toasts = [];
+  state.currentRoute = null;
+  state.navigationCalls = [];
   state.afterRequest = undefined;
   state.sessionLookupFails = false;
   useRightPanelStore.setState(useRightPanelStore.getInitialState(), true);
@@ -379,6 +391,7 @@ describe("thread action permissions", () => {
       "clear-draft:side-chat",
       "refresh-archive",
       "clear-terminal-ui",
+      `temporary:${secondary}:${target.threadId}:false`,
     ]);
     expect(state.localEffects).not.toContain("clear-draft:fork");
     expect(state.localEffects).not.toContain("clear-draft:other-side-chat");
@@ -418,6 +431,27 @@ describe("thread action permissions", () => {
     expect(state.requests.map((request) => request.action)).toEqual(["stopSession", "delete"]);
     expect(state.localEffects).toContain("clear-terminal-ui");
     expect(threadPanelStatePresence(target)).toEqual(panelStateCleared);
+    expect(state.localEffects).toContain(`temporary:${secondary}:${target.threadId}:false`);
+  });
+
+  it("deletes a temporary thread without navigating to a fallback or removing its worktree", async () => {
+    state.scopes
+      .get(secondary)!
+      .add(AuthOrchestrationOperateScope)
+      .add(AuthSourceControlWriteScope);
+    state.threads[0]!.worktreePath = "/worktrees/thread";
+    state.currentRoute = target;
+
+    const result = await useThreadActions().deleteThread(target, {
+      navigateToFallback: false,
+      deleteWorktree: false,
+    });
+
+    expect(result._tag).toBe("Success");
+    expect(state.confirm).not.toHaveBeenCalled();
+    expect(state.requests.map((request) => request.action)).toEqual(["stopSession", "delete"]);
+    expect(state.navigationCalls).toEqual([]);
+    expect(state.localEffects).toContain(`temporary:${secondary}:${target.threadId}:false`);
   });
 
   it("clears the drafts of the side chats deleted with it", async () => {

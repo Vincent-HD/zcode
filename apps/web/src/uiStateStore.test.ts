@@ -1,8 +1,10 @@
-import { ThreadId } from "@t3tools/contracts";
+import { EnvironmentId, ThreadId } from "@t3tools/contracts";
+import { scopeThreadRef, scopedThreadKey } from "@t3tools/client-runtime/environment";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 import {
   legacyProjectCwdPreferenceKey,
+  isTemporaryThread,
   markThreadUnread,
   markThreadVisited,
   parsePersistedState,
@@ -12,6 +14,8 @@ import {
   reorderProjects,
   resolveProjectExpanded,
   setProjectExpanded,
+  setTemporaryThread,
+  transferTemporaryThread,
   type UiState,
 } from "./uiStateStore";
 
@@ -23,6 +27,7 @@ function makeUiState(overrides: Partial<UiState> = {}): UiState {
     threadLastVisitedAtById: {},
     threadChangedFilesExpandedById: {},
     defaultAdvertisedEndpointKey: null,
+    temporaryThreadKeys: [],
     pullRequestMergeMethod: "merge",
     ...overrides,
   };
@@ -81,6 +86,32 @@ describe("uiStateStore pure functions", () => {
     expect(setProjectExpanded(next, keys, false)).toBe(next);
   });
 
+  it("keeps the temporary marker on the scoped thread key across promotion routes", () => {
+    const threadKey = scopedThreadKey(
+      scopeThreadRef(EnvironmentId.make("environment-1"), ThreadId.make("thread-1")),
+    );
+    const initialState = makeUiState();
+    const temporaryState = setTemporaryThread(initialState, threadKey, true);
+
+    expect(isTemporaryThread(temporaryState, threadKey)).toBe(true);
+    expect(setTemporaryThread(temporaryState, threadKey, true)).toBe(temporaryState);
+    expect(setTemporaryThread(temporaryState, threadKey, false).temporaryThreadKeys).toEqual([]);
+  });
+
+  it("moves a temporary marker when promotion changes its scoped thread ref", () => {
+    const initialState = makeUiState({
+      temporaryThreadKeys: ["environment-1:reserved-thread"],
+    });
+
+    const promotedState = transferTemporaryThread(
+      initialState,
+      "environment-1:reserved-thread",
+      "environment-2:server-thread",
+    );
+
+    expect(promotedState.temporaryThreadKeys).toEqual(["environment-2:server-thread"]);
+  });
+
   it("moves grouped project members together", () => {
     const keyALocal = "env-local:proj-a";
     const keyARemote = "env-remote:proj-a";
@@ -114,6 +145,7 @@ describe("parsePersistedState", () => {
           "turn-2": true,
         },
       },
+      temporaryThreadKeys: ["environment-1:thread-1", "invalid"],
     });
 
     expect(parsed).toEqual({
@@ -133,6 +165,7 @@ describe("parsePersistedState", () => {
           "turn-2": true,
         },
       },
+      temporaryThreadKeys: ["environment-1:thread-1"],
     });
   });
 
@@ -144,6 +177,7 @@ describe("parsePersistedState", () => {
           "turn-1": false,
         },
       },
+      temporaryThreadKeys: ["environment-1:thread-1"],
     });
 
     expect(parsed.threadChangedFilesExpandedById).toEqual({});
@@ -213,6 +247,7 @@ describe("uiStateStore persistence", () => {
           "turn-2": true,
         },
       },
+      temporaryThreadKeys: ["environment:thread-1"],
       defaultAdvertisedEndpointKey: "desktop-core:lan:http",
     });
 
@@ -239,6 +274,7 @@ describe("uiStateStore persistence", () => {
           "turn-2": true,
         },
       },
+      temporaryThreadKeys: ["environment:thread-1"],
       pullRequestMergeMethod: "merge",
     });
     expect(parsePersistedState(persisted)).toEqual({

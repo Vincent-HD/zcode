@@ -62,6 +62,7 @@ import { createModelSelection, normalizeModelSlug } from "@t3tools/shared/model"
 import { USAGE_LIMITS_COMMAND } from "@t3tools/shared/usageLimits";
 import {
   memo,
+  type ReactNode,
   use,
   useEffect,
   useEffectEvent,
@@ -432,6 +433,7 @@ export interface ChatComposerProps {
   reportedModelSelection?: ModelSelection | null;
   activeProjectId: ProjectId | null;
   projectName?: string | undefined;
+  usageFooter?: ReactNode;
 
   compactThreadUnavailable: boolean;
   compactDisabled: boolean;
@@ -4177,6 +4179,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
               </div>
             ) : null}
           </div>
+          {props.usageFooter}
         </ComposerSurface.Main>
       </div>
     </form>

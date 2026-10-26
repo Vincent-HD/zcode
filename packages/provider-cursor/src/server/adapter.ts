@@ -52,6 +52,7 @@ import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderS
 import * as McpProviderSession from "@t3tools/provider-core/server/mcpSession";
 import { CursorTransportFailure } from "./transportFailure.ts";
 import { cursorContextWindowTokens, cursorSdkModelSelection } from "./sdkModel.ts";
+import { cursorTurnTokenUsage } from "./turn-usage.ts";
 import {
   appendCursorInvokedSkills,
   cursorSlashSkillNames,
@@ -989,6 +990,7 @@ interface ActiveCursorTurn {
   readonly runtimeInstructions: string | undefined;
   compacted: boolean;
   interrupted: boolean;
+  hasMissingUsage: boolean;
   finalized: boolean;
   /** The agent's latest turn ended and no new work has started since. */
   turnEnded: boolean;
@@ -2447,6 +2449,11 @@ export const makeCursorAdapterV2 = Effect.fn("makeCursorAdapterV2")(function* (
               return;
             case "step-completed":
             case "turn-ended":
+              context.hasMissingUsage ||= update.usage === undefined;
+              yield* completeAssistant(context);
+              yield* completeReasoning(context);
+              return;
+            case "step-completed":
               yield* completeAssistant(context);
               yield* completeReasoning(context);
               return;
@@ -2554,6 +2561,7 @@ export const makeCursorAdapterV2 = Effect.fn("makeCursorAdapterV2")(function* (
           >;
           readonly failure?: OrchestrationV2ProviderFailure;
           readonly threadDisposition?: "reusable" | "broken";
+          readonly usage?: RunResult["usage"];
         }) {
           if (input.context.finalized) {
             return;
@@ -3087,6 +3095,7 @@ export const makeCursorAdapterV2 = Effect.fn("makeCursorAdapterV2")(function* (
               runtimeInstructions,
               compacted,
               interrupted: false,
+              hasMissingUsage: false,
               finalized: false,
               turnEnded: false,
               session: agent.session,
@@ -3151,6 +3160,7 @@ export const makeCursorAdapterV2 = Effect.fn("makeCursorAdapterV2")(function* (
                     yield* finalizeTurn({
                       context,
                       status,
+                      usage: result.usage,
                       ...(status === "failed"
                         ? {
                             failure:

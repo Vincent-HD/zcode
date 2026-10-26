@@ -47,6 +47,7 @@ import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderS
 import * as McpProviderSession from "@t3tools/provider-core/server/mcpSession";
 import { CursorTransportFailure } from "./transportFailure.ts";
 import { cursorContextWindowTokens, cursorSdkModelSelection } from "./sdkModel.ts";
+import { cursorTurnTokenUsage } from "./turn-usage.ts";
 import {
   discoverCursorSkills,
   hasCursorSkillMention,
@@ -949,6 +950,7 @@ interface ActiveCursorTurn {
   /** The user text this run sent, before runtime instructions; absent for /compress. */
   readonly prompt: string | undefined;
   interrupted: boolean;
+  hasMissingUsage: boolean;
   finalized: boolean;
   /** The agent's latest turn ended and no new work has started since. */
   turnEnded: boolean;
@@ -2058,8 +2060,12 @@ export const makeCursorAdapterV2 = Effect.fn("makeCursorAdapterV2")(function* (
               yield* completeReasoning(context);
               yield* handleToolUpdate(context, update);
               return;
-            case "step-completed":
             case "turn-ended":
+              context.hasMissingUsage ||= update.usage === undefined;
+              yield* completeAssistant(context);
+              yield* completeReasoning(context);
+              return;
+            case "step-completed":
               yield* completeAssistant(context);
               yield* completeReasoning(context);
               return;
@@ -2097,6 +2103,7 @@ export const makeCursorAdapterV2 = Effect.fn("makeCursorAdapterV2")(function* (
           readonly context: ActiveCursorTurn;
           readonly status: OrchestrationV2ProviderTurn["status"];
           readonly completedAt: DateTime.Utc | null;
+          readonly usage?: RunResult["usage"];
         }): OrchestrationV2ProviderTurn => ({
           id: input.context.providerTurnId,
           providerThreadId: input.context.input.providerThread.id,
@@ -2111,6 +2118,16 @@ export const makeCursorAdapterV2 = Effect.fn("makeCursorAdapterV2")(function* (
           status: input.status,
           startedAt: input.context.startedAt,
           completedAt: input.completedAt,
+          ...(input.completedAt === null
+            ? {}
+            : {
+                turnTokenUsage: cursorTurnTokenUsage({
+                  usage: input.usage,
+                  status: input.status,
+                  hasSubagents: input.context.subagents.size > 0,
+                  hasMissingUsage: input.context.hasMissingUsage,
+                }),
+              }),
         });
 
         const finalizeTurn = Effect.fnUntraced(function* (input: {
@@ -2121,6 +2138,7 @@ export const makeCursorAdapterV2 = Effect.fn("makeCursorAdapterV2")(function* (
           >;
           readonly failure?: OrchestrationV2ProviderFailure;
           readonly threadDisposition?: "reusable" | "broken";
+          readonly usage?: RunResult["usage"];
         }) {
           if (input.context.finalized) {
             return;
@@ -2155,6 +2173,7 @@ export const makeCursorAdapterV2 = Effect.fn("makeCursorAdapterV2")(function* (
               context: input.context,
               status: input.status,
               completedAt,
+              usage: input.usage,
             }),
           });
           yield* emitProviderEvent({
@@ -2471,6 +2490,7 @@ export const makeCursorAdapterV2 = Effect.fn("makeCursorAdapterV2")(function* (
               },
               prompt,
               interrupted: false,
+              hasMissingUsage: false,
               finalized: false,
               turnEnded: false,
             };
@@ -2536,6 +2556,7 @@ export const makeCursorAdapterV2 = Effect.fn("makeCursorAdapterV2")(function* (
                     yield* finalizeTurn({
                       context,
                       status,
+                      usage: result.usage,
                       ...(status === "failed"
                         ? {
                             failure:

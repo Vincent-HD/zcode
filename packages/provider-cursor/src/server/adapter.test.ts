@@ -41,14 +41,15 @@ const { ConfigurationError } = loadCursorSdk();
 
 describe("CursorAdapterV2", () => {
   it.effect.each([
-    { status: "finished", model: undefined, lateModel: undefined },
-    { status: "cancelled", model: "claude-opus-4-6", lateModel: undefined },
-    { status: "error", model: "custom-fable", lateModel: undefined },
-    { status: "finished", model: undefined, lateModel: "gpt-6-sol" },
-    { status: "finished", model: "gpt-6-sol", lateModel: null },
+    { status: "finished", model: undefined, lateModel: undefined, missingUsage: false },
+    { status: "cancelled", model: "claude-opus-4-6", lateModel: undefined, missingUsage: false },
+    { status: "error", model: "custom-fable", lateModel: undefined, missingUsage: false },
+    { status: "finished", model: undefined, lateModel: "gpt-6-sol", missingUsage: false },
+    { status: "finished", model: "gpt-6-sol", lateModel: null, missingUsage: false },
+    { status: "finished", model: undefined, lateModel: undefined, missingUsage: true },
   ] as const)(
-    "projects Cursor tasks and unfinished tools: $status, late model $lateModel",
-    ({ status, model, lateModel }) =>
+    "projects Cursor tasks and unfinished tools: $status, late model $lateModel, missing usage $missingUsage",
+    ({ status, model, lateModel, missingUsage }) =>
       Effect.gen(function* () {
         const fileSystem = yield* FileSystem.FileSystem;
         const workspace = yield* fileSystem.makeTempDirectoryScoped({
@@ -147,6 +148,20 @@ describe("CursorAdapterV2", () => {
                     for (const update of readUpdates) {
                       yield* input.onDelta!(update);
                     }
+                    yield* input.onDelta!({
+                      type: "turn-ended",
+                      ...(missingUsage
+                        ? {}
+                        : {
+                            usage: {
+                              inputTokens: 100,
+                              outputTokens: 40,
+                              cacheReadTokens: 60,
+                              cacheWriteTokens: 20,
+                              reasoningTokens: 10,
+                            },
+                          }),
+                    }).pipe(Effect.orDie);
                     return {
                       agentId: "native-cursor-lifecycle",
                       runId: "native-cursor-run",
@@ -156,6 +171,18 @@ describe("CursorAdapterV2", () => {
                         status,
                         model: { id: "composer-2.5" },
                         durationMs: 1,
+                        ...(status === "error"
+                          ? {}
+                          : {
+                              usage: {
+                                inputTokens: 100,
+                                outputTokens: 40,
+                                cacheReadTokens: 60,
+                                cacheWriteTokens: 20,
+                                reasoningTokens: 10,
+                                totalTokens: 220,
+                              },
+                            }),
                       }),
                       cancel: Effect.void,
                     };
@@ -271,6 +298,23 @@ describe("CursorAdapterV2", () => {
           "read-secret": unfinished,
           "read-open": "completed",
         });
+        const turns = events.filter((event) => event.type === "provider_turn.updated");
+        assert.isUndefined(turns[0]?.providerTurn.turnTokenUsage);
+        assert.deepEqual(
+          turns.at(-1)?.providerTurn.turnTokenUsage,
+          status === "error"
+            ? { usageScope: "main_agent", usageStatus: "unavailable", hasSubagents: true }
+            : {
+                usageScope: "main_agent",
+                usageStatus: status === "finished" && !missingUsage ? "complete" : "partial",
+                inputTokens: 180,
+                outputTokens: 40,
+                cachedInputTokens: 60,
+                cacheCreationTokens: 20,
+                reasoningTokens: 10,
+                hasSubagents: true,
+              },
+        );
       }).pipe(
         Effect.scoped,
         Effect.provide(

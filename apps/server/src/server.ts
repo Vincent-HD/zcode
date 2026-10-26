@@ -1,3 +1,5 @@
+import * as JjPanelService from "./jj/JjPanelService.ts";
+import * as JjForgeService from "./jj/JjForgeService.ts";
 import * as ProviderEventLoggers from "@t3tools/provider-core/server/ProviderEventLoggers";
 import type { RelayManagedEndpointRuntimeConfig } from "@t3tools/contracts/relay";
 import * as Random from "effect/Random";
@@ -414,6 +416,14 @@ const layerReview = ReviewService.layer.pipe(
 );
 
 const layerVcs = Layer.empty.pipe(
+  Layer.provideMerge(
+    JjForgeService.layer.pipe(
+      Layer.provideMerge(JjPanelService.layer),
+      Layer.provide(layerPullRequestService),
+      Layer.provide(RuntimeLayer.layerProjectService),
+      Layer.provide(layerSourceControlProviderRegistry),
+    ),
+  ),
   Layer.provideMerge(VcsProjectConfig.layer),
   Layer.provideMerge(layerVcsDriverRegistry),
   Layer.provideMerge(VcsProvisioningService.layer.pipe(Layer.provide(layerVcsDriverRegistry))),

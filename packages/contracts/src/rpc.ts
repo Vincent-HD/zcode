@@ -1,4 +1,25 @@
 import {
+  JjGetPanelInput,
+  JjRunActionInput,
+  JjGetDiffInput,
+  JjDiffResult,
+  JjPanelSnapshot,
+  JjDescribeInput,
+  JjSquashInput,
+  JjRevertOperationInput,
+  JjMutationResult,
+  JjPanelError,
+} from "./jj.ts";
+import {
+  JjForgePreviewInput,
+  JjForgePlan,
+  JjForgePublishInput,
+  JjForgePublishResult,
+  JjForgeStatusInput,
+  JjForgeStatusResult,
+  JjForgeError,
+} from "./jj-forge.ts";
+import {
   OrchestrationV2SearchThreadError,
   OrchestrationV2SearchThreadInput,
   OrchestrationV2SearchThreadResult,
@@ -436,6 +457,15 @@ export const WS_METHODS = {
   providerInstallRemove: "provider.install.remove",
 
   vcsPull: "vcs.pull",
+  jjGetPanel: "jj.getPanel",
+  jjRunAction: "jj.runAction",
+  jjGetDiff: "jj.getDiff",
+  jjForgePreview: "jj.forgePreview",
+  jjForgePublish: "jj.forgePublish",
+  jjForgeStatus: "jj.forgeStatus",
+  jjDescribe: "jj.describe",
+  jjSquash: "jj.squash",
+  jjRevertOperation: "jj.revertOperation",
   vcsRefreshStatus: "vcs.refreshStatus",
   vcsListRefs: "vcs.listRefs",
   vcsCreateWorktree: "vcs.createWorktree",
@@ -1408,6 +1438,52 @@ const WsVcsPullRpc = Rpc.make(WS_METHODS.vcsPull, {
   error: Schema.Union([GitCommandError, EnvironmentAuthorizationError]),
 });
 
+const WsJjRunActionRpc = Rpc.make(WS_METHODS.jjRunAction, {
+  payload: JjRunActionInput,
+  success: JjMutationResult,
+  error: Schema.Union([JjPanelError, EnvironmentAuthorizationError]),
+});
+const WsJjGetDiffRpc = Rpc.make(WS_METHODS.jjGetDiff, {
+  payload: JjGetDiffInput,
+  success: JjDiffResult,
+  error: Schema.Union([JjPanelError, EnvironmentAuthorizationError]),
+});
+const WsJjForgePreviewRpc = Rpc.make(WS_METHODS.jjForgePreview, {
+  payload: JjForgePreviewInput,
+  success: JjForgePlan,
+  error: Schema.Union([JjForgeError, EnvironmentAuthorizationError]),
+});
+const WsJjForgePublishRpc = Rpc.make(WS_METHODS.jjForgePublish, {
+  payload: JjForgePublishInput,
+  success: JjForgePublishResult,
+  error: Schema.Union([JjForgeError, EnvironmentAuthorizationError]),
+});
+const WsJjForgeStatusRpc = Rpc.make(WS_METHODS.jjForgeStatus, {
+  payload: JjForgeStatusInput,
+  success: JjForgeStatusResult,
+  error: Schema.Union([JjForgeError, EnvironmentAuthorizationError]),
+});
+const WsJjGetPanelRpc = Rpc.make(WS_METHODS.jjGetPanel, {
+  payload: JjGetPanelInput,
+  success: JjPanelSnapshot,
+  error: Schema.Union([JjPanelError, EnvironmentAuthorizationError]),
+});
+const WsJjDescribeRpc = Rpc.make(WS_METHODS.jjDescribe, {
+  payload: JjDescribeInput,
+  success: JjMutationResult,
+  error: Schema.Union([JjPanelError, EnvironmentAuthorizationError]),
+});
+const WsJjSquashRpc = Rpc.make(WS_METHODS.jjSquash, {
+  payload: JjSquashInput,
+  success: JjMutationResult,
+  error: Schema.Union([JjPanelError, EnvironmentAuthorizationError]),
+});
+const WsJjRevertOperationRpc = Rpc.make(WS_METHODS.jjRevertOperation, {
+  payload: JjRevertOperationInput,
+  success: JjMutationResult,
+  error: Schema.Union([JjPanelError, EnvironmentAuthorizationError]),
+});
+
 const WsVcsRefreshStatusRpc = Rpc.make(WS_METHODS.vcsRefreshStatus, {
   payload: Schema.Struct({
     ...VcsStatusInput.fields,
@@ -2053,6 +2129,15 @@ export const WsRpcGroup = RpcGroup.make(
   WsSubscribeWorktreeSetupRpc,
   WsWorktreeSetupCancelRpc,
   WsVcsPullRpc,
+  WsJjGetPanelRpc,
+  WsJjRunActionRpc,
+  WsJjForgePreviewRpc,
+  WsJjForgePublishRpc,
+  WsJjForgeStatusRpc,
+  WsJjGetDiffRpc,
+  WsJjDescribeRpc,
+  WsJjSquashRpc,
+  WsJjRevertOperationRpc,
   WsVcsRefreshStatusRpc,
   WsGitRunStackedActionRpc,
   WsGitResolvePullRequestRpc,

@@ -47,6 +47,8 @@ import * as DirectEndpoints from "./environment/DirectEndpoints.ts";
 import * as EnvironmentAuth from "./auth/EnvironmentAuth.ts";
 import * as EnvironmentTheme from "./environmentTheme.ts";
 import * as GitWorkflowService from "./git/GitWorkflowService.ts";
+import * as JjForgeService from "./jj/JjForgeService.ts";
+import * as JjPanelService from "./jj/JjPanelService.ts";
 import * as HostResources from "./resourceTelemetry/HostResources.ts";
 import * as ManagedProjectFolders from "./project/ManagedProjectFolders.ts";
 import * as McpAppRequests from "./mcpApps/McpAppRequests.ts";
@@ -485,6 +487,8 @@ const layerUnusedConfigRpcServices = Layer.mergeAll(
   Layer.mock(DeviceService.DeviceService)({}),
   Layer.mock(EnvironmentTheme.EnvironmentThemeService)({}),
   Layer.mock(GitWorkflowService.GitWorkflowService)({}),
+  Layer.mock(JjForgeService.JjForgeService)({}),
+  Layer.mock(JjPanelService.JjPanelService)({}),
   Layer.mock(HostResources.HostResources)({}),
   Layer.mock(McpAppRequests.McpAppRequests)({}),
   Layer.mock(ModelManifest.ModelManifest)({}),

@@ -14,6 +14,7 @@ import type { ChatFileAttachment } from "./types";
 
 const RIGHT_PANEL_KINDS = [
   "diff",
+  "jj",
   "files",
   "file",
   "preview",
@@ -45,6 +46,7 @@ export type RightPanelSurface =
       activeTerminalId: string;
       splitDirection?: "horizontal" | "vertical";
     }
+  | { id: "jj"; kind: "jj" }
   | { id: "diff"; kind: "diff" }
   | {
       id: "files";
@@ -205,6 +207,8 @@ const singletonSurface = (
   kind: Exclude<RightPanelKind, "file" | "preview" | "terminal" | "pull-request">,
 ): RightPanelSurface => {
   switch (kind) {
+    case "jj":
+      return { id: "jj", kind };
     case "diff":
       return { id: "diff", kind };
     case "files":

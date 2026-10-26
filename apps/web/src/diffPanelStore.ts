@@ -1,7 +1,13 @@
 import type { ThreadStructureVisibleTurnItem } from "@t3tools/client-runtime/state/shell";
 import { turnItemDetailRevision } from "@t3tools/client-runtime/work-log/item-detail";
 import { scopedThreadKey } from "@t3tools/client-runtime/environment";
-import type { RunId, ScopedThreadRef, ThreadId, TurnItemId } from "@t3tools/contracts";
+import type {
+  JjWorkspaceIdentity,
+  RunId,
+  ScopedThreadRef,
+  ThreadId,
+  TurnItemId,
+} from "@t3tools/contracts";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
@@ -13,11 +19,23 @@ export interface ToolCallDiffTarget {
   readonly revision: string;
 }
 
+export interface JjDiffContext {
+  readonly workspaceIdentity: JjWorkspaceIdentity;
+  readonly expectedOperationId: string;
+}
+
 export type DiffPanelSelection =
   | ({ kind: "tool-call" } & ToolCallDiffTarget)
   | { kind: "branch"; baseRef: string | null }
   | { kind: "unstaged" }
-  | { kind: "turn"; turnId: RunId; filePath: string | null; revealRequestId: number };
+  | { kind: "turn"; turnId: RunId; filePath: string | null; revealRequestId: number }
+  | {
+      kind: "jj";
+      revisionCommitId: string;
+      filePath: string | null;
+      revealRequestId: number;
+      context?: JjDiffContext;
+    };
 
 const DEFAULT_SELECTION: DiffPanelSelection = { kind: "branch", baseRef: null };
 
@@ -28,6 +46,12 @@ interface DiffPanelStoreState {
   selectBranchBaseRef: (ref: ScopedThreadRef, baseRef: string | null) => void;
   selectToolCall: (ref: ScopedThreadRef, target: ToolCallDiffTarget) => void;
   selectTurn: (ref: ScopedThreadRef, turnId: RunId, filePath?: string) => void;
+  selectJjRevision: (
+    ref: ScopedThreadRef,
+    revisionCommitId: string,
+    filePath?: string,
+    context?: JjDiffContext,
+  ) => void;
   reconcileTurnSelection: (ref: ScopedThreadRef, availableTurnIds: ReadonlyArray<RunId>) => void;
   removeThread: (ref: ScopedThreadRef) => void;
 }
@@ -98,6 +122,23 @@ export const useDiffPanelStore = create<DiffPanelStoreState>()(
                 turnId,
                 filePath: filePath?.trim() || null,
                 revealRequestId: previous?.kind === "turn" ? previous.revealRequestId + 1 : 1,
+              },
+            },
+          };
+        }),
+      selectJjRevision: (ref, revisionCommitId, filePath, context) =>
+        set((state) => {
+          const threadKey = scopedThreadKey(ref);
+          const previous = state.byThreadKey[threadKey];
+          return {
+            byThreadKey: {
+              ...state.byThreadKey,
+              [threadKey]: {
+                kind: "jj",
+                revisionCommitId,
+                filePath: filePath?.trim() || null,
+                revealRequestId: previous?.kind === "jj" ? previous.revealRequestId + 1 : 1,
+                ...(context ? { context } : {}),
               },
             },
           };

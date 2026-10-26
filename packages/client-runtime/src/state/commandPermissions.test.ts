@@ -14,6 +14,7 @@ import {
   AuthPreviewOperateScope,
   AuthSettingsWriteScope,
   AuthSourceControlWriteScope,
+  AuthFilesystemReadScope,
   ThreadId,
   EnvironmentId,
   ScheduledTaskId,
@@ -501,4 +502,66 @@ it.effect("rejects protected unary and streamed RPCs outside a guarded command",
     expect(streamed._tag).toBe("EnvironmentAuthorizationError");
     expect(writes).toBe(0);
   }),
+);
+
+it.effect("requires the destination source-control grant for every Jujutsu rewrite", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const registry = yield* setup;
+      registry.set(sessions(env), AsyncResult.success(grant(true)));
+      registry.set(
+        sessions(other),
+        AsyncResult.success({
+          ...grant(true),
+          scopes: [AuthSourceControlWriteScope],
+          permissions: [AuthSourceControlWriteScope],
+        }),
+      );
+      for (const tag of [
+        WS_METHODS.jjDescribe,
+        WS_METHODS.jjSquash,
+        WS_METHODS.jjRevertOperation,
+        WS_METHODS.jjRunAction,
+        WS_METHODS.jjForgePublish,
+      ]) {
+        const command = createCommandPermissions(runtime, tag);
+        expect(registry.get(command.permissionAtom(env))).toBe(false);
+        const denied = yield* command.authorize(registry, env).pipe(Effect.flip);
+        expect(denied.requiredPermission).toBe(AuthSourceControlWriteScope);
+        expect(registry.get(command.permissionAtom(other))).toBe(true);
+        yield* command.authorize(registry, other);
+      }
+    }),
+  ),
+);
+
+it.effect("requires the destination filesystem grant for Jujutsu diff reads", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const registry = yield* setup;
+      registry.set(
+        sessions(env),
+        AsyncResult.success({
+          ...grant(true),
+          scopes: [AuthSourceControlWriteScope],
+          permissions: [AuthSourceControlWriteScope],
+        }),
+      );
+      registry.set(
+        sessions(other),
+        AsyncResult.success({
+          ...grant(true),
+          scopes: [AuthFilesystemReadScope],
+          permissions: [AuthFilesystemReadScope],
+        }),
+      );
+      const command = createCommandPermissions(runtime, WS_METHODS.jjGetDiff);
+      expect(registry.get(command.permissionAtom(env))).toBe(false);
+      expect((yield* command.authorize(registry, env).pipe(Effect.flip)).requiredPermission).toBe(
+        AuthFilesystemReadScope,
+      );
+      expect(registry.get(command.permissionAtom(other))).toBe(true);
+      yield* command.authorize(registry, other);
+    }),
+  ),
 );

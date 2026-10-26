@@ -39,6 +39,29 @@ async function reloadRightPanelStore() {
 }
 
 describe("rightPanelStore", () => {
+  it("keeps Jujutsu singleton, restores it, and scopes it to its thread", () => {
+    const store = useRightPanelStore.getState();
+    store.open(refA, "jj");
+    store.open(refA, "jj");
+    const state = selectThreadRightPanelState(useRightPanelStore.getState().byThreadKey, refA);
+    expect(state.surfaces).toEqual([{ id: "jj", kind: "jj" }]);
+    expect(
+      selectThreadRightPanelState(useRightPanelStore.getState().byThreadKey, refB).surfaces,
+    ).toEqual([]);
+    const migrated = migratePersistedRightPanelState({
+      byThreadKey: useRightPanelStore.getState().byThreadKey,
+    });
+    expect(Object.values(migrated.byThreadKey)[0]?.surfaces).toEqual(state.surfaces);
+    store.closeSurface(refA, "jj");
+    expect(
+      selectThreadRightPanelState(useRightPanelStore.getState().byThreadKey, refA).isOpen,
+    ).toBe(false);
+    store.open(refA, "jj");
+    expect(
+      selectThreadRightPanelState(useRightPanelStore.getState().byThreadKey, refA).activeSurfaceId,
+    ).toBe("jj");
+  });
+
   it("records single and bulk tab closes, newest first", () => {
     const store = useRightPanelStore.getState();
     const pr = pullRequestSurface({

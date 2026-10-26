@@ -2552,6 +2552,7 @@ export default function ChatView(props: ChatViewProps) {
     duplicateBrowserSurfaceStable,
     moveRightPanelSurfaceStable,
     onOpenToolDiffStable,
+    onOpenJjDiffStable,
     onOpenTurnDiffStable,
     openChangesFromThreadPanelStable,
     openFileSurfaceStable,
@@ -3463,6 +3464,9 @@ export default function ChatView(props: ChatViewProps) {
       workspaceRevision={workspaceRevision.revision}
       getShortcutContext={getShortcutContextStable}
       onSendAnnotation={sendPreviewAnnotationStable}
+      cwd={gitCwd}
+      projectId={activeThread.projectId}
+      onOpenJjDiff={onOpenJjDiffStable}
       onCloseSurface={closeRightPanelSurface}
       sideChatParentPanel={sideChatParentPanel}
       terminal={{
@@ -4288,6 +4292,11 @@ export default function ChatView(props: ChatViewProps) {
           onDuplicateBrowser={duplicateBrowserSurfaceStable}
           onAddTerminal={addTerminalSurfaceStable}
           onAddDiff={addDiffSurfaceStable}
+          onAddJj={
+            gitCwd && activeThreadRef
+              ? () => useRightPanelStore.getState().open(activeThreadRef, "jj")
+              : undefined
+          }
           onAddFiles={addFilesSurfaceStable}
           onAddPullRequest={addPullRequestSurfaceStable}
           onAddPullRequests={addPullRequestsSurfaceStable}

@@ -162,6 +162,7 @@ describe("reopenClosedView", () => {
       workspaceAvailable: false,
     };
     for (const surface of [
+      { kind: "jj", id: "jj" },
       { kind: "files", id: "files", folderTrail: "apps/web/src" },
       {
         kind: "file",

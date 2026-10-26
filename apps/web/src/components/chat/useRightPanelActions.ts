@@ -17,7 +17,11 @@ import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
-import { useDiffPanelStore } from "../../diffPanelStore";
+import {
+  type JjDiffContext,
+  selectThreadDiffPanelSelection,
+  useDiffPanelStore,
+} from "../../diffPanelStore";
 import { type ThreadPanelPresentation } from "../../rightPanelLayout";
 import {
   selectThreadPanelOpen,
@@ -320,6 +324,16 @@ export function useRightPanelActions(input: RightPanelActionsInput) {
     onDiffPanelOpen?.();
   });
   const onOpenTurnDiffStable = useStableCallback(onOpenTurnDiff);
+  const onOpenJjDiff = (revisionCommitId: string, filePath: string, context?: JjDiffContext) => {
+    if (!isServerThread || !activeThreadRef) return;
+    explicitDiffOpenRef.current = diffOpen ? null : activeThreadRef;
+    useDiffPanelStore
+      .getState()
+      .selectJjRevision(activeThreadRef, revisionCommitId, filePath, context);
+    useRightPanelStore.getState().open(activeThreadRef, "diff");
+    onDiffPanelOpen?.();
+  };
+  const onOpenJjDiffStable = useStableCallback(onOpenJjDiff);
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- subscribes to the preview action bus to toggle the preview panel
   useEffect(
     () =>
@@ -359,6 +373,7 @@ export function useRightPanelActions(input: RightPanelActionsInput) {
     duplicateBrowserSurfaceStable,
     moveRightPanelSurfaceStable,
     onOpenToolDiffStable,
+    onOpenJjDiffStable,
     onOpenTurnDiffStable,
     onToggleDiffStable,
     openChangesFromThreadPanelStable,

@@ -54,6 +54,7 @@ import { splitTransferredFiles } from "./workspaceFileDrop";
 import { createModelSelection, normalizeModelSlug } from "@t3tools/shared/model";
 import { USAGE_LIMITS_COMMAND } from "@t3tools/shared/usageLimits";
 import {
+  type ReactNode,
   memo,
   use,
   useEffect,
@@ -429,6 +430,7 @@ export interface ChatComposerProps {
   contextWindowEntries: Parameters<typeof deriveLatestContextWindowSnapshot>[0];
   contextWindowLiveUsage: Parameters<typeof deriveLatestContextWindowSnapshot>[1];
   contextWindowProviderThread: Parameters<typeof deriveLatestContextWindowSnapshot>[2];
+  usageFooter?: ReactNode;
   compactThreadUnavailable: boolean;
   compactDisabled: boolean;
   compactDisabledReason: string | null;
@@ -3580,6 +3582,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
               </div>
             ) : null}
           </div>
+          {props.usageFooter}
         </ComposerSurface.Main>
       </div>
     </form>

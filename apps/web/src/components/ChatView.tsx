@@ -45,6 +45,7 @@ import { isScratchProject } from "@t3tools/client-runtime/state/projects";
 import { visibleThreadPullRequests } from "@t3tools/shared/threadPullRequests";
 import type { UsageLimitSourceSnapshots } from "@t3tools/contracts";
 import { feedbackBannerItem } from "./chat/ComposerFeedback";
+import { collectProviderUsageLimits } from "@t3tools/shared/usageLimits";
 import { useUsageLimitsPanel } from "./chat/useUsageLimitsPanel";
 import { useWorktreeSetup } from "./chat/useWorktreeSetup";
 import { useChatShortcuts } from "./chat/useChatShortcuts";
@@ -257,6 +258,9 @@ import {
   useThreadCheckpointSummaries,
 } from "../state/entities";
 import { useEnvironmentShellHasSnapshot } from "../state/shell";
+import { resolveUsageTurn } from "./chat/turn-usage.logic";
+import { selectComposerUsageAccounts } from "./chat/composer-usage.logic";
+import { ComposerUsageFooter } from "./chat/ComposerUsageFooter";
 import { ChatComposer, type ChatComposerHandle } from "./chat/ChatComposer";
 import { DraftHeroHeadline } from "./chat/DraftHeroHeadline";
 import { ExpandedImageDialogHost, openExpandedImagePreview } from "./chat/ExpandedImageDialog";
@@ -1385,6 +1389,7 @@ export default function ChatView(props: ChatViewProps) {
           activeThread?.latestRun?.runId ?? "",
           activePendingApproval?.requestId ?? activePendingUserInput?.requestId ?? "",
         ].join(":");
+  const usageLimitSources = serverConfig?.usageLimitSources ?? EMPTY_USAGE_LIMIT_SOURCES;
   const {
     banner: usageLimitsBanner,
     offered: usageLimitsOffered,
@@ -1397,8 +1402,22 @@ export default function ChatView(props: ChatViewProps) {
     providerInstanceId: activeProviderInstanceId,
     providerDriver: activeProviderStatus?.driver ?? null,
     providers: providerStatuses,
-    sources: serverConfig?.usageLimitSources ?? EMPTY_USAGE_LIMIT_SOURCES,
+    sources: usageLimitSources,
   });
+  // Leave this unmemoized. A manual useMemo here bails the React Compiler out of
+  // ChatView, and the uncompiled render-phase state adjustments then loop.
+  const composerUsageAccounts =
+    activeProviderInstanceId === null || activeProviderStatus === null
+      ? []
+      : selectComposerUsageAccounts(
+          collectProviderUsageLimits(
+            activeProviderInstanceId,
+            providerStatuses,
+            usageLimitSources,
+            Date.parse(activeProviderStatus.checkedAt),
+          )?.accounts ?? [],
+          activeProviderInstanceId,
+        );
   const {
     beginLocalDispatch,
     resetLocalDispatch,
@@ -1455,6 +1474,29 @@ export default function ChatView(props: ChatViewProps) {
     activeThreadLiveTokenUsage,
     activeProviderThread,
   );
+  const composerUsageSession = (() => {
+    const turns =
+      serverProjection?.providerTurns.filter(
+        (turn) => turn.providerThreadId === serverProjection.thread.activeProviderThreadId,
+      ) ?? [];
+    const completedTurnIds = new Set(
+      turns.filter((turn) => turn.status === "completed").map((turn) => turn.id),
+    );
+    const toolCalls =
+      serverProjection?.nodes.filter(
+        (node) =>
+          node.kind === "tool_call" &&
+          node.providerTurnId !== null &&
+          completedTurnIds.has(node.providerTurnId),
+      ) ?? [];
+    const usageTurns = serverProjection
+      ? turns.flatMap((turn) => {
+          const data = resolveUsageTurn({ projection: serverProjection, providerTurnId: turn.id });
+          return data ? [data] : [];
+        })
+      : [];
+    return { turns, toolCalls, usageTurns };
+  })();
   const pendingBackgroundTasks = deriveThreadPendingBackgroundTasks(serverProjection);
   const activeWorkStartedAt =
     deriveActiveWorkStartedAt(activeActivityRun, activeRuntime, localDispatchStartedAt) ??
@@ -3677,6 +3719,24 @@ export default function ChatView(props: ChatViewProps) {
                               contextWindowEntries={serverVisibleTurnItems}
                               contextWindowLiveUsage={activeThreadLiveTokenUsage}
                               contextWindowProviderThread={activeProviderThread}
+                              usageFooter={
+                                <ComposerUsageFooter
+                                  accounts={composerUsageAccounts}
+                                  context={activeContextWindow}
+                                  toolCalls={composerUsageSession.toolCalls}
+                                  turns={composerUsageSession.turns}
+                                  usageTurns={composerUsageSession.usageTurns}
+                                  lastTurn={
+                                    serverProjection?.providerTurns.findLast(
+                                      (turn) =>
+                                        turn.status === "completed" &&
+                                        turn.providerThreadId ===
+                                          serverProjection.thread.activeProviderThreadId,
+                                    ) ?? null
+                                  }
+                                  onOpenLimits={openUsageLimits}
+                                />
+                              }
                               compactThreadUnavailable={compactThreadUnavailable}
                               compactDisabled={compactDisabled}
                               compactDisabledReason={compactDisabledReason}

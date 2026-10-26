@@ -1,4 +1,5 @@
 import { Debouncer } from "@tanstack/react-pacer";
+import { parseScopedThreadKey } from "@t3tools/client-runtime/environment";
 import type { PullRequestMergeMethod } from "@t3tools/contracts";
 import { create } from "zustand";
 import { normalizeProjectPathForComparison } from "@t3tools/client-runtime/state/projects";
@@ -30,6 +31,7 @@ export interface PersistedUiState {
   sidebarProjectScopeKeys?: string[];
   threadChangedFilesExpansionVersion?: number;
   threadChangedFilesExpandedById?: Record<string, Record<string, boolean>>;
+  temporaryThreadKeys?: string[];
   pullRequestMergeMethod?: string;
 }
 
@@ -53,7 +55,9 @@ export interface UiPullRequestState {
 }
 
 export interface UiState
-  extends UiProjectState, UiThreadState, UiEndpointState, UiPullRequestState {}
+  extends UiProjectState, UiThreadState, UiEndpointState, UiPullRequestState {
+  temporaryThreadKeys: string[];
+}
 
 const initialState: UiState = {
   projectExpandedById: {},
@@ -62,6 +66,7 @@ const initialState: UiState = {
   threadLastVisitedAtById: {},
   threadChangedFilesExpandedById: {},
   defaultAdvertisedEndpointKey: null,
+  temporaryThreadKeys: [],
   pullRequestMergeMethod: "merge",
 };
 
@@ -154,6 +159,9 @@ export function parsePersistedState(parsed: PersistedUiState): UiState {
     sidebarProjectScopeKeys: sanitizeStringArray(
       parsed.sidebarProjectScopeKeys ?? [parsed.sidebarProjectScopeKey],
     ),
+    temporaryThreadKeys: sanitizeStringArray(parsed.temporaryThreadKeys).filter(
+      (threadKey) => parseScopedThreadKey(threadKey) !== null,
+    ),
     pullRequestMergeMethod: isPullRequestMergeMethod(parsed.pullRequestMergeMethod)
       ? parsed.pullRequestMergeMethod
       : initialState.pullRequestMergeMethod,
@@ -235,6 +243,7 @@ export function persistState(state: UiState): void {
             : null,
         threadChangedFilesExpansionVersion: THREAD_CHANGED_FILES_EXPANSION_VERSION,
         threadChangedFilesExpandedById: state.threadChangedFilesExpandedById,
+        temporaryThreadKeys: state.temporaryThreadKeys,
         pullRequestMergeMethod: state.pullRequestMergeMethod,
       } satisfies PersistedUiState),
     );
@@ -351,6 +360,32 @@ function setPullRequestMergeMethod(state: UiState, method: PullRequestMergeMetho
     : { ...state, pullRequestMergeMethod: method };
 }
 
+export function setTemporaryThread(state: UiState, threadKey: string, temporary: boolean): UiState {
+  const keys = new Set(state.temporaryThreadKeys);
+  const hadKey = keys.has(threadKey);
+  if (temporary === hadKey) return state;
+  if (temporary) keys.add(threadKey);
+  else keys.delete(threadKey);
+  return { ...state, temporaryThreadKeys: [...keys] };
+}
+
+export function isTemporaryThread(state: UiState, threadKey: string): boolean {
+  return state.temporaryThreadKeys.includes(threadKey);
+}
+
+export function transferTemporaryThread(state: UiState, fromKey: string, toKey: string): UiState {
+  if (fromKey === toKey || !state.temporaryThreadKeys.includes(fromKey)) return state;
+  return {
+    ...state,
+    temporaryThreadKeys: [
+      ...state.temporaryThreadKeys.filter(
+        (threadKey) => threadKey !== fromKey && threadKey !== toKey,
+      ),
+      toKey,
+    ],
+  };
+}
+
 export function resolveProjectExpanded(
   projectExpandedById: Readonly<Record<string, boolean>>,
   preferenceKeys: readonly string[],
@@ -435,6 +470,8 @@ interface UiStateStore extends UiState {
   setDefaultAdvertisedEndpointKey: (key: string | null) => void;
   setSidebarProjectScopeKeys: (projectKeys: readonly string[]) => void;
   setPullRequestMergeMethod: (method: PullRequestMergeMethod) => void;
+  setTemporaryThread: (threadKey: string, temporary: boolean) => void;
+  transferTemporaryThread: (fromKey: string, toKey: string) => void;
   setProjectExpanded: (projectIds: string | readonly string[], expanded: boolean) => void;
   reorderProjects: (
     currentProjectOrder: readonly string[],
@@ -456,6 +493,18 @@ export const useUiStateStore = create<UiStateStore>((set) => ({
   setSidebarProjectScopeKeys: (projectKeys) =>
     set((state) => setSidebarProjectScopeKeys(state, projectKeys)),
   setPullRequestMergeMethod: (method) => set((state) => setPullRequestMergeMethod(state, method)),
+  setTemporaryThread: (threadKey, temporary) =>
+    set((state) => {
+      const nextState = setTemporaryThread(state, threadKey, temporary);
+      if (nextState !== state) persistState(nextState);
+      return nextState;
+    }),
+  transferTemporaryThread: (fromKey, toKey) =>
+    set((state) => {
+      const nextState = transferTemporaryThread(state, fromKey, toKey);
+      if (nextState !== state) persistState(nextState);
+      return nextState;
+    }),
   setProjectExpanded: (projectIds, expanded) =>
     set((state) => setProjectExpanded(state, projectIds, expanded)),
   reorderProjects: (currentProjectOrder, draggedProjectIds, targetProjectIds) =>
@@ -464,7 +513,27 @@ export const useUiStateStore = create<UiStateStore>((set) => ({
     ),
 }));
 
-useUiStateStore.subscribe((state) => debouncedPersistState.maybeExecute(state));
+let syncingTemporaryThreads = false;
+useUiStateStore.subscribe((state) => {
+  if (!syncingTemporaryThreads) debouncedPersistState.maybeExecute(state);
+});
+
+if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
+  window.addEventListener("storage", (event) => {
+    if (event.key !== PERSISTED_STATE_KEY) return;
+    try {
+      const state = event.newValue
+        ? parsePersistedState(JSON.parse(event.newValue) as PersistedUiState)
+        : initialState;
+      syncingTemporaryThreads = true;
+      useUiStateStore.setState({ temporaryThreadKeys: state.temporaryThreadKeys });
+    } catch {
+      useUiStateStore.setState({ temporaryThreadKeys: [] });
+    } finally {
+      syncingTemporaryThreads = false;
+    }
+  });
+}
 
 if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
   window.addEventListener("beforeunload", () => {

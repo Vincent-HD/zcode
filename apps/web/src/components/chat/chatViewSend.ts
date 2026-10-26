@@ -55,16 +55,37 @@ const draftSendStateByRouteKey = new Map<
   string,
   {
     readonly sendInFlight: { current: boolean };
+    readonly fanoutInFlight: { current: number };
     readonly uncertainSubmissions: { current: Map<string, ThreadId> };
   }
 >();
 export function draftSendState(routeKey: string) {
   let state = draftSendStateByRouteKey.get(routeKey);
   if (!state) {
-    state = { sendInFlight: { current: false }, uncertainSubmissions: { current: new Map() } };
+    state = {
+      sendInFlight: { current: false },
+      fanoutInFlight: { current: 0 },
+      uncertainSubmissions: { current: new Map() },
+    };
     draftSendStateByRouteKey.set(routeKey, state);
   }
   return state;
+}
+
+export function beginFanoutSend(routeKey: string): () => void {
+  const state = draftSendState(routeKey);
+  state.fanoutInFlight.current += 1;
+  let finished = false;
+  return () => {
+    if (finished) return;
+    finished = true;
+    state.fanoutInFlight.current -= 1;
+  };
+}
+
+export function hasPendingDraftSend(routeKey: string): boolean {
+  const state = draftSendState(routeKey);
+  return state.sendInFlight.current || state.fanoutInFlight.current > 0;
 }
 
 /**

@@ -12,6 +12,7 @@ const baseState: ThreadActionMenuState = {
   isSnoozed: false,
   canSnoozeNow: true,
   isRegeneratingTitle: false,
+  isTemporary: false,
   isRunning: false,
   supports: {
     settlement: true,
@@ -70,5 +71,20 @@ describe("buildThreadActionMenuItems", () => {
       (item) => item.id === "archive",
     );
     expect(archiveItem?.disabled).toBe(true);
+  });
+
+  it("shows the reversible temporary conversation action without server permission", () => {
+    const makeTemporaryItems = buildThreadActionMenuItems({
+      ...baseState,
+      canOperate: false,
+    });
+    const keepPermanentItems = buildThreadActionMenuItems({
+      ...baseState,
+      canOperate: false,
+      isTemporary: true,
+    });
+
+    expect(makeTemporaryItems.find((item) => item.id === "make-temporary")?.disabled).toBeFalsy();
+    expect(keepPermanentItems.find((item) => item.id === "keep-permanent")?.disabled).toBeFalsy();
   });
 });

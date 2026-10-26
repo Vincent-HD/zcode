@@ -2728,6 +2728,7 @@ export default function ChatView(props: ChatViewProps) {
   const { onResume, isResuming } = useComposerResume({
     environmentId,
     routeThreadKey,
+    draftId,
     currentRouteThreadKeyRef,
     activeThread,
     resumableRunId,
@@ -3210,6 +3211,10 @@ export default function ChatView(props: ChatViewProps) {
             onOpenThread={onOpenRelatedThreadStable}
             rightPanelOpen={inlineRightPanelOwnsTitleBar}
             onNewThreadInProject={handleNewThreadInActiveProjectStable}
+            temporaryConversationKeys={[
+              routeThreadKey,
+              ...(draftThread?.promotedTo ? [scopedThreadKey(draftThread.promotedTo)] : []),
+            ]}
             {...(activeDraftLogicalProjectKey
               ? { onOpenProjectSettings: handleOpenDraftProjectSettingsStable }
               : {})}

@@ -1,4 +1,4 @@
-import { scopeProjectRef } from "@t3tools/client-runtime/environment";
+import { scopeProjectRef, scopedThreadKey } from "@t3tools/client-runtime/environment";
 import { requestCustomSnooze } from "../components/CustomSnoozeDialog";
 import { openGuestShareDialog } from "../components/chat/guestShareDialogState";
 import {
@@ -24,6 +24,7 @@ import {
 import { stackedThreadToast, toastManager } from "../components/ui/toast";
 import { copyThreadReference } from "../lib/copyThreadReference";
 import { threadChipCopyTarget } from "@t3tools/client-runtime/thread-reference";
+import { hasPendingDraftSend } from "../components/chat/chatViewSend";
 import { threadEnvironment } from "../state/threads";
 import { useOrchestrationCommand } from "../state/use-orchestration-command";
 import { readEnvironmentScope } from "../state/session";
@@ -46,6 +47,7 @@ import { useCopyToClipboard } from "./useCopyToClipboard";
 import { useNewThreadHandler } from "./useHandleNewThread";
 import { useClientSettings } from "./useSettings";
 import { useThreadActions } from "./useThreadActions";
+import { useUiStateStore } from "../uiStateStore";
 
 function failureToast(title: string, error: unknown) {
   toastManager.add(
@@ -92,6 +94,9 @@ export function useThreadActionMenu(input: {
   const confirmThreadDelete = useClientSettings((s) => s.confirmThreadDelete);
   const confirmThreadArchive = useClientSettings((s) => s.confirmThreadArchive);
   const timestampFormat = useClientSettings((s) => s.timestampFormat);
+  const isTemporary = useUiStateStore(
+    (state) => threadRef !== null && state.temporaryThreadKeys.includes(scopedThreadKey(threadRef)),
+  );
   const { copyToClipboard: copyPathToClipboard } = useCopyToClipboard<{ path: string }>({
     onCopy: ({ path }) => {
       toastManager.add({ type: "success", title: "Path copied", description: path });
@@ -140,6 +145,7 @@ export function useThreadActionMenu(input: {
         isSnoozed: supports.snooze && effectiveSnoozed(thread, { now: now.toISOString() }),
         canSnoozeNow: canSnooze(thread, { now: now.toISOString() }),
         isRegeneratingTitle,
+        isTemporary,
         isRunning: !threadRuntimeCanArchive(thread.runtime),
         supports,
         snoozePresets,
@@ -253,6 +259,18 @@ export function useThreadActionMenu(input: {
           return;
         case "share-guest":
           openGuestShareDialog(threadRef);
+          return;
+        case "make-temporary":
+          if (hasPendingDraftSend(scopedThreadKey(threadRef))) {
+            toastManager.add({ type: "warning", title: "Wait for the message to finish sending" });
+            return;
+          }
+          useUiStateStore.getState().setTemporaryThread(scopedThreadKey(threadRef), true);
+          toastManager.add({ type: "success", title: "Conversation marked temporary" });
+          return;
+        case "keep-permanent":
+          useUiStateStore.getState().setTemporaryThread(scopedThreadKey(threadRef), false);
+          toastManager.add({ type: "success", title: "Conversation will be kept" });
           return;
         case "copy-path": {
           const workspacePath = thread.worktreePath ?? projectCwd;

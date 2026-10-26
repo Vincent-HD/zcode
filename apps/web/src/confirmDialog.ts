@@ -15,6 +15,11 @@ export type ConfirmDialogState =
       readonly initialFocus: ConfirmDialogOptions["initialFocus"];
     };
 
+export type ConfirmDialogRequestOptions = ConfirmDialogOptions & {
+  readonly cancelLabel?: string;
+  readonly confirmLabel?: string;
+};
+
 type PendingConfirmation = {
   readonly message: string;
   readonly variant: ConfirmDialogVariant;
@@ -64,7 +69,7 @@ export function subscribeConfirmDialogHost(listener: () => void): () => void {
 /** Undefined means no themed host is available. */
 export function requestConfirmDialog(
   message: string,
-  options?: ConfirmDialogOptions,
+  options?: ConfirmDialogRequestOptions,
 ): Promise<boolean> | undefined {
   if (listeners.size === 0) return undefined;
 

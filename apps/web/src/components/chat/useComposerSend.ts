@@ -130,6 +130,7 @@ import {
   threadContextsOutsideEnvironment,
 } from "@t3tools/shared/composerContextReferences";
 import {
+  beginFanoutSend,
   draftSendState,
   type MultipleModelTarget,
   resolveMultipleModelTargets,
@@ -428,6 +429,13 @@ export function useComposerSend(input: ComposerSendInput) {
     },
   ) => {
     e?.preventDefault();
+    if (isTemporaryConversationSendBlocked({ draftId, threadKey: routeThreadKey })) {
+      toastManager.add({
+        type: "warning",
+        title: "This temporary conversation is being discarded",
+      });
+      return;
+    }
     // What the user pressed send on; uploads below can take a while, and a redirect must not
     // decline approvals for a draft that changed meanwhile.
     let promptAtSend = detachedOverride ? detachedOverride.prompt : promptRef.current;

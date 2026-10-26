@@ -139,10 +139,33 @@ export function ThreadRouteView({
     draftThreadExists: draftThread !== null,
   });
   const environmentHasAnyThreads = environmentThreadRefs.length > 0 || environmentHasDraftThreads;
+  const reservedDraftThreadKey = draftSession
+    ? scopedThreadKey(scopeThreadRef(draftSession.environmentId, draftSession.threadId))
+    : null;
+  const promotedDraftThreadKey = draftSession?.promotedTo
+    ? scopedThreadKey(draftSession.promotedTo)
+    : null;
 
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- clears pending file drops and navigates the router home once a server thread is confirmed missing
   useEffect(() => {
-    if (target.kind !== "server" || !bootstrapComplete) {
+    if (
+      reservedDraftThreadKey === null ||
+      promotedDraftThreadKey === null ||
+      reservedDraftThreadKey === promotedDraftThreadKey
+    ) {
+      return;
+    }
+    useUiStateStore
+      .getState()
+      .transferTemporaryThread(reservedDraftThreadKey, promotedDraftThreadKey);
+  }, [promotedDraftThreadKey, reservedDraftThreadKey]);
+
+  useEffect(() => {
+    if (
+      target.kind !== "server" ||
+      !bootstrapComplete ||
+      isTemporaryConversationDiscarding(target)
+    ) {
       return;
     }
     if (renderState === "missing") {
@@ -205,7 +228,7 @@ export function ThreadRouteView({
           replace
         />
       );
-    } else {
+    } else if (!isTemporaryConversationDiscarding(target)) {
       redirect = <Navigate to="/" replace />;
     }
   } else if (hiddenByTagFilter) {

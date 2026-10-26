@@ -1,5 +1,6 @@
 import { shouldPreserveAssistantLineBreaks } from "@t3tools/shared/markdownPipeline";
 import { type RunId } from "@t3tools/contracts";
+import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import { canForkProjectedAssistantItem } from "@t3tools/client-runtime/state/thread-workflows";
 import { memo, use, useState } from "react";
 import { type ChatMessage, type TurnDiffSummary } from "../../types";
@@ -11,7 +12,7 @@ import { HtmlRenderFrame } from "./HtmlRenderFrame";
 import { McpAppFrame } from "./McpAppFrame";
 import { ChangedFilesCard } from "./ChangedFilesTree";
 import { useFileContextMenuHandler } from "../../fileContextMenu";
-import { useProject, useThreadShell } from "../../state/entities";
+import { useProject, useThreadProjection, useThreadShell } from "../../state/entities";
 import { MessageCopyButton } from "./MessageCopyButton";
 import { AssistantCitationSource } from "./AssistantCitationSource";
 import { resolveAssistantMessageCopyState } from "./MessagesTimeline.logic";
@@ -22,6 +23,8 @@ import { formatChatTimestampTooltip, formatDayAwareTimestamp } from "../../times
 import { useV2ItemSupport } from "../../state/v2ItemSupport";
 import { TimelineRowCtx, TimelineRowActivityCtx, type TimelineRow } from "./timelineRowContext";
 import { MESSAGE_HEADING_LEVEL, MessageAuthorHeading } from "./TimelineRowParts";
+import { TurnUsage } from "./turn-usage";
+import { resolveUsageTurn } from "./turn-usage.logic";
 
 export function AssistantTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" }> }) {
   const ctx = use(TimelineRowCtx);
@@ -181,6 +184,9 @@ function AssistantMessageMeta({
       {projectedItem?.item.type === "assistant_message" ? (
         <AssistantForkButton projectedItem={projectedItem} />
       ) : null}
+      {projectedItem?.item.type === "assistant_message" && !message.streaming && (
+        <AssistantTurnUsage projectedItem={projectedItem} />
+      )}
       {!message.streaming && (
         <Tooltip>
           <TooltipTrigger render={<p className="text-muted-foreground text-xs tabular-nums" />}>
@@ -193,6 +199,26 @@ function AssistantMessageMeta({
       )}
     </div>
   );
+}
+
+function AssistantTurnUsage({
+  projectedItem,
+}: {
+  readonly projectedItem: NonNullable<Extract<TimelineRow, { kind: "message" }>["projectedItem"]>;
+}) {
+  const ctx = use(TimelineRowCtx);
+  const source = useThreadProjection(
+    scopeThreadRef(ctx.activeThreadEnvironmentId, projectedItem.sourceThreadId),
+  );
+  const data =
+    source && projectedItem.item.providerTurnId
+      ? resolveUsageTurn({
+          projection: source.projection,
+          providerTurnId: projectedItem.item.providerTurnId,
+          runId: projectedItem.item.runId,
+        })
+      : null;
+  return data ? <TurnUsage data={data} /> : null;
 }
 
 function AssistantCopyButton({

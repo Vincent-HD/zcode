@@ -26,6 +26,7 @@ concurrency:
 
 jobs:
   fingerprint:
+    if: github.repository != 'Vincent-HD/zcode'
     name: Native fingerprint diff
     if: github.event.action != 'edited' || github.event.changes.base
     runs-on: blacksmith-8vcpu-ubuntu-2404

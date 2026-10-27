@@ -25,6 +25,7 @@ permissions:
 
 jobs:
   test:
+    if: github.repository != 'Vincent-HD/zcode'
     name: Test (${{ inputs.package || 'all non-server' }})
     runs-on: blacksmith-8vcpu-windows-2025
     timeout-minutes: 45

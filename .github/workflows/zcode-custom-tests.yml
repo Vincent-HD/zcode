@@ -1,0 +1,83 @@
+name: Z Code custom tests
+
+# Run the focused custom suite on every branch and pull request in the fork.
+# Upstream workflows skip this repository; this job skips the upstream repo.
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: zcode-custom-tests-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  custom_tests:
+    name: Z Code custom tests
+    if: github.repository == 'Vincent-HD/zcode'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        # actions/checkout v6.1.0
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+
+      - name: Setup CI dependencies
+        uses: ./.github/actions/setup-ci-deps
+
+      # Keep the headless browser and Linux libraries aligned with the locked app dependency.
+      - name: Resolve Playwright version
+        id: playwright_version
+        shell: bash
+        run: |
+          version="$(node -p "require('./apps/web/node_modules/playwright/package.json').version")"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Chromium
+        id: chromium_cache
+        # actions/cache v6.1.0
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-shell-${{ runner.os }}-${{ runner.arch }}-${{ steps.playwright_version.outputs.version }}
+
+      - name: Install Chromium for web browser tests
+        if: steps.chromium_cache.outputs.cache-hit != 'true'
+        run: node apps/web/node_modules/playwright/cli.js install --only-shell chromium
+
+      - name: Install missing Chromium system dependencies
+        shell: bash
+        run: |
+          browser=$(find "$HOME/.cache/ms-playwright" -name chrome-headless-shell -type f -print -quit)
+          test -n "$browser"
+          if ldd "$browser" | grep '=> not found'; then
+            node apps/web/node_modules/playwright/cli.js install-deps chromium
+          fi
+
+      - name: Install pinned Jujutsu
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          archive="$RUNNER_TEMP/jj-v0.46.0-x86_64-unknown-linux-musl.tar.gz"
+          install_dir="$RUNNER_TEMP/jj/bin"
+          mkdir -p "$install_dir"
+          curl --fail --location --silent --show-error \
+            --proto '=https' --tlsv1.2 \
+            https://github.com/jj-vcs/jj/releases/download/v0.46.0/jj-v0.46.0-x86_64-unknown-linux-musl.tar.gz \
+            --output "$archive"
+          printf '%s  %s\n' \
+            fce0271158e665ceb82dc66c5eb95b1728649094e9133074f3b5baece345fc08 \
+            "$archive" | sha256sum --check --strict
+          tar --extract --gzip --file "$archive" --directory "$install_dir"
+          mkdir -p "$RUNNER_TEMP/bin"
+          install --mode=0755 "$install_dir/jj" "$RUNNER_TEMP/bin/jj"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/bin/jj" --version
+
+      - name: Run selected custom tests
+        run: bash scripts/test-zcode-custom.sh

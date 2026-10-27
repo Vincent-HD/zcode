@@ -21,6 +21,7 @@ jobs:
   # their dependents. Pushes to main still run every Linux job. Detection fails
   # open: if the diff cannot be resolved, everything runs.
   changes:
+    if: github.repository != 'Vincent-HD/zcode'
     name: Changes
     runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 5
@@ -60,6 +61,7 @@ jobs:
   # file, docs included. The `Check` job at the end of this file passes only
   # when every other job passes or was skipped by `changes`.
   lint:
+    if: github.repository != 'Vincent-HD/zcode'
     permissions:
       contents: read
       id-token: write
@@ -119,7 +121,11 @@ jobs:
       id-token: write
     name: Build and Typecheck
     needs: changes
-    if: ${{ !cancelled() && (needs.changes.outputs.build != 'false' || needs.changes.outputs.typecheck != 'false') }}
+    if: >-
+      github.repository != 'Vincent-HD/zcode' &&
+      (
+        !cancelled() && (needs.changes.outputs.build != 'false' || needs.changes.outputs.typecheck != 'false')
+      )
     runs-on: blacksmith-8vcpu-ubuntu-2404
     timeout-minutes: 10
     steps:
@@ -268,7 +274,11 @@ jobs:
       id-token: write
     name: Test
     needs: changes
-    if: ${{ !cancelled() && needs.changes.outputs.test != 'false' }}
+    if: >-
+      github.repository != 'Vincent-HD/zcode' &&
+      (
+        !cancelled() && needs.changes.outputs.test != 'false'
+      )
     runs-on: blacksmith-8vcpu-ubuntu-2404
     timeout-minutes: 10
     steps:
@@ -350,7 +360,11 @@ jobs:
       id-token: write
     name: Test Web
     needs: changes
-    if: ${{ !cancelled() && needs.changes.outputs.test_web != 'false' }}
+    if: >-
+      github.repository != 'Vincent-HD/zcode' &&
+      (
+        !cancelled() && needs.changes.outputs.test_web != 'false'
+      )
     runs-on: blacksmith-8vcpu-ubuntu-2404
     timeout-minutes: 10
     steps:
@@ -405,6 +419,7 @@ jobs:
   # The shards are the longest jobs, so they gate themselves instead of waiting
   # ~15s for `changes`: a shard the change cannot affect stops after checkout.
   test_server:
+    if: github.repository != 'Vincent-HD/zcode'
     permissions:
       contents: read
       id-token: write
@@ -524,7 +539,11 @@ jobs:
   rust:
     name: Rust
     needs: changes
-    if: ${{ !cancelled() && needs.changes.outputs.rust != 'false' }}
+    if: >-
+      github.repository != 'Vincent-HD/zcode' &&
+      (
+        !cancelled() && needs.changes.outputs.rust != 'false'
+      )
     runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 10
     steps:
@@ -557,7 +576,11 @@ jobs:
   mobile_native_static_analysis:
     name: Mobile Native Static Analysis
     needs: changes
-    if: ${{ !cancelled() && needs.changes.outputs.mobile_native != 'false' }}
+    if: >-
+      github.repository != 'Vincent-HD/zcode' &&
+      (
+        !cancelled() && needs.changes.outputs.mobile_native != 'false'
+      )
     runs-on: blacksmith-6vcpu-macos-26
     timeout-minutes: 10
     steps:
@@ -590,7 +613,11 @@ jobs:
       id-token: write
     name: Release Smoke
     needs: changes
-    if: ${{ !cancelled() && needs.changes.outputs.release_smoke != 'false' }}
+    if: >-
+      github.repository != 'Vincent-HD/zcode' &&
+      (
+        !cancelled() && needs.changes.outputs.release_smoke != 'false'
+      )
     runs-on: blacksmith-8vcpu-ubuntu-2404
     timeout-minutes: 15
     steps:
@@ -618,7 +645,11 @@ jobs:
   # branch protection, so a cancelled run must still produce a failing check.
   check:
     name: Check
-    if: ${{ always() }}
+    if: >-
+      github.repository != 'Vincent-HD/zcode' &&
+      (
+        always()
+      )
     needs:
       [
         changes,

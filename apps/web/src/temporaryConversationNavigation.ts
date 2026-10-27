@@ -3,6 +3,12 @@ import type { ThreadRouteTarget } from "./threadRoutes";
 
 const discardingRoutes = new Set<string>();
 
+export function shouldMountTemporaryConversationCoordinator(
+  authGateStatus: "authenticated" | "hosted-static" | "guest" | "hosted-pairing" | "requires-auth",
+): boolean {
+  return authGateStatus === "authenticated" || authGateStatus === "hosted-static";
+}
+
 export function temporaryConversationRouteKey(target: ThreadRouteTarget | null): string | null {
   if (target === null) return null;
   return target.kind === "draft"

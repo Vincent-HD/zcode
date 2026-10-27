@@ -259,6 +259,7 @@ import {
   useComposerDraftStore,
   DraftId,
 } from "../composerDraftStore";
+import { useUiStateStore } from "../uiStateStore";
 import { type TerminalContextDraft } from "../lib/terminalContext";
 import { collectInlineContextIds } from "../lib/composerContextReferences";
 import { selectThreadTerminalUiState, useTerminalUiStateStore } from "../terminalUiStateStore";
@@ -525,6 +526,13 @@ export default function ChatView(props: ChatViewProps) {
       : draftId
         ? store.getDraftSession(draftId)
         : null,
+  );
+  const temporaryConversationKeys = [
+    routeThreadKey,
+    ...(draftThread?.promotedTo ? [scopedThreadKey(draftThread.promotedTo)] : []),
+  ];
+  const isTemporaryConversation = useUiStateStore((state) =>
+    temporaryConversationKeys.some((key) => state.temporaryThreadKeys.includes(key)),
   );
   const serverThreadShell = useQuietThreadShell(routeThreadRef);
   const routeThreadDetailRef = resolveThreadDetailRef(routeThreadRef, {
@@ -3955,6 +3963,7 @@ export default function ChatView(props: ChatViewProps) {
                                 activeThreadModelSelection={activeThread?.modelSelection}
                                 activeProjectId={activeProject?.id ?? null}
                                 projectName={activeProject?.title}
+                                isTemporaryConversation={isTemporaryConversation}
                                 usageFooter={
                                   <ComposerUsageFooter
                                     accounts={composerUsageAccounts}

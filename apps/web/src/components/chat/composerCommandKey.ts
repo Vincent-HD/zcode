@@ -44,6 +44,7 @@ export function composerCommandKeyHandler(input: {
   readonly getShortcutContext: ChatComposerProps["getShortcutContext"];
   readonly sendShortcut: ChatComposerProps["settings"]["sendShortcut"];
   readonly routeKind: ChatComposerProps["routeKind"];
+  readonly isTemporaryConversation: ChatComposerProps["isTemporaryConversation"];
   readonly phase: ChatComposerProps["phase"];
   readonly canSteer: boolean;
   readonly followUpBehavior: ChatComposerProps["settings"]["followUpBehavior"];
@@ -105,6 +106,7 @@ export function composerCommandKeyHandler(input: {
     getShortcutContext,
     sendShortcut,
     routeKind,
+    isTemporaryConversation,
     phase,
     canSteer,
     followUpBehavior,

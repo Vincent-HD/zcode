@@ -98,6 +98,11 @@ import {
 import { environmentServerConfigsAtom } from "../../state/server";
 import { threadEnvironment } from "../../state/threads";
 import { runMobileComposerTransition } from "./draftHeroTransition";
+import {
+  isTemporaryComposerConversation,
+  restoreFailedDraftSend,
+  runTemporaryConversationSendGuard,
+} from "./useComposerSend.logic";
 import { useClientSettingsHydrated } from "../../hooks/useSettings";
 import { useStableCallback } from "../../hooks/useStableCallback";
 import { environmentPresentations } from "../../state/presentation";
@@ -380,6 +385,7 @@ export function useComposerSend(input: ComposerSendInput) {
   const linkedEnvironments = useLinkedEnvironments(environmentId);
   const handleNewThread = useNewThreadHandler();
   const navigate = useNavigate();
+  const router = useRouter();
   const clientSettingsHydrated = useClientSettingsHydrated();
   const startThreadTurn = useOrchestrationCommand(threadEnvironment.startTurn, {
     reportFailure: false,
@@ -403,6 +409,8 @@ export function useComposerSend(input: ComposerSendInput) {
     resetLocalDispatch,
     setThreadError,
   });
+  const isTemporaryConversation = () =>
+    isTemporaryComposerConversation({ routeThreadKey, draftId, draftThread });
   const { sendInFlight: sendInFlightRef } = draftSendState(routeThreadKey);
   const composerSendGenerationRef = useRef(0);
   const environmentUnavailableSendToastSlotRef = useRef(0);
@@ -415,8 +423,7 @@ export function useComposerSend(input: ComposerSendInput) {
     respondingRequestIdsRef.current = respondingRequestIds;
   }, [pendingApprovals, respondingRequestIds]);
 
-  const onSend = async (
-    e?: { preventDefault: () => void },
+  const sendAfterTemporaryConversationGuard = async (
     dispatchMode: ComposerDispatchMode = "auto",
     submissionIntent: ComposerSubmissionIntent = "foreground",
     directAnnotation?: {
@@ -428,14 +435,6 @@ export function useComposerSend(input: ComposerSendInput) {
       readonly sendContext: ReturnType<NonNullable<ComposerHandleRef["current"]>["getSendContext"]>;
     },
   ) => {
-    e?.preventDefault();
-    if (isTemporaryConversationSendBlocked({ draftId, threadKey: routeThreadKey })) {
-      toastManager.add({
-        type: "warning",
-        title: "This temporary conversation is being discarded",
-      });
-      return;
-    }
     // What the user pressed send on; uploads below can take a while, and a redirect must not
     // decline approvals for a draft that changed meanwhile.
     let promptAtSend = detachedOverride ? detachedOverride.prompt : promptRef.current;
@@ -1503,6 +1502,7 @@ export function useComposerSend(input: ComposerSendInput) {
     }
 
     let backgroundDraftOpened = false;
+    let backgroundDraftBlockedByTemporary = false;
     let turnStartSucceeded = false;
     if (failure === null && turnAttachmentsResult._tag === "Success") {
       const bootstrap =
@@ -1573,9 +1573,12 @@ export function useComposerSend(input: ComposerSendInput) {
         },
       });
       if (backgroundThreadRef) {
-        try {
-          backgroundDraftOpened = Boolean(
-            await handleNewThread(
+        if (isTemporaryConversation()) {
+          clearBackgroundDraftSubmissionByRef(backgroundThreadRef);
+          backgroundDraftBlockedByTemporary = true;
+        } else {
+          try {
+            const openedDraft = await handleNewThread(
               scopeProjectRef(activeProject.environmentId, activeProject.id),
               resolveBackgroundDraftWorkspaceOptions({
                 envMode: sendEnvMode,
@@ -1642,7 +1645,15 @@ export function useComposerSend(input: ComposerSendInput) {
           submissionIntent === "background" &&
           currentRouteThreadKeyRef.current === routeThreadKey
         ) {
-          handleNewThreadInActiveProject();
+          if (isTemporaryConversation()) {
+            toastManager.add({
+              type: "info",
+              title: "Message started in this conversation",
+              description: "Temporary conversations stay open while a message is submitted.",
+            });
+          } else {
+            handleNewThreadInActiveProject();
+          }
         }
         void recordPromptSent(environmentId);
       }
@@ -1650,14 +1661,14 @@ export function useComposerSend(input: ComposerSendInput) {
 
     if (failure !== null) {
       if (isLocalDraftThread && draftId && draftThread) {
-        restoreFailedDraftThread(
+        restoreFailedDraftSend({
+          environmentId,
+          routeThreadKey,
           draftId,
           draftThread,
-          wasBootstrapThreadDeleted(squashAtomCommandFailure(failure))
-            ? newThreadId()
-            : threadIdForSend,
-        );
-        clearBackgroundDraftSubmissionByRef(scopeThreadRef(environmentId, threadIdForSend));
+          threadIdForSend,
+          bootstrapThreadDeleted: wasBootstrapThreadDeleted(squashAtomCommandFailure(failure)),
+        });
       }
       // Only an acknowledged send replaces its optimistic row, so a failed one leaves here.
       setOptimisticUserMessages((existing) => {

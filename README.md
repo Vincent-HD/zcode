@@ -84,6 +84,75 @@ yay -S t3code-nightly-bin
 
 The AUR packaging is maintained in this repository under [`packaging/aur`](./packaging/aur).
 
+#### Linux (Nix flake, this fork)
+
+The flake builds the renderer and server from this checkout, then repacks them into the matching
+upstream x86_64 AppImage to retain its Electron runtime, native modules, and desktop assets. Before
+fetching the pnpm closure, the build checks the lockfile, workspace configuration, and dependency
+fields in every workspace manifest against the source tag for that AppImage version. It also compares
+`apps/desktop`, `native`, `packages/shared`, `packages/ssh`, and `packages/tailscale` source trees
+byte-for-byte with that tag. These are the source inputs for the desktop and native runtime retained
+from the AppImage; the server and web sources are rebuilt from this checkout. Before fetching
+dependencies, the check verifies that the SPDX version and revision in Nix match the license
+generator. The build generates the open source notices from this fork's built web bundle and pinned
+SPDX license data:
+
+```bash
+nix build .#z-code --no-link
+nix run .#z-code
+```
+
+The package is Linux x86_64 only. It provides the `z-code`, `zcode`, and `t3code` commands and
+flake package/app aliases. The app keeps its upstream T3 Code identity and uses the same
+`~/.t3/userdata` state, so existing data is shared with the upstream desktop app. Back up that
+state before switching versions; downgrading the binary does not reverse database migrations.
+
+After rebasing this fork onto the upstream release you want to package, run the updater with that
+release version:
+
+```bash
+./scripts/update-z-code-nix.sh 0.1.2-nightly.20261022.3541
+# Preview the candidate pins, then restore nix/default.nix:
+./scripts/update-z-code-nix.sh --dry-run 0.1.2-nightly.20261022.3541
+```
+
+The updater proves that the selected upstream tag commit is an ancestor of the fork's current `HEAD`
+without fetching or changing Git refs. It reads the `upstream` remote by default; set
+`Z_CODE_UPSTREAM_REMOTE` if that remote has a different name. It then synchronizes the version,
+AppImage hash, upstream source hash, and pnpm closure hash. It refreshes the fixed-output pnpm
+closure to derive its hash; it does not build the complete package. Tracked dirty changes are
+included in the flake source and the preflight. Untracked files are refused because Git flakes omit
+them. A mismatch in the lockfile, workspace configuration, license configuration, workspace package
+identity/version/dependency declarations, retained desktop/native source trees, or SPDX generator
+pins stops the update before pins change. Source changes used by the rebuilt server and web outputs,
+including the current feature changes, remain allowed.
+
+After updating pins, you can optionally build the complete package separately:
+
+```bash
+nix build .#z-code --no-link
+```
+
+This full build is not part of pin refresh and can require substantially more disk space.
+
+The build regenerates license notices from the fork's web bundle, so added or removed bundled npm
+imports receive notices from the fork's actual dependency tree. The upstream AppImage remains the
+source of the Electron runtime and native modules. The source check compares only the listed desktop
+and native trees, alongside the workspace dependency graph; source outside those areas is not
+compared. It permits changes to server/web build inputs such as contracts and client-runtime because
+they feed the replacement outputs. This is not a comprehensive ABI proof: it does not prove
+compatibility between the rebuilt server/web protocol and the retained desktop binary, or verify
+that a native module's ABI matches Electron. Review those boundaries before packaging. A dependency
+graph change needs a matching upstream runtime or a separate runtime update, and the build fails until
+the pinned source tag and fork manifests agree.
+
+`flake.lock` pins the exact Nixpkgs revision used by the package. Refresh it from the
+`nixos-unstable` ref declared in [`flake.nix`](./flake.nix) with `nix flake update nixpkgs`.
+The local source is the flake's `self`, not a downloaded tarball or a Nix-applied feature patch set.
+In a Git checkout, add new source files to the index before building because Git flakes omit
+untracked files. Changes to the upstream AppImage layout, Electron ABI, or native dependency graph
+need review before updating this packaging path.
+
 ## Some notes
 
 We are very very early in this project. Expect bugs.

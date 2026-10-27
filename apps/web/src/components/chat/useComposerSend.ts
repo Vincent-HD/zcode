@@ -45,7 +45,7 @@ import {
 import { createModelSelection } from "@t3tools/shared/model";
 import { type SetStateAction, useLayoutEffect, useRef } from "react";
 import { flushSync } from "react-dom";
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, useRouter } from "@tanstack/react-router";
 import {
   isAtomCommandInterrupted,
   settlePromise,
@@ -61,15 +61,18 @@ import { recordPromptSent } from "../GitHubStarPrompt";
 import { stackedThreadToast, toastManager } from "../ui/toast";
 import { useUiStateStore } from "../../uiStateStore";
 import { isTemporaryConversationSendBlocked } from "../../temporaryConversationNavigation";
-import { newMessageId, newThreadId } from "~/lib/utils";
+import { newMessageId } from "~/lib/utils";
 import { useNewThreadHandler } from "../../hooks/useHandleNewThread";
-import { buildThreadRouteParams } from "../../threadRoutes";
+import {
+  buildThreadRouteParams,
+  isRequestedDraftRouteTarget,
+  resolveThreadRouteTarget,
+} from "../../threadRoutes";
 import {
   beginBackgroundDraftSubmissionByRef,
   clearBackgroundDraftSubmissionByRef,
   finalizePromotedDraftThreadByRef,
   markPromotedDraftThreadByRef,
-  restoreFailedDraftThread,
   composerDraftHasUserContent,
   type ComposerFileAttachment,
   type ComposerImageAttachment,
@@ -89,6 +92,11 @@ import {
 import { environmentServerConfigsAtom } from "../../state/server";
 import { threadEnvironment } from "../../state/threads";
 import { runMobileComposerTransition } from "./draftHeroTransition";
+import {
+  isTemporaryComposerConversation,
+  restoreFailedDraftSend,
+  runTemporaryConversationSendGuard,
+} from "./useComposerSend.logic";
 import { useClientSettingsHydrated } from "../../hooks/useSettings";
 import { environmentPresentations } from "../../state/presentation";
 import {
@@ -331,6 +339,7 @@ export function useComposerSend(input: ComposerSendInput) {
   const linkedEnvironments = useLinkedEnvironments(environmentId);
   const handleNewThread = useNewThreadHandler();
   const navigate = useNavigate();
+  const router = useRouter();
   const clientSettingsHydrated = useClientSettingsHydrated();
   const startThreadTurn = useOrchestrationCommand(threadEnvironment.startTurn, {
     reportFailure: false,
@@ -353,6 +362,8 @@ export function useComposerSend(input: ComposerSendInput) {
     resetLocalDispatch,
     setThreadError,
   });
+  const isTemporaryConversation = () =>
+    isTemporaryComposerConversation({ routeThreadKey, draftId, draftThread });
   const { sendInFlight: sendInFlightRef } = draftSendState(routeThreadKey);
   const composerSendGenerationRef = useRef(0);
   const environmentUnavailableSendToastSlotRef = useRef(0);
@@ -365,8 +376,7 @@ export function useComposerSend(input: ComposerSendInput) {
     respondingRequestIdsRef.current = respondingRequestIds;
   }, [pendingApprovals, respondingRequestIds]);
 
-  const onSend = async (
-    e?: { preventDefault: () => void },
+  const sendAfterTemporaryConversationGuard = async (
     dispatchMode: ComposerDispatchMode = "auto",
     submissionIntent: ComposerSubmissionIntent = "foreground",
     directAnnotation?: {
@@ -374,14 +384,6 @@ export function useComposerSend(input: ComposerSendInput) {
       image: ComposerImageAttachment | null;
     },
   ) => {
-    e?.preventDefault();
-    if (isTemporaryConversationSendBlocked({ draftId, threadKey: routeThreadKey })) {
-      toastManager.add({
-        type: "warning",
-        title: "This temporary conversation is being discarded",
-      });
-      return;
-    }
     // What the user pressed send on; uploads below can take a while, and a redirect must not
     // decline approvals for a draft that changed meanwhile.
     const promptAtSend = promptRef.current;
@@ -840,10 +842,7 @@ export function useComposerSend(input: ComposerSendInput) {
       });
       return;
     }
-    if (
-      multipleModelSelections !== null &&
-      useUiStateStore.getState().temporaryThreadKeys.includes(routeThreadKey)
-    ) {
+    if (multipleModelSelections !== null && isTemporaryConversation()) {
       toastManager.add({
         type: "warning",
         title: "Multiple-model sends are unavailable for temporary conversations",
@@ -1225,6 +1224,7 @@ export function useComposerSend(input: ComposerSendInput) {
     }
 
     let backgroundDraftOpened = false;
+    let backgroundDraftBlockedByTemporary = false;
     let turnStartSucceeded = false;
     if (failure === null && turnAttachmentsResult._tag === "Success") {
       const bootstrap =
@@ -1287,26 +1287,46 @@ export function useComposerSend(input: ComposerSendInput) {
         },
       });
       if (backgroundThreadRef) {
-        try {
-          backgroundDraftOpened = Boolean(
-            await handleNewThread(
+        if (isTemporaryConversation()) {
+          clearBackgroundDraftSubmissionByRef(backgroundThreadRef);
+          backgroundDraftBlockedByTemporary = true;
+        } else {
+          try {
+            const openedDraft = await handleNewThread(
               scopeProjectRef(activeProject.environmentId, activeProject.id),
               resolveBackgroundDraftWorkspaceOptions({
                 envMode: sendEnvMode,
                 branch: activeThreadBranch,
                 startFromOrigin,
               }),
-            ),
-          );
-        } catch (error) {
-          clearBackgroundDraftSubmissionByRef(backgroundThreadRef);
-          toastManager.add(
-            stackedThreadToast({
-              type: "warning",
-              title: "Could not open a fresh composer",
-              description: error instanceof Error ? error.message : undefined,
-            }),
-          );
+            );
+            const currentRouteParams =
+              router.state.matches[router.state.matches.length - 1]?.params ?? {};
+            backgroundDraftOpened = isRequestedDraftRouteTarget(
+              resolveThreadRouteTarget(currentRouteParams),
+              openedDraft?.draftId,
+            );
+            if (!backgroundDraftOpened) {
+              backgroundDraftBlockedByTemporary = isTemporaryConversation();
+              if (!backgroundDraftBlockedByTemporary) {
+                toastManager.add(
+                  stackedThreadToast({
+                    type: "warning",
+                    title: "Could not open a fresh composer",
+                  }),
+                );
+              }
+            }
+          } catch (error) {
+            clearBackgroundDraftSubmissionByRef(backgroundThreadRef);
+            toastManager.add(
+              stackedThreadToast({
+                type: "warning",
+                title: "Could not open a fresh composer",
+                description: error instanceof Error ? error.message : undefined,
+              }),
+            );
+          }
         }
       }
       const startResult = await startPromise;
@@ -1347,12 +1367,28 @@ export function useComposerSend(input: ComposerSendInput) {
                 },
               }),
             );
+          } else if (backgroundDraftBlockedByTemporary) {
+            toastManager.add(
+              stackedThreadToast({
+                type: "info",
+                title: "Message started in this conversation",
+                description: "Temporary conversations stay open while a message is submitted.",
+              }),
+            );
           }
         } else if (
           submissionIntent === "background" &&
           currentRouteThreadKeyRef.current === routeThreadKey
         ) {
-          handleNewThreadInActiveProject();
+          if (isTemporaryConversation()) {
+            toastManager.add({
+              type: "info",
+              title: "Message started in this conversation",
+              description: "Temporary conversations stay open while a message is submitted.",
+            });
+          } else {
+            handleNewThreadInActiveProject();
+          }
         }
         void recordPromptSent(environmentId);
       }
@@ -1360,14 +1396,14 @@ export function useComposerSend(input: ComposerSendInput) {
 
     if (failure !== null) {
       if (isLocalDraftThread && draftId && draftThread) {
-        restoreFailedDraftThread(
+        restoreFailedDraftSend({
+          environmentId,
+          routeThreadKey,
           draftId,
           draftThread,
-          wasBootstrapThreadDeleted(squashAtomCommandFailure(failure))
-            ? newThreadId()
-            : threadIdForSend,
-        );
-        clearBackgroundDraftSubmissionByRef(scopeThreadRef(environmentId, threadIdForSend));
+          threadIdForSend,
+          bootstrapThreadDeleted: wasBootstrapThreadDeleted(squashAtomCommandFailure(failure)),
+        });
       }
       if (
         !composerDraftHasUserContent(
@@ -1430,6 +1466,39 @@ export function useComposerSend(input: ComposerSendInput) {
       );
       if (!sendQueuesBehindSetup) resetLocalDispatch();
     }
+  };
+
+  const onSend = async (
+    e?: { preventDefault: () => void },
+    dispatchMode: ComposerDispatchMode = "auto",
+    submissionIntent: ComposerSubmissionIntent = "foreground",
+    directAnnotation?: {
+      annotation: PreviewAnnotationPayload;
+      image: ComposerImageAttachment | null;
+    },
+  ) => {
+    e?.preventDefault();
+    if (isTemporaryConversationSendBlocked({ draftId, threadKey: routeThreadKey })) {
+      toastManager.add({
+        type: "warning",
+        title: "This temporary conversation is being discarded",
+      });
+      return;
+    }
+    return runTemporaryConversationSendGuard(
+      {
+        submissionIntent,
+        isTemporaryConversation:
+          submissionIntent === "background" &&
+          isTemporaryComposerConversation({ routeThreadKey, draftId, draftThread }),
+        onBlocked: () =>
+          toastManager.add({
+            type: "warning",
+            title: "Background sends are unavailable for temporary conversations",
+          }),
+      },
+      () => sendAfterTemporaryConversationGuard(dispatchMode, submissionIntent, directAnnotation),
+    );
   };
 
   return { onSend };

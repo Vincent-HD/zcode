@@ -37,6 +37,7 @@ export function composerCommandKeyHandler(input: {
   readonly keybindings: ChatComposerProps["keybindings"];
   readonly sendShortcut: ChatComposerProps["settings"]["sendShortcut"];
   readonly routeKind: ChatComposerProps["routeKind"];
+  readonly isTemporaryConversation: ChatComposerProps["isTemporaryConversation"];
   readonly phase: ChatComposerProps["phase"];
   readonly isCompacting: boolean;
   readonly followUpBehavior: ChatComposerProps["settings"]["followUpBehavior"];
@@ -90,6 +91,7 @@ export function composerCommandKeyHandler(input: {
     keybindings,
     sendShortcut,
     routeKind,
+    isTemporaryConversation,
     phase,
     isCompacting,
     followUpBehavior,
@@ -205,6 +207,7 @@ export function composerCommandKeyHandler(input: {
       keybindings,
       isSoftwareKeyboardOpen,
       isDraftThread: routeKind === "draft",
+      isTemporaryConversation,
       isRunning: phase === "running",
       sendShortcut,
       prompt: promptRef.current,

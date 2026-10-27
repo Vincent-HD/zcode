@@ -8,6 +8,7 @@ import { makeThreadProjectionFixture } from "./test-fixtures";
 
 import {
   isThreadRoutePathname,
+  isRequestedDraftRouteTarget,
   isThreadRouteSnapshotAuthoritative,
   resolveActiveThreadRouteRef,
   resolveThreadRouteRenderState,
@@ -15,6 +16,18 @@ import {
 } from "./threadRoutes";
 
 describe("threadRoutes", () => {
+  it("confirms a background draft only after its returned draft route is active", () => {
+    const requestedTarget = resolveThreadRouteTarget({ draftId: "draft-1" });
+    const otherDraftTarget = resolveThreadRouteTarget({ draftId: "draft-2" });
+    const serverTarget = resolveThreadRouteTarget({ environmentId: "env-1", threadId: "thread-1" });
+    if (requestedTarget?.kind !== "draft") throw new Error("Expected a draft route target");
+
+    expect(isRequestedDraftRouteTarget(requestedTarget, requestedTarget.draftId)).toBe(true);
+    expect(isRequestedDraftRouteTarget(otherDraftTarget, requestedTarget.draftId)).toBe(false);
+    expect(isRequestedDraftRouteTarget(serverTarget, requestedTarget.draftId)).toBe(false);
+    expect(isRequestedDraftRouteTarget(null, requestedTarget.draftId)).toBe(false);
+  });
+
   it("matches only the thread's own route pathname", () => {
     const ref = scopeThreadRef("env-1" as never, ThreadId.make("thread-1"));
 

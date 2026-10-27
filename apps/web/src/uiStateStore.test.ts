@@ -16,6 +16,7 @@ import {
   setProjectExpanded,
   setTemporaryThread,
   transferTemporaryThread,
+  transferTemporaryThreads,
   type UiState,
 } from "./uiStateStore";
 
@@ -110,6 +111,30 @@ describe("uiStateStore pure functions", () => {
     );
 
     expect(promotedState.temporaryThreadKeys).toEqual(["environment-2:server-thread"]);
+  });
+
+  it("moves temporary markers from bootstrap aliases through repeated retry ids", () => {
+    const initialState = makeUiState({
+      temporaryThreadKeys: ["environment-1:reserved-thread", "environment-2:promoted-thread"],
+    });
+
+    const firstRetryState = transferTemporaryThreads(
+      initialState,
+      ["environment-1:reserved-thread", "environment-2:promoted-thread"],
+      "environment-1:retry-thread-1",
+    );
+    const secondRetryState = transferTemporaryThreads(
+      firstRetryState,
+      ["environment-1:retry-thread-1"],
+      "environment-1:retry-thread-2",
+    );
+    const permanentState = makeUiState();
+
+    expect(firstRetryState.temporaryThreadKeys).toEqual(["environment-1:retry-thread-1"]);
+    expect(secondRetryState.temporaryThreadKeys).toEqual(["environment-1:retry-thread-2"]);
+    expect(
+      transferTemporaryThreads(permanentState, ["environment-1:reserved-thread"], "retry-thread"),
+    ).toBe(permanentState);
   });
 
   it("moves grouped project members together", () => {

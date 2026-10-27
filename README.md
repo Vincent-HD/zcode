@@ -1,3 +1,114 @@
+# zcode
+
+`zcode` is a community-maintained fork of T3 Code. This section describes the features maintained
+in this fork and how to install or update its Linux x86_64 Nix package. The Original T3 Code README
+below retains the upstream CLI and desktop installation instructions; those commands install
+upstream builds and do not include this fork's additions.
+
+## Features in this community fork
+
+- **Usage and context:** The composer can show provider-reported account quota windows and reset times,
+  context used and capacity, completed main-agent totals for the active provider session, and the
+  last response's usage. Per-turn details use the recorded provider and model; token counts and
+  models.dev API-equivalent cost estimates are available when usage data and rates exist.
+  Throughput is output divided by the full turn duration, including tools and waits, and appears
+  only when token and timing data are complete; it is not model generation speed. Providers report
+  different fields, and missing values stay unavailable. Cost estimates are separate from
+  subscription charges. Time to first token and breakdowns of system prompt, tools, and messages
+  are unavailable unless a provider supplies them.
+- **Jujutsu panel:** Open the **Jujutsu** tab from the chat's right-panel menu to inspect the
+  current working copy and up to ten preceding revisions, view changed files in T3 Code's
+  existing diff panel, and manage revisions, bookmarks, and confirmed publication through the
+  existing forge integrations. It requires `jj` installed in the thread's environment and an
+  existing jj workspace; it never initializes a repository. Available actions depend on
+  environment capabilities and permissions, conflicts are informational, and Squash Onto requires
+  jj's experimental `--onto` option.
+- **Temporary conversations:** Mark a draft or conversation temporary to get a prompt to stay or
+  leave and discard when navigating away. Discard uses the normal conversation deletion flow and
+  preserves the workspace and worktree. The temporary marker is local to the browser profile.
+  This is not private storage or secure erasure: T3 event records, provider transcripts, remote
+  copies, and other data may remain. Closing or refreshing the browser cannot reliably finish
+  asynchronous deletion, so the conversation may remain.
+
+## Fork-specific CI
+
+This fork runs its focused regression suite on every push and pull request through GitHub Actions.
+The workflow runs [`scripts/test-zcode-custom.sh`](./scripts/test-zcode-custom.sh); upstream CI
+skips this repository, and this workflow runs only in `Vincent-HD/zcode`.
+
+## Linux installation and updates (Nix flake)
+
+The flake builds the renderer and server from this checkout, then repacks them into the matching
+upstream x86_64 AppImage to retain its Electron runtime, native modules, and desktop assets. Before
+fetching the pnpm closure, the build checks the lockfile, workspace configuration, and dependency
+fields in every workspace manifest against the source tag for that AppImage version. It also compares
+`apps/desktop`, `native`, `packages/shared`, `packages/ssh`, and `packages/tailscale` source trees
+byte-for-byte with that tag. These are the source inputs for the desktop and native runtime retained
+from the AppImage; the server and web sources are rebuilt from this checkout. Before fetching
+dependencies, the check verifies that the SPDX version and revision in Nix match the license
+generator. The build generates the open source notices from this fork's built web bundle and pinned
+SPDX license data:
+
+```bash
+nix build .#z-code --no-link
+nix run .#z-code
+```
+
+The package is Linux x86_64 only. It provides the `z-code`, `zcode`, and `t3code` commands and
+flake package/app aliases. The app keeps its upstream T3 Code identity and uses the same
+`~/.t3/userdata` state, so existing data is shared with the upstream desktop app. Back up that
+state before switching versions; downgrading the binary does not reverse database migrations.
+
+After rebasing this fork onto the upstream release you want to package, run the updater with that
+release version:
+
+```bash
+./scripts/update-z-code-nix.sh 0.1.3-nightly.20261027.3754
+# Preview the candidate pins, then restore nix/default.nix:
+./scripts/update-z-code-nix.sh --dry-run 0.1.3-nightly.20261027.3754
+```
+
+The updater proves that the selected upstream tag commit is an ancestor of the fork's current `HEAD`
+without fetching or changing Git refs. It reads the `upstream` remote by default; set
+`Z_CODE_UPSTREAM_REMOTE` if that remote has a different name. It then synchronizes the version,
+AppImage hash, upstream source hash, and pnpm closure hash. It refreshes the fixed-output pnpm
+closure to derive its hash; it does not build the complete package. Tracked dirty changes are
+included in the flake source and the preflight. Untracked files are refused because Git flakes omit
+them. A mismatch in the lockfile, workspace configuration, license configuration, workspace package
+identity/version/dependency declarations, retained desktop/native source trees, or SPDX generator
+pins stops the update before pins change. Source changes used by the rebuilt server and web outputs,
+including the current feature changes, remain allowed.
+
+After updating pins, you can optionally build the complete package separately:
+
+```bash
+nix build .#z-code --no-link
+```
+
+This full build is not part of pin refresh and can require substantially more disk space.
+
+The build regenerates license notices from the fork's web bundle, so added or removed bundled npm
+imports receive notices from the fork's actual dependency tree. The upstream AppImage remains the
+source of the Electron runtime and native modules. The source check compares only the listed desktop
+and native trees, alongside the workspace dependency graph; source outside those areas is not
+compared. It permits changes to server/web build inputs such as contracts and client-runtime because
+they feed the replacement outputs. This is not a comprehensive ABI proof: it does not prove
+compatibility between the rebuilt server/web protocol and the retained desktop binary, or verify
+that a native module's ABI matches Electron. Review those boundaries before packaging. A dependency
+graph change needs a matching upstream runtime or a separate runtime update, and the build fails until
+the pinned source tag and fork manifests agree.
+
+`flake.lock` pins the exact Nixpkgs revision used by the package. Refresh it from the
+`nixos-unstable` ref declared in [`flake.nix`](./flake.nix) with `nix flake update nixpkgs`.
+The local source is the flake's `self`, not a downloaded tarball or a Nix-applied feature patch set.
+In a Git checkout, add new source files to the index before building because Git flakes omit
+untracked files. Changes to the upstream AppImage layout, Electron ABI, or native dependency graph
+need review before updating this packaging path.
+
+---
+
+# Original T3 Code README
+
 # T3 Code
 
 T3 Code is an "agent harness control surface". It enables control of the agents on your machine with a best-in-class mobile app ([iOS](https://apps.apple.com/us/app/t3-code-remote-claude-more/id6787819824), [Android](https://play.google.com/store/apps/details?id=com.t3tools.t3code)), [web app](https://app.t3.codes) and [Electron-based desktop app](https://t3.codes).
@@ -83,75 +194,6 @@ yay -S t3code-nightly-bin
 ```
 
 The AUR packaging is maintained in this repository under [`packaging/aur`](./packaging/aur).
-
-#### Linux (Nix flake, this fork)
-
-The flake builds the renderer and server from this checkout, then repacks them into the matching
-upstream x86_64 AppImage to retain its Electron runtime, native modules, and desktop assets. Before
-fetching the pnpm closure, the build checks the lockfile, workspace configuration, and dependency
-fields in every workspace manifest against the source tag for that AppImage version. It also compares
-`apps/desktop`, `native`, `packages/shared`, `packages/ssh`, and `packages/tailscale` source trees
-byte-for-byte with that tag. These are the source inputs for the desktop and native runtime retained
-from the AppImage; the server and web sources are rebuilt from this checkout. Before fetching
-dependencies, the check verifies that the SPDX version and revision in Nix match the license
-generator. The build generates the open source notices from this fork's built web bundle and pinned
-SPDX license data:
-
-```bash
-nix build .#z-code --no-link
-nix run .#z-code
-```
-
-The package is Linux x86_64 only. It provides the `z-code`, `zcode`, and `t3code` commands and
-flake package/app aliases. The app keeps its upstream T3 Code identity and uses the same
-`~/.t3/userdata` state, so existing data is shared with the upstream desktop app. Back up that
-state before switching versions; downgrading the binary does not reverse database migrations.
-
-After rebasing this fork onto the upstream release you want to package, run the updater with that
-release version:
-
-```bash
-./scripts/update-z-code-nix.sh 0.1.3-nightly.20261027.3754
-# Preview the candidate pins, then restore nix/default.nix:
-./scripts/update-z-code-nix.sh --dry-run 0.1.3-nightly.20261027.3754
-```
-
-The updater proves that the selected upstream tag commit is an ancestor of the fork's current `HEAD`
-without fetching or changing Git refs. It reads the `upstream` remote by default; set
-`Z_CODE_UPSTREAM_REMOTE` if that remote has a different name. It then synchronizes the version,
-AppImage hash, upstream source hash, and pnpm closure hash. It refreshes the fixed-output pnpm
-closure to derive its hash; it does not build the complete package. Tracked dirty changes are
-included in the flake source and the preflight. Untracked files are refused because Git flakes omit
-them. A mismatch in the lockfile, workspace configuration, license configuration, workspace package
-identity/version/dependency declarations, retained desktop/native source trees, or SPDX generator
-pins stops the update before pins change. Source changes used by the rebuilt server and web outputs,
-including the current feature changes, remain allowed.
-
-After updating pins, you can optionally build the complete package separately:
-
-```bash
-nix build .#z-code --no-link
-```
-
-This full build is not part of pin refresh and can require substantially more disk space.
-
-The build regenerates license notices from the fork's web bundle, so added or removed bundled npm
-imports receive notices from the fork's actual dependency tree. The upstream AppImage remains the
-source of the Electron runtime and native modules. The source check compares only the listed desktop
-and native trees, alongside the workspace dependency graph; source outside those areas is not
-compared. It permits changes to server/web build inputs such as contracts and client-runtime because
-they feed the replacement outputs. This is not a comprehensive ABI proof: it does not prove
-compatibility between the rebuilt server/web protocol and the retained desktop binary, or verify
-that a native module's ABI matches Electron. Review those boundaries before packaging. A dependency
-graph change needs a matching upstream runtime or a separate runtime update, and the build fails until
-the pinned source tag and fork manifests agree.
-
-`flake.lock` pins the exact Nixpkgs revision used by the package. Refresh it from the
-`nixos-unstable` ref declared in [`flake.nix`](./flake.nix) with `nix flake update nixpkgs`.
-The local source is the flake's `self`, not a downloaded tarball or a Nix-applied feature patch set.
-In a Git checkout, add new source files to the index before building because Git flakes omit
-untracked files. Changes to the upstream AppImage layout, Electron ABI, or native dependency graph
-need review before updating this packaging path.
 
 ## Some notes
 

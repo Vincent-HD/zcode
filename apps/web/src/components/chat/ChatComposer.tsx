@@ -355,6 +355,7 @@ export interface ChatComposerProps {
   supportsQuestionAttachments: boolean;
   maxFileAttachmentBytes: number | null;
   routeKind: "server" | "draft";
+  isTemporaryConversation: boolean;
   routeThreadRef: ScopedThreadRef;
   draftId: DraftId | null;
   multipleModelSelections: ReadonlyArray<ModelSelection> | null;
@@ -2182,6 +2183,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       keybindings,
       sendShortcut: settings.sendShortcut,
       routeKind,
+      isTemporaryConversation: props.isTemporaryConversation,
       phase,
       isCompacting,
       followUpBehavior,

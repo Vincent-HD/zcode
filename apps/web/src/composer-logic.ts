@@ -62,6 +62,7 @@ export function composerSubmissionIntentForKey(input: {
   platform?: string;
   isSoftwareKeyboardOpen: boolean;
   isDraftThread: boolean;
+  isTemporaryConversation?: boolean;
   isRunning?: boolean;
   sendShortcut?: ClientSettings["sendShortcut"];
   prompt?: string;
@@ -79,6 +80,12 @@ export function composerSubmissionIntentForKey(input: {
       composerRequiresModifier: composerRequiresModifier(input.sendShortcut, input.prompt ?? ""),
     },
   });
+  if (
+    input.isTemporaryConversation &&
+    (command === "composer.sendBackground" || command === "composer.sendAndNewThread")
+  ) {
+    return null;
+  }
   if (command === "composer.sendAlternate" && input.isRunning) return "alternate";
   if (command === "composer.sendBackground" && input.isDraftThread) return "background";
   if (command === "composer.sendAndNewThread" && !input.isDraftThread) return "background";

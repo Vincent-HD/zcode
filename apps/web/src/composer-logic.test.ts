@@ -143,6 +143,26 @@ describe("composerSubmissionIntentForKey", () => {
     ).toBe("alternate");
   });
 
+  it("disables background send shortcuts for temporary drafts and threads", () => {
+    const backgroundEvent = { ...enter, ctrlKey: true, altKey: true };
+
+    expect(
+      composerSubmissionIntentForKey({
+        ...input,
+        isDraftThread: true,
+        isTemporaryConversation: true,
+        event: backgroundEvent,
+      }),
+    ).toBeNull();
+    expect(
+      composerSubmissionIntentForKey({
+        ...input,
+        isTemporaryConversation: true,
+        event: backgroundEvent,
+      }),
+    ).toBeNull();
+  });
+
   it.each(["enter", "mod-enter", "mod-enter-multiline"] as const)(
     "uses remapped keys and removes the old action bindings with %s",
     (sendShortcut) => {

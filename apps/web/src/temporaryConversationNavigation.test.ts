@@ -4,6 +4,7 @@ import {
   createTemporaryConversationNavigationBlocker,
   isTemporaryConversationDiscarding,
   isTemporaryConversationSendBlocked,
+  shouldMountTemporaryConversationCoordinator,
   setTemporaryConversationDiscarding,
   temporaryConversationRouteKey,
 } from "./temporaryConversationNavigation";
@@ -38,6 +39,16 @@ describe("temporary conversation discard navigation", () => {
     expect(isTemporaryConversationSendBlocked({ draftId: null, threadKey })).toBe(true);
     setTemporaryConversationDiscarding(serverKey, false);
     expect(isTemporaryConversationSendBlocked({ draftId: null, threadKey })).toBe(false);
+  });
+});
+
+describe("temporary conversation coordinator availability", () => {
+  it("runs for authenticated and hosted-static clients while keeping guest routes excluded", () => {
+    expect(shouldMountTemporaryConversationCoordinator("authenticated")).toBe(true);
+    expect(shouldMountTemporaryConversationCoordinator("hosted-static")).toBe(true);
+    expect(shouldMountTemporaryConversationCoordinator("guest")).toBe(false);
+    expect(shouldMountTemporaryConversationCoordinator("hosted-pairing")).toBe(false);
+    expect(shouldMountTemporaryConversationCoordinator("requires-auth")).toBe(false);
   });
 });
 

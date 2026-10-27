@@ -34,7 +34,8 @@ const harness = vi.hoisted(() => {
     route: { key: "thread-route", name: "Thread", params: {} as object },
     reset: () => undefined,
     checkout: vi.fn(),
-    // Hook results stay stable across renders, as the real hooks' are.
+    // Hook results stay stable across renders, as the real hooks' are. Only
+    // main's screen reads these (see the main-comparison mocks below).
     layout: { deferThreadSelectionUntil: () => undefined },
     navigation: { goBack: () => undefined },
     preventContext: { preventedRoutes: {} },
@@ -68,18 +69,23 @@ vi.mock("./new-task-flow-provider", () => ({
   useNewTaskFlow: () => harness,
 }));
 vi.mock("./checkout-new-task-branch", () => ({ checkoutNewTaskBranch: harness.checkout }));
+// Main-comparison mocks: this screen no longer uses them, but main's screen
+// did (deferThreadSelectionUntil, useAtomCommand, useNavigation). They stay so
+// this test can run against main's screen and fail there for the right reason
+// (a second checkout) instead of on an unmockable import.
 vi.mock("../layout/AdaptiveWorkspaceLayout", () => ({
   useAdaptiveWorkspaceLayout: () => harness.layout,
 }));
+vi.mock("../../state/use-atom-command", () => ({ useAtomCommand: () => harness.checkout }));
 vi.mock("../../state/entities", () => ({ useProjects: () => useSnapshot().projects }));
 vi.mock("../../state/workspace", () => ({
   useWorkspaceState: () => ({ state: useSnapshot().catalog }),
 }));
 vi.mock("../../state/vcs", () => ({ vcsEnvironment: { readRefs: {}, switchRef: {} } }));
-vi.mock("../../state/use-atom-command", () => ({ useAtomCommand: () => harness.checkout }));
 vi.mock("@react-navigation/native", () => ({
   CommonActions: { goBack: () => ({ type: "GO_BACK" }) },
   createNavigationContainerRef: () => ({ current: null }),
+  // Main-comparison only, like the mocks above.
   useNavigation: () => harness.navigation,
   useRoute: () => harness.route,
   usePreventRemove: () => undefined,

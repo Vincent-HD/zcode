@@ -6,6 +6,7 @@ import { appAtomRegistry } from "../../state/atom-registry";
 import {
   type BranchCheckoutRequest,
   type BranchCheckoutResult,
+  branchCheckoutRequestKey,
   makeNewTaskBranchCheckouts,
 } from "./new-task-branch-checkout";
 
@@ -45,7 +46,7 @@ const failure: BranchCheckoutResult = AsyncResult.failure(Cause.fail(new Error("
 describe("new task branch checkouts", () => {
   it("runs once per request even when its atom node is removed and rebuilt", async () => {
     const { checkouts, runs } = setup();
-    const key = checkouts.requestKey(request("flow-a", "feature"));
+    const key = branchCheckoutRequestKey(request("flow-a", "feature"));
 
     // A render read with no subscriber, then the node is dropped before the
     // subscription commits, then the subscription builds a fresh node.
@@ -75,10 +76,10 @@ describe("new task branch checkouts", () => {
   it("serializes checkouts across routes", async () => {
     const { checkouts, runs } = setup();
     const unmountA = appAtomRegistry.mount(
-      checkouts.atom(checkouts.requestKey(request("flow-a", "a"))),
+      checkouts.atom(branchCheckoutRequestKey(request("flow-a", "a"))),
     );
     const unmountB = appAtomRegistry.mount(
-      checkouts.atom(checkouts.requestKey(request("flow-b", "b"))),
+      checkouts.atom(branchCheckoutRequestKey(request("flow-b", "b"))),
     );
     await vi.waitFor(() => expect(runs).toHaveLength(1));
     expect(runs[0]!.request.branch).toBe("a");
@@ -93,8 +94,8 @@ describe("new task branch checkouts", () => {
 
   it("handles a failure only after the route is released, and never once it left", async () => {
     const { checkouts, runs, holds, onFailure } = setup();
-    const keyA = checkouts.requestKey(request("flow-a", "a"));
-    const keyB = checkouts.requestKey(request("flow-b", "b"));
+    const keyA = branchCheckoutRequestKey(request("flow-a", "a"));
+    const keyB = branchCheckoutRequestKey(request("flow-b", "b"));
     const unmountA = appAtomRegistry.mount(checkouts.atom(keyA));
     const unmountB = appAtomRegistry.mount(checkouts.atom(keyB));
 
@@ -119,7 +120,7 @@ describe("new task branch checkouts", () => {
   it("stops holding navigation when its route leaves the stack", async () => {
     const { checkouts, runs, holds } = setup();
     const unmount = appAtomRegistry.mount(
-      checkouts.atom(checkouts.requestKey(request("flow-a", "a"))),
+      checkouts.atom(branchCheckoutRequestKey(request("flow-a", "a"))),
     );
     await vi.waitFor(() => expect(runs).toHaveLength(1));
     runs[0]!.settle(success("a"));

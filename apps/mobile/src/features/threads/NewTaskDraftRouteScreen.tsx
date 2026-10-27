@@ -25,7 +25,11 @@ import { useWorkspaceState } from "../../state/workspace";
 import { vcsEnvironment } from "../../state/vcs";
 import { checkoutNewTaskBranch } from "./checkout-new-task-branch";
 import { resolveNewTaskBranchWorktreePath } from "./new-task-context-presentation";
-import { type BranchCheckoutResult, makeNewTaskBranchCheckouts } from "./new-task-branch-checkout";
+import {
+  type BranchCheckoutResult,
+  branchCheckoutRequestKey,
+  makeNewTaskBranchCheckouts,
+} from "./new-task-branch-checkout";
 import { liveNewTaskFlowKeys, newTaskFlowKey } from "./new-task-flow-state";
 import { NativeStackScreenOptions } from "../../native/StackHeader";
 
@@ -127,7 +131,7 @@ export function NewTaskDraftRouteScreen({ route }: StaticScreenProps<NewTaskDraf
   const flowKey = newTaskFlowKey(currentRoute);
   const checkoutKey =
     needsPreparation && initialProjectRef.branch && !waitingForProject && flowKey !== undefined
-      ? branchCheckouts.requestKey({
+      ? branchCheckoutRequestKey({
           flowKey,
           routeKey: currentRoute.key,
           environmentId: project?.environmentId ?? null,

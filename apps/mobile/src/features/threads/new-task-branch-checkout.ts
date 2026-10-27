@@ -1,7 +1,8 @@
 import type { AtomCommandResult } from "@t3tools/client-runtime/state/runtime";
 import type { VcsRef } from "@t3tools/client-runtime/state/vcs";
-import type { EnvironmentId } from "@t3tools/contracts";
+import { EnvironmentId } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
+import * as Schema from "effect/Schema";
 import { Atom } from "effect/reactivity";
 
 export type BranchCheckoutResult = AtomCommandResult<VcsRef, unknown>;
@@ -15,6 +16,39 @@ export interface BranchCheckoutRequest {
   readonly workspaceRoot: string | null;
   readonly branch: string;
   readonly worktreePath: string | null;
+}
+
+// The family key lists the request's fields in a fixed order, so equal
+// requests share one key and start can rebuild the request from it.
+const RequestKey = Schema.fromJsonString(
+  Schema.Tuple([
+    Schema.String,
+    Schema.String,
+    Schema.NullOr(EnvironmentId),
+    Schema.NullOr(Schema.String),
+    Schema.String,
+    Schema.NullOr(Schema.String),
+  ]),
+);
+const encodeRequestKey = Schema.encodeSync(RequestKey);
+const decodeRequestKey = Schema.decodeSync(RequestKey);
+
+/** A pure, stable key for a request: the same fields always give the same key. */
+export function branchCheckoutRequestKey(request: BranchCheckoutRequest): string {
+  return encodeRequestKey([
+    request.flowKey,
+    request.routeKey,
+    request.environmentId,
+    request.workspaceRoot,
+    request.branch,
+    request.worktreePath,
+  ]);
+}
+
+function requestFromKey(key: string): BranchCheckoutRequest {
+  const [flowKey, routeKey, environmentId, workspaceRoot, branch, worktreePath] =
+    decodeRequestKey(key);
+  return { flowKey, routeKey, environmentId, workspaceRoot, branch, worktreePath };
 }
 
 interface CheckoutEntry {
@@ -39,23 +73,19 @@ export function makeNewTaskBranchCheckouts(deps: {
   // Ignoring a stale result cannot undo its Git mutation, so checkouts run one
   // at a time across routes.
   let tail: Promise<unknown> = Promise.resolve();
+  // Registered when a checkout starts, never from render.
   const entries = new Map<string, CheckoutEntry>();
-  // The family key is the request's serialized identity; the typed request is
-  // registered alongside it so start never has to decode the key.
-  const requests = new Map<string, BranchCheckoutRequest>();
 
   function abandon(key: string, entry: CheckoutEntry): void {
     entry.abandoned = true;
     entry.release();
     entries.delete(key);
-    requests.delete(key);
   }
 
   function start(key: string): Promise<BranchCheckoutResult> {
     const existing = entries.get(key);
     if (existing) return existing.checkout;
-    const request = requests.get(key);
-    if (!request) return Promise.reject(new Error(`Unknown branch checkout request: ${key}`));
+    const request = requestFromKey(key);
     // A route asks for one checkout at a time; a superseded request no longer
     // owns the route's failure handling or holds navigation.
     for (const [otherKey, other] of entries) {
@@ -77,11 +107,6 @@ export function makeNewTaskBranchCheckouts(deps: {
   }
 
   return {
-    requestKey(request: BranchCheckoutRequest): string {
-      const key = JSON.stringify(request);
-      requests.set(key, request);
-      return key;
-    },
     atom: Atom.family((key: string) =>
       Atom.make(Effect.promise(() => start(key))).pipe(
         Atom.withLabel("mobile:new-task-branch-checkout"),
@@ -95,9 +120,6 @@ export function makeNewTaskBranchCheckouts(deps: {
     prune(liveFlowKeys: ReadonlySet<string>): void {
       for (const [key, entry] of entries) {
         if (!liveFlowKeys.has(entry.request.flowKey)) abandon(key, entry);
-      }
-      for (const [key, request] of requests) {
-        if (!liveFlowKeys.has(request.flowKey)) requests.delete(key);
       }
     },
   };

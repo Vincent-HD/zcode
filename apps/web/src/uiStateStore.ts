@@ -374,12 +374,21 @@ export function isTemporaryThread(state: UiState, threadKey: string): boolean {
 }
 
 export function transferTemporaryThread(state: UiState, fromKey: string, toKey: string): UiState {
-  if (fromKey === toKey || !state.temporaryThreadKeys.includes(fromKey)) return state;
+  return transferTemporaryThreads(state, [fromKey], toKey);
+}
+
+export function transferTemporaryThreads(
+  state: UiState,
+  fromKeys: readonly string[],
+  toKey: string,
+): UiState {
+  const sourceKeys = new Set(fromKeys.filter((key) => key !== toKey));
+  if (!state.temporaryThreadKeys.some((threadKey) => sourceKeys.has(threadKey))) return state;
   return {
     ...state,
     temporaryThreadKeys: [
       ...state.temporaryThreadKeys.filter(
-        (threadKey) => threadKey !== fromKey && threadKey !== toKey,
+        (threadKey) => !sourceKeys.has(threadKey) && threadKey !== toKey,
       ),
       toKey,
     ],
@@ -472,6 +481,7 @@ interface UiStateStore extends UiState {
   setPullRequestMergeMethod: (method: PullRequestMergeMethod) => void;
   setTemporaryThread: (threadKey: string, temporary: boolean) => void;
   transferTemporaryThread: (fromKey: string, toKey: string) => void;
+  transferTemporaryThreads: (fromKeys: readonly string[], toKey: string) => void;
   setProjectExpanded: (projectIds: string | readonly string[], expanded: boolean) => void;
   reorderProjects: (
     currentProjectOrder: readonly string[],
@@ -502,6 +512,12 @@ export const useUiStateStore = create<UiStateStore>((set) => ({
   transferTemporaryThread: (fromKey, toKey) =>
     set((state) => {
       const nextState = transferTemporaryThread(state, fromKey, toKey);
+      if (nextState !== state) persistState(nextState);
+      return nextState;
+    }),
+  transferTemporaryThreads: (fromKeys, toKey) =>
+    set((state) => {
+      const nextState = transferTemporaryThreads(state, fromKeys, toKey);
       if (nextState !== state) persistState(nextState);
       return nextState;
     }),

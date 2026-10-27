@@ -167,6 +167,7 @@ import {
 import { createChatCanvasStore, resolveChatCanvasModel } from "./chat/canvasStore";
 import { usePreviewSession } from "./preview/usePreviewSession";
 import { getConfiguredPreviewUrls } from "./preview/previewEmptyStateLogic";
+import { useUiStateStore } from "../uiStateStore";
 
 import {
   previewMiniPlayerSourceKey,
@@ -478,6 +479,13 @@ export default function ChatView(props: ChatViewProps) {
       : draftId
         ? store.getDraftSession(draftId)
         : null,
+  );
+  const temporaryConversationKeys = [
+    routeThreadKey,
+    ...(draftThread?.promotedTo ? [scopedThreadKey(draftThread.promotedTo)] : []),
+  ];
+  const isTemporaryConversation = useUiStateStore((state) =>
+    temporaryConversationKeys.some((key) => state.temporaryThreadKeys.includes(key)),
   );
   const serverThreadShell = useQuietThreadShell(routeThreadRef);
   const routeThreadDetailRef = resolveThreadDetailRef(routeThreadRef, {
@@ -3646,6 +3654,7 @@ export default function ChatView(props: ChatViewProps) {
                               supportsQuestionAttachments={supportsQuestionAttachments}
                               maxFileAttachmentBytes={maxFileAttachmentBytes}
                               routeKind={routeKind}
+                              isTemporaryConversation={isTemporaryConversation}
                               routeThreadRef={routeThreadRef}
                               draftId={draftId}
                               activeThreadId={activeThreadId}

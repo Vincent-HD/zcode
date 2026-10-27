@@ -19,6 +19,7 @@ import { useUiStateStore } from "../uiStateStore";
 import { hasPendingDraftSend } from "./chat/chatViewSend";
 import {
   createTemporaryConversationNavigationBlocker,
+  shouldMountTemporaryConversationCoordinator,
   setTemporaryConversationDiscarding,
   temporaryConversationRouteKey,
   type TemporaryConversationIdentity,
@@ -184,4 +185,19 @@ export function TemporaryConversationCoordinator() {
   }, [isTemporary]);
 
   return null;
+}
+
+export function TemporaryConversationCoordinatorGate({
+  authGateStatus,
+}: {
+  readonly authGateStatus:
+    | "authenticated"
+    | "hosted-static"
+    | "guest"
+    | "hosted-pairing"
+    | "requires-auth";
+}) {
+  return shouldMountTemporaryConversationCoordinator(authGateStatus) ? (
+    <TemporaryConversationCoordinator />
+  ) : null;
 }

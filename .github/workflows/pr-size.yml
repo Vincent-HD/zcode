@@ -9,6 +9,7 @@ permissions:
 
 jobs:
   prepare-config:
+    if: github.repository != 'Vincent-HD/zcode'
     name: Prepare PR size config
     runs-on: ubuntu-24.04
     outputs:
@@ -57,7 +58,11 @@ jobs:
   sync-label-definitions:
     name: Sync PR size label definitions
     needs: prepare-config
-    if: github.event_name != 'pull_request_target'
+    if: >-
+      github.repository != 'Vincent-HD/zcode' &&
+      (
+        github.event_name != 'pull_request_target'
+      )
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -114,7 +119,11 @@ jobs:
   label:
     name: Label PR size
     needs: prepare-config
-    if: github.event_name == 'pull_request_target'
+    if: >-
+      github.repository != 'Vincent-HD/zcode' &&
+      (
+        github.event_name == 'pull_request_target'
+      )
     runs-on: ubuntu-24.04
     permissions:
       contents: read

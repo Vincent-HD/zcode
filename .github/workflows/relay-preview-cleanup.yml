@@ -24,11 +24,14 @@ jobs:
   cleanup_pr:
     name: Tear down relay preview
     if: >-
-      github.ref == 'refs/heads/main' &&
-      github.event_name == 'pull_request_target' &&
+      github.repository != 'Vincent-HD/zcode' &&
       (
-        (github.event.action == 'unlabeled' && github.event.label.name == 'relay:preview') ||
-        (github.event.action == 'closed' && contains(github.event.pull_request.labels.*.name, 'relay:preview'))
+        github.ref == 'refs/heads/main' &&
+        github.event_name == 'pull_request_target' &&
+        (
+          (github.event.action == 'unlabeled' && github.event.label.name == 'relay:preview') ||
+          (github.event.action == 'closed' && contains(github.event.pull_request.labels.*.name, 'relay:preview'))
+        )
       )
     # Job-level so that events which skip this job, such as a closed PR without
     # the label, never take the group's pending slot. GitHub replaces a pending
@@ -100,7 +103,11 @@ jobs:
 
   list_closed_previews:
     name: List closed relay previews
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request_target'
+    if: >-
+      github.repository != 'Vincent-HD/zcode' &&
+      (
+        github.ref == 'refs/heads/main' && github.event_name != 'pull_request_target'
+      )
     runs-on: blacksmith-8vcpu-ubuntu-2404
     timeout-minutes: 10
     outputs:
@@ -124,7 +131,11 @@ jobs:
   sweep_pr:
     name: Retry teardown for PR ${{ matrix.number }}
     needs: list_closed_previews
-    if: github.ref == 'refs/heads/main' && needs.list_closed_previews.outputs.numbers != '[]'
+    if: >-
+      github.repository != 'Vincent-HD/zcode' &&
+      (
+        github.ref == 'refs/heads/main' && needs.list_closed_previews.outputs.numbers != '[]'
+      )
     runs-on: blacksmith-8vcpu-ubuntu-2404
     timeout-minutes: 30
     strategy:

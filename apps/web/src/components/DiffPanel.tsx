@@ -288,6 +288,7 @@ export default function DiffPanel({
     selectedJjRevision,
     jjRefreshId,
   ]);
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- loads the selected remote Jujutsu diff and drops stale replies
   useEffect(() => {
     if (
       !selectedJjRevision ||
@@ -445,12 +446,12 @@ export default function DiffPanel({
     : selectedJjRevision
       ? `JJ ${selectedJjRevision.revisionCommitId.slice(0, 12)}`
       : selectedRunId === null
-      ? selectedGitScope === "unstaged"
-        ? "Uncommitted"
-        : "Changes"
-      : selectedTurn?.runId === latestTurn?.runId
-        ? "Latest turn"
-        : `Turn ${selectedCheckpointTurnCount ?? "?"}`;
+        ? selectedGitScope === "unstaged"
+          ? "Uncommitted"
+          : "Changes"
+        : selectedTurn?.runId === latestTurn?.runId
+          ? "Latest turn"
+          : `Turn ${selectedCheckpointTurnCount ?? "?"}`;
   const reviewSectionId = toolCallSelection
     ? `tool-call:${toolCallSelection.threadId}:${toolCallSelection.itemId}`
     : selectedJjRevision

@@ -1,13 +1,6 @@
-import { spawnSync } from "node:child_process";
-import {
-  existsSync,
-  globSync,
-  lstatSync,
-  readFileSync,
-  readdirSync,
-  readlinkSync,
-} from "node:fs";
-import { join } from "node:path";
+import * as NodeChildProcess from "node:child_process";
+import * as NodeFS from "node:fs";
+import * as NodePath from "node:path";
 
 const [sourceRoot, upstreamRoot, version, sourceMode, ...extraArguments] = process.argv.slice(2);
 
@@ -25,7 +18,7 @@ if (!sourceModes.includes(sourceMode)) {
 }
 
 function readText(root, file) {
-  return readFileSync(join(root, file), "utf8");
+  return NodeFS.readFileSync(NodePath.join(root, file), "utf8");
 }
 
 function normalize(value) {
@@ -44,7 +37,9 @@ function workspacePatterns(root) {
   const lines = readText(root, "pnpm-workspace.yaml").split(/\r?\n/);
   const packageSectionIndex = lines.findIndex((line) => /^packages:\s*$/.test(line));
   if (packageSectionIndex === -1) {
-    throw new Error("Cannot validate pnpm workspace manifests: pnpm-workspace.yaml has no packages list.");
+    throw new Error(
+      "Cannot validate pnpm workspace manifests: pnpm-workspace.yaml has no packages list.",
+    );
   }
 
   const patterns = [];
@@ -54,7 +49,9 @@ function workspacePatterns(root) {
 
     const match = line.match(/^\s*-\s*(.+?)\s*(?:#.*)?$/);
     if (!match?.[1]) {
-      throw new Error(`Cannot validate pnpm workspace manifests: unsupported packages entry '${line.trim()}'.`);
+      throw new Error(
+        `Cannot validate pnpm workspace manifests: unsupported packages entry '${line.trim()}'.`,
+      );
     }
 
     const pattern = match[1].trim().replace(/^(["'])(.*)\1$/, "$2");
@@ -62,7 +59,9 @@ function workspacePatterns(root) {
   }
 
   if (patterns.length === 0) {
-    throw new Error("Cannot validate pnpm workspace manifests: pnpm-workspace.yaml has an empty packages list.");
+    throw new Error(
+      "Cannot validate pnpm workspace manifests: pnpm-workspace.yaml has an empty packages list.",
+    );
   }
   return patterns;
 }
@@ -73,9 +72,9 @@ function workspacePackages(root) {
   for (const entry of workspacePatterns(root)) {
     const exclude = entry.startsWith("!");
     const pattern = exclude ? entry.slice(1) : entry;
-    for (const match of globSync(pattern, { cwd: root })) {
+    for (const match of NodeFS.globSync(pattern, { cwd: root })) {
       const normalizedPath = match.split("\\").join("/");
-      if (!existsSync(join(root, normalizedPath, "package.json"))) continue;
+      if (!NodeFS.existsSync(NodePath.join(root, normalizedPath, "package.json"))) continue;
       if (exclude) paths.delete(normalizedPath);
       else paths.add(normalizedPath);
     }
@@ -114,7 +113,9 @@ function readStringAssignment(source, name, file) {
   const pattern = new RegExp(`^[\\t ]*${escapedName}[\\t ]*=[\\t ]*"([^"\\r\\n]+)";[\\t ]*$`, "gm");
   const matches = [...source.matchAll(pattern)];
   if (matches.length !== 1) {
-    failSpdxPins(`expected exactly one ${name} string assignment in ${file}, found ${matches.length}`);
+    failSpdxPins(
+      `expected exactly one ${name} string assignment in ${file}, found ${matches.length}`,
+    );
   }
   return matches[0][1];
 }
@@ -123,7 +124,9 @@ function readGeneratorConstant(source, name) {
   const pattern = new RegExp(`^const[\\t ]+${name}[\\t ]*=[\\t ]*"([^"\\r\\n]+)";[\\t ]*$`, "gm");
   const matches = [...source.matchAll(pattern)];
   if (matches.length !== 1) {
-    failSpdxPins(`expected exactly one ${name} constant in scripts/lib/third-party-licenses.ts, found ${matches.length}`);
+    failSpdxPins(
+      `expected exactly one ${name} constant in scripts/lib/third-party-licenses.ts, found ${matches.length}`,
+    );
   }
   return matches[0][1];
 }
@@ -135,7 +138,11 @@ function verifySpdxPins() {
   const generatorVersion = readGeneratorConstant(generator, "SPDX_LICENSE_LIST_VERSION");
   const generatorRevision = readGeneratorConstant(generator, "SPDX_LICENSE_LIST_REVISION");
   const nixVersion = readStringAssignment(nixDefaults, "spdxLicenseListVersion", "nix/default.nix");
-  const nixRevision = readStringAssignment(nixDefaults, "spdxLicenseListRevision", "nix/default.nix");
+  const nixRevision = readStringAssignment(
+    nixDefaults,
+    "spdxLicenseListRevision",
+    "nix/default.nix",
+  );
   const licenseSourceDefinitions = [
     ...nixDefaults.matchAll(/spdxLicenseList\s*=\s*pkgs\.fetchFromGitHub\s*\{([\s\S]*?)\n\s*\};/g),
   ];
@@ -147,10 +154,14 @@ function verifySpdxPins() {
     failSpdxPins("nix/default.nix must fetch license-list-data from spdxLicenseListRevision");
   }
   if (
-    !nixRenderer.includes('spdxLicenseCacheDirectory=".generated/third-party-licenses/spdx/${spdxLicenseListVersion}"') ||
+    !nixRenderer.includes(
+      'spdxLicenseCacheDirectory=".generated/third-party-licenses/spdx/${spdxLicenseListVersion}"',
+    ) ||
     !nixRenderer.includes("process.env.SPDX_LICENSE_CACHE_DIRECTORY")
   ) {
-    failSpdxPins("nix/renderer-server.nix must populate the cache directory selected by spdxLicenseListVersion");
+    failSpdxPins(
+      "nix/renderer-server.nix must populate the cache directory selected by spdxLicenseListVersion",
+    );
   }
 
   if (nixVersion !== generatorVersion) {
@@ -171,39 +182,42 @@ function collectTreeEntries(root, tree) {
   function visit(absolutePath, relativePath) {
     let stat;
     try {
-      stat = lstatSync(absolutePath);
+      stat = NodeFS.lstatSync(absolutePath);
     } catch (error) {
       if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") return;
       throw error;
     }
 
     if (stat.isDirectory()) {
-      for (const child of readdirSync(absolutePath).sort()) {
-        visit(join(absolutePath, child), relativePath === "" ? child : `${relativePath}/${child}`);
+      for (const child of NodeFS.readdirSync(absolutePath).sort()) {
+        visit(
+          NodePath.join(absolutePath, child),
+          relativePath === "" ? child : `${relativePath}/${child}`,
+        );
       }
       return;
     }
     if (stat.isSymbolicLink()) {
-      entries.set(relativePath, { kind: "symlink", value: readlinkSync(absolutePath) });
+      entries.set(relativePath, { kind: "symlink", value: NodeFS.readlinkSync(absolutePath) });
       return;
     }
     if (stat.isFile()) {
       entries.set(relativePath, {
         kind: "file",
         executable: Boolean(stat.mode & 0o111),
-        value: readFileSync(absolutePath),
+        value: NodeFS.readFileSync(absolutePath),
       });
       return;
     }
     entries.set(relativePath, { kind: "other", value: String(stat.mode) });
   }
 
-  visit(join(root, tree), "");
+  visit(NodePath.join(root, tree), "");
   return entries;
 }
 
 function collectWorkingCheckoutTreeEntries(root, tree) {
-  const result = spawnSync("git", ["ls-files", "--cached", "-z", "--", tree], {
+  const result = NodeChildProcess.spawnSync("git", ["ls-files", "--cached", "-z", "--", tree], {
     cwd: root,
     encoding: "buffer",
     maxBuffer: 64 * 1024 * 1024,
@@ -228,10 +242,10 @@ function collectWorkingCheckoutTreeEntries(root, tree) {
         : null;
     if (relativePath === null) continue;
 
-    const absolutePath = join(root, trackedPath);
+    const absolutePath = NodePath.join(root, trackedPath);
     let stat;
     try {
-      stat = lstatSync(absolutePath);
+      stat = NodeFS.lstatSync(absolutePath);
     } catch (error) {
       if (
         error &&
@@ -245,12 +259,12 @@ function collectWorkingCheckoutTreeEntries(root, tree) {
     }
 
     if (stat.isSymbolicLink()) {
-      entries.set(relativePath, { kind: "symlink", value: readlinkSync(absolutePath) });
+      entries.set(relativePath, { kind: "symlink", value: NodeFS.readlinkSync(absolutePath) });
     } else if (stat.isFile()) {
       entries.set(relativePath, {
         kind: "file",
         executable: Boolean(stat.mode & 0o111),
-        value: readFileSync(absolutePath),
+        value: NodeFS.readFileSync(absolutePath),
       });
     } else if (stat.isDirectory()) {
       entries.set(relativePath, { kind: "directory", value: "directory" });
@@ -316,11 +330,7 @@ function verifyRetainedRuntimeSource() {
   return comparedFiles;
 }
 
-for (const file of [
-  "pnpm-lock.yaml",
-  "pnpm-workspace.yaml",
-  "third-party-licenses.config.json",
-]) {
+for (const file of ["pnpm-lock.yaml", "pnpm-workspace.yaml", "third-party-licenses.config.json"]) {
   if (readText(sourceRoot, file) !== readText(upstreamRoot, file)) {
     fail(file, "differs from the matching pinned upstream source");
   }
@@ -370,10 +380,7 @@ for (const path of sourcePaths) {
   );
 
   if (differences.length > 0) {
-    fail(
-      `${path}/package.json`,
-      `differs in dependency fields: ${differences.join(", ")}`,
-    );
+    fail(`${path}/package.json`, `differs in dependency fields: ${differences.join(", ")}`);
   }
 }
 

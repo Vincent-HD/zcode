@@ -62,7 +62,7 @@ function temporaryThreadRefForTarget(target: ThreadRouteTarget) {
   return session.promotedTo ?? scopeThreadRef(session.environmentId, session.threadId);
 }
 
-export function TemporaryConversationCoordinator() {
+function TemporaryConversationCoordinator() {
   const routeTarget = useThreadRouteTarget();
   const { deleteThread } = useThreadActions();
   const stableDeleteThread = useStableCallback(deleteThread);
@@ -166,6 +166,7 @@ export function TemporaryConversationCoordinator() {
   useBlocker({ shouldBlockFn, enableBeforeUnload: false });
 
   const routeKey = temporaryConversationRouteKey(routeTarget);
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- clears the route's discard marker when it unmounts
   useEffect(() => () => setTemporaryConversationDiscarding(routeKey, false), [routeKey]);
 
   const threadRef = routeTarget ? temporaryThreadRefForTarget(routeTarget) : null;
@@ -174,6 +175,7 @@ export function TemporaryConversationCoordinator() {
     threadKey === null ? false : state.temporaryThreadKeys.includes(threadKey),
   );
 
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- installs the browser unload guard for a temporary conversation
   useEffect(() => {
     if (!isTemporary) return;
     const warnBeforeUnload = (event: BeforeUnloadEvent) => {

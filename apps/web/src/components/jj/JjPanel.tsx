@@ -23,7 +23,7 @@ import {
   RefreshCw,
   Tag,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useEffectEvent, useRef, useState, type ReactNode } from "react";
 import { useEnvironmentScope } from "~/state/session";
 import { useServerConfigs } from "~/state/entities";
 import { jjEnvironment } from "~/state/jj";
@@ -203,8 +203,9 @@ const JjPanel = (props: {
   const mutationBusy = useRef(false);
   const identity = useRef<string | null>(null);
   const mounted = useRef(false);
-  const currentContext = useRef(contextKey);
 
+  // Tracks the component lifetime so async Jujutsu actions ignore replies after unmount.
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- tracks the component lifetime for async reply guards
   useEffect(() => {
     mounted.current = true;
     return () => {
@@ -212,80 +213,57 @@ const JjPanel = (props: {
     };
   }, []);
 
-  useEffect(() => {
-    currentContext.current = contextKey;
-    identity.current = null;
-    generation.current++;
-    queueMicrotask(() => {
-      if (!mounted.current || currentContext.current !== contextKey) return;
-      setSnapshot(null);
-      setSnapshotContext(null);
-      setExpansion({});
-      setDetailsExpansion({});
+  const acceptSnapshot = (next: JjPanelSnapshot) => {
+    setSnapshot(next);
+    setSnapshotContext(contextKey);
+    if (next.status !== "ready") {
+      identity.current = null;
       setSelectedCommitIds([]);
       setSelectedPaths({});
-      setEditingChangeId(null);
+      return;
+    }
+    const nextIdentity = workspaceKey(next);
+    const sameWorkspace = identity.current === nextIdentity;
+    identity.current = nextIdentity;
+    const revisions = jjTargetRevisions(next);
+    if (props.cwd)
+      useJjDescriptionDraftStore.getState().setDrafts({
+        scopeKey: jjDescriptionDraftScopeKey({
+          environmentId: props.environmentId,
+          cwd: props.cwd,
+          workspaceIdentity: next.workspaceIdentity,
+        }),
+        update: (current) => reconcileDescriptionDrafts({ drafts: current, revisions }),
+      });
+    setSelectedCommitIds((current) =>
+      sameWorkspace
+        ? reconcileJjSelection({
+            selectedCommitIds: current,
+            revisions,
+          })
+        : [],
+    );
+    setSelectedPaths((current) =>
+      Object.fromEntries(
+        revisions.map((revision) => [
+          revision.commitId,
+          sameWorkspace
+            ? (current[revision.commitId] ?? []).filter((path) =>
+                revision.files.some((file) => file.path === path),
+              )
+            : [],
+        ]),
+      ),
+    );
+    if (!sameWorkspace) {
       setReceipt(null);
-      setPreview(null);
-      setRevertReceipt(null);
-      setError(null);
-    });
-  }, [contextKey]);
+      setExpansion({});
+      setDetailsExpansion({});
+      setEditingChangeId(null);
+    }
+  };
 
-  const acceptSnapshot = useCallback(
-    (next: JjPanelSnapshot) => {
-      setSnapshot(next);
-      setSnapshotContext(contextKey);
-      if (next.status !== "ready") {
-        identity.current = null;
-        setSelectedCommitIds([]);
-        setSelectedPaths({});
-        return;
-      }
-      const nextIdentity = workspaceKey(next);
-      const sameWorkspace = identity.current === nextIdentity;
-      identity.current = nextIdentity;
-      const revisions = jjTargetRevisions(next);
-      if (props.cwd)
-        useJjDescriptionDraftStore.getState().setDrafts({
-          scopeKey: jjDescriptionDraftScopeKey({
-            environmentId: props.environmentId,
-            cwd: props.cwd,
-            workspaceIdentity: next.workspaceIdentity,
-          }),
-          update: (current) => reconcileDescriptionDrafts({ drafts: current, revisions }),
-        });
-      setSelectedCommitIds((current) =>
-        sameWorkspace
-          ? reconcileJjSelection({
-              selectedCommitIds: current,
-              revisions,
-            })
-          : [],
-      );
-      setSelectedPaths((current) =>
-        Object.fromEntries(
-          revisions.map((revision) => [
-            revision.commitId,
-            sameWorkspace
-              ? (current[revision.commitId] ?? []).filter((path) =>
-                  revision.files.some((file) => file.path === path),
-                )
-              : [],
-          ]),
-        ),
-      );
-      if (!sameWorkspace) {
-        setReceipt(null);
-        setExpansion({});
-        setDetailsExpansion({});
-        setEditingChangeId(null);
-      }
-    },
-    [contextKey, props.cwd, props.environmentId],
-  );
-
-  const refresh = useCallback(async () => {
+  const refresh = async () => {
     if (
       !active.current ||
       !props.cwd ||
@@ -301,12 +279,7 @@ const JjPanel = (props: {
       environmentId: props.environmentId,
       input: { cwd: props.cwd },
     });
-    if (
-      !active.current ||
-      generation.current !== requestGeneration ||
-      currentContext.current !== contextKey
-    )
-      return;
+    if (!active.current || generation.current !== requestGeneration) return;
     setLoading(false);
     if (AsyncResult.isSuccess(result)) {
       acceptSnapshot(result.value);
@@ -314,32 +287,25 @@ const JjPanel = (props: {
       return;
     }
     if (result._tag === "Failure") setError(formatJjPanelError(result.cause));
-  }, [
-    acceptSnapshot,
-    canRead,
-    contextKey,
-    getPanel,
-    props.cwd,
-    props.environmentId,
-    supportsPanel,
-  ]);
+  };
+  const refreshFromEffect = useEffectEvent(refresh);
 
+  // Refreshes when the panel becomes available and when the window or document regains focus.
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- manages refresh requests across access and focus changes while shown
   useEffect(() => {
     active.current = props.visible;
-    if (!props.visible) {
+    if (!props.visible || !canRead || !supportsPanel) {
       generation.current++;
       return;
     }
-    queueMicrotask(() => {
-      void refresh();
-    });
+    queueMicrotask(() => refreshFromEffect());
     const onFocus = () => {
       if (document.visibilityState === "hidden") {
         generation.current++;
         setLoading(false);
         return;
       }
-      void refresh();
+      refreshFromEffect();
     };
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onFocus);
@@ -349,25 +315,14 @@ const JjPanel = (props: {
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onFocus);
     };
-  }, [props.visible, refresh]);
-
-  const latestRefresh = useRef(refresh);
-  useEffect(() => {
-    latestRefresh.current = refresh;
-  }, [refresh]);
+  }, [props.visible, canRead, supportsPanel]);
 
   const mutate = async (input: {
     run: () => Promise<AsyncResult.AsyncResult<JjMutationResult, unknown>>;
     title: string;
     savedChangeId?: string;
   }) => {
-    if (
-      !active.current ||
-      !supportsPanel ||
-      mutationBusy.current ||
-      currentContext.current !== contextKey
-    )
-      return;
+    if (!active.current || !supportsPanel || mutationBusy.current) return;
     const savedDraft = input.savedChangeId ? drafts[input.savedChangeId] : undefined;
     mutationBusy.current = true;
     ++generation.current;
@@ -384,10 +339,6 @@ const JjPanel = (props: {
     }
     if (!mounted.current) return;
     setMutating(false);
-    if (currentContext.current !== contextKey) {
-      void latestRefresh.current();
-      return;
-    }
     if (AsyncResult.isSuccess(result)) {
       acceptSnapshot(result.value.panel);
       setReceipt(result.value.receipt);
@@ -1049,7 +1000,7 @@ const JjPanel = (props: {
             {error}
           </p>
         )}
-        {loading && (
+        {loading && props.visible && canRead && supportsPanel && (
           <p role="status" className="mb-2 text-xs text-muted-foreground">
             Refreshing…
           </p>

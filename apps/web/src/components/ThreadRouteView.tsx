@@ -97,7 +97,7 @@ export function ThreadRouteView({
     ? scopedThreadKey(draftSession.promotedTo)
     : null;
 
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- clears pending file drops and navigates the router home once a server thread is confirmed missing
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- carries the temporary marker across draft promotion
   useEffect(() => {
     if (
       reservedDraftThreadKey === null ||
@@ -111,6 +111,7 @@ export function ThreadRouteView({
       .transferTemporaryThread(reservedDraftThreadKey, promotedDraftThreadKey);
   }, [promotedDraftThreadKey, reservedDraftThreadKey]);
 
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- clears pending drops and navigates away when a server thread is confirmed missing
   useEffect(() => {
     if (
       target.kind !== "server" ||

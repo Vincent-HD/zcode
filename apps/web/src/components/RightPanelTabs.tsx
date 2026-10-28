@@ -630,7 +630,7 @@ function SurfaceIcon({
   pullRequestStatusSeed: PullRequestTabStatusSeed | undefined;
 }) {
   switch (surface.kind) {
-case "preview":
+    case "preview":
       return <PreviewFavicon capturedUrl={previewCapturedUrl} url={previewUrl} />;
     case "jj":
       return <GitBranch className="size-3 shrink-0" />;

@@ -21,8 +21,9 @@ added_tests=(
   apps/web/src/components/chat/composer-usage.logic.test.ts
   apps/web/src/components/chat/models-dev-pricing.test.ts
   apps/web/src/components/chat/turn-usage.logic.test.ts
-  apps/web/src/components/chat/usage-popover.test.tsx
+  apps/web/src/components/chat/usage-popover.browser.test.tsx
   apps/web/src/components/chat/usage-pricing.test.ts
+  apps/web/src/components/jj/JjPanel.permissions.browser.test.tsx
   apps/web/src/components/jj/jj-description-draft-store.test.ts
   apps/web/src/components/jj/jj-forge-state.test.ts
   apps/web/src/components/jj/jj-panel-state.test.ts

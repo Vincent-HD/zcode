@@ -19,8 +19,9 @@ import {
   type CompletedUsageTurn,
 } from "./composer-usage.logic";
 
-const count = (value: number | null | undefined) => (value == null ? "—" : value.toLocaleString());
-const percent = (value: number | null) => (value === null ? "—" : `${value.toFixed(0)}%`);
+const count = (value: number | null | undefined) =>
+  value == null ? "N/A" : value.toLocaleString();
+const percent = (value: number | null) => (value === null ? "N/A" : `${value.toFixed(0)}%`);
 
 export const ComposerUsageFooter = (props: {
   readonly accounts: UsageLimitsReport["accounts"];
@@ -41,7 +42,7 @@ export const ComposerUsageFooter = (props: {
   const toolTime = toolUsageDuration(props.toolCalls);
   const context = props.context;
   const speed =
-    usage?.tokensPerSecond == null ? "— tok/s" : `${usage.tokensPerSecond.toFixed(1)} tok/s`;
+    usage?.tokensPerSecond == null ? "N/A tok/s" : `${usage.tokensPerSecond.toFixed(1)} tok/s`;
   const accountSummary = composerQuotaSummary(props.accounts);
   return (
     <div

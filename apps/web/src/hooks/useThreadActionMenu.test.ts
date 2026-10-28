@@ -35,10 +35,15 @@ function recordEffect(action: string) {
 }
 
 vi.mock("../components/CustomSnoozeDialog", () => ({ requestCustomSnooze: vi.fn() }));
-vi.mock("react", () => ({
-  useCallback: (callback: unknown) => callback,
-  useMemo: (factory: () => unknown) => factory(),
-}));
+vi.mock("../components/chat/chatViewSend", () => ({ hasPendingDraftSend: () => false }));
+vi.mock("react", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("react")>();
+  return {
+    ...actual,
+    useCallback: (callback: unknown) => callback,
+    useMemo: (factory: () => unknown) => factory(),
+  };
+});
 vi.mock("@tanstack/react-router", () => ({
   useRouter: () => ({ navigate: async () => recordEffect("project-settings") }),
 }));
@@ -63,8 +68,8 @@ vi.mock("../state/entities", () => ({
 }));
 vi.mock("../state/environments", () => ({ usePrimaryEnvironmentId: () => "primary" }));
 vi.mock("../state/threads", () => ({ threadEnvironment: { updateMetadata: "metadata" } }));
-vi.mock("../state/use-atom-command", () => ({
-  useAtomCommand: () => async () => {
+vi.mock("../state/use-orchestration-command", () => ({
+  useOrchestrationCommand: () => async () => {
     recordEffect("metadata");
     return AsyncResult.success(undefined);
   },
@@ -92,6 +97,7 @@ vi.mock("../uiStateStore", () => ({
   useUiStateStore: (select: (store: unknown) => unknown) =>
     select({
       markThreadUnread: () => recordEffect("mark-unread"),
+      temporaryThreadKeys: [],
     }),
 }));
 vi.mock("../components/ui/toast", () => ({

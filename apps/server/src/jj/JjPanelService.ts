@@ -85,6 +85,7 @@ const revisionTemplate = jsonObjectTemplate({
 const revisionsTemplate = `${revisionTemplate} ++ "\\n"`;
 const error = (reason: JjPanelError["reason"]) => new JjPanelError({ reason });
 const decodeFilePath = Schema.decodeUnknownEffect(JjFilePath);
+const isJjBookmarkName = Schema.is(JjBookmarkName);
 const decodeRunAction = Schema.decodeUnknownEffect(JjRunActionInput);
 const decodeGetDiff = Schema.decodeUnknownEffect(JjGetDiffInput);
 
@@ -304,7 +305,7 @@ const make = Effect.gen(function* () {
     const remotes = remoteLines
       .split("\n")
       .flatMap((line) => /^(\S+)\s/.exec(line)?.[1] ?? [])
-      .filter((name) => Schema.is(JjBookmarkName)(name));
+      .filter(isJjBookmarkName);
     return {
       status: "ready",
       cwd: input.cwd,

@@ -640,7 +640,6 @@ describe("expanded JjPanelService actions", () => {
         if (!selectedSource) return;
         yield* f.cli(["new", "-m", "descendant"]);
         yield* f.fs.writeFileString(`${f.cwd}/file`, "content\n");
-        const before = yield* f.panel();
         const result = yield* f.action({
           type: "rebase",
           revisionCommitId: selectedSource.commitId,

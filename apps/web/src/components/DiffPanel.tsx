@@ -310,6 +310,7 @@ export default function DiffPanel({
     selectedJjRevision,
     jjRefreshId,
   ]);
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- loads the selected remote Jujutsu diff and drops stale replies
   useEffect(() => {
     if (
       !selectedJjRevision ||

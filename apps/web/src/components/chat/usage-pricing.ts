@@ -12,7 +12,7 @@ const dollarFormatter = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 1,
 });
 export const usageDollars = (value: number | null | undefined) =>
-  value == null ? "—" : dollarFormatter.format(value);
+  value == null ? "N/A" : dollarFormatter.format(value);
 
 export const priceUsageTurn = (input: {
   readonly catalog: ModelsDevCatalog | null;

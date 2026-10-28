@@ -9,7 +9,7 @@ describe("usageDollars", () => {
   });
 
   it("keeps missing costs unavailable", () => {
-    expect(usageDollars(null)).toBe("—");
-    expect(usageDollars(undefined)).toBe("—");
+    expect(usageDollars(null)).toBe("N/A");
+    expect(usageDollars(undefined)).toBe("N/A");
   });
 });

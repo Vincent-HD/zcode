@@ -59,7 +59,6 @@ import {
 import { type ChatMessage, DEFAULT_INTERACTION_MODE } from "../../types";
 import { recordPromptSent } from "../GitHubStarPrompt";
 import { stackedThreadToast, toastManager } from "../ui/toast";
-import { useUiStateStore } from "../../uiStateStore";
 import { isTemporaryConversationSendBlocked } from "../../temporaryConversationNavigation";
 import { newMessageId } from "~/lib/utils";
 import { useNewThreadHandler } from "../../hooks/useHandleNewThread";

@@ -25,7 +25,7 @@ export const TurnUsage = (props: { readonly data: UsageTurn }) => {
     input != null && input > 0 && cached != null && cached <= input ? (cached / input) * 100 : null;
   const uncached = input != null && cached != null && input >= cached ? input - cached : null;
   const tokens = (value: number | null | undefined) =>
-    value == null ? "—" : `${value.toLocaleString()} tok`;
+    value == null ? "N/A tok" : `${value.toLocaleString()} tok`;
   return (
     <UsagePopover
       label="Turn usage"
@@ -43,7 +43,7 @@ export const TurnUsage = (props: { readonly data: UsageTurn }) => {
           }
         />
         <UsageRow label="Total tokens" value={tokens(total)} />
-        <UsageRow label="Cache hit" value={cacheHit === null ? "—" : `${cacheHit.toFixed(1)}%`} />
+        <UsageRow label="Cache hit" value={cacheHit === null ? "N/A" : `${cacheHit.toFixed(1)}%`} />
         <UsageRow
           label="Non-cached input"
           value={
@@ -94,7 +94,11 @@ export const TurnUsage = (props: { readonly data: UsageTurn }) => {
         />
         <UsageRow
           label="Average throughput"
-          value={usage?.tokensPerSecond == null ? "—" : `${usage.tokensPerSecond.toFixed(1)} tok/s`}
+          value={
+            usage?.tokensPerSecond == null
+              ? "N/A tok/s"
+              : `${usage.tokensPerSecond.toFixed(1)} tok/s`
+          }
         />
       </dl>
       <p className="mt-2 text-2xs text-muted-foreground">

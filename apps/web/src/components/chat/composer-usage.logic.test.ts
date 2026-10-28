@@ -23,8 +23,8 @@ describe("compactTokenCount", () => {
     [1300000000, "1.3B"],
     [999999, "1M"],
     [1000000000000, "1T"],
-    [null, "—"],
-    [undefined, "—"],
+    [null, "N/A"],
+    [undefined, "N/A"],
   ])("formats %s as %s", (value, expected) => {
     expect(compactTokenCount(value)).toBe(expected);
   });
@@ -244,5 +244,5 @@ describe("toolUsageDuration", () => {
 it("formats compact session durations", () => {
   expect(formatUsageDuration(245000)).toBe("4m 5s");
   expect(formatUsageDuration(3660000)).toBe("1h 1m");
-  expect(formatUsageDuration(null)).toBe("—");
+  expect(formatUsageDuration(null)).toBe("N/A");
 });

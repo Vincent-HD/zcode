@@ -13,7 +13,7 @@ const compactCountFormatter = new Intl.NumberFormat("en-US", {
 });
 
 export const compactTokenCount = (value: number | null | undefined) =>
-  value == null ? "—" : compactCountFormatter.format(value);
+  value == null ? "N/A" : compactCountFormatter.format(value);
 
 export const selectComposerUsageAccounts = (
   accounts: UsageLimitsReport["accounts"],
@@ -70,7 +70,7 @@ export const lastResponseUsage = (turn: CompletedUsageTurn | null) => {
 };
 
 export const formatUsageDuration = (milliseconds: number | null) => {
-  if (milliseconds === null) return "—";
+  if (milliseconds === null) return "N/A";
   const seconds = Math.round(milliseconds / 1000);
   if (seconds < 60) return `${seconds}s`;
   if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;

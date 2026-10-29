@@ -84,6 +84,135 @@ describe("composer quota selection", () => {
     expect(composerQuotaSummary([selected])).toBe("Quota unavailable");
     expect(composerQuotaSummary([source])).toBe("Weekly 42%");
   });
+
+  it("uses reported durations, keeps named counters, and leaves missing durations named", () => {
+    const account = {
+      ...selected,
+      limits: {
+        checkedAt: unavailable.checkedAt,
+        windows: [
+          {
+            id: "five-hour",
+            kind: "session" as const,
+            label: "Session",
+            usedPercent: 12,
+            windowDurationMins: 300,
+          },
+          {
+            id: "daily",
+            kind: "other" as const,
+            label: "Daily",
+            usedPercent: 18,
+            windowDurationMins: 1440,
+          },
+          {
+            id: "fractional-hour",
+            kind: "other" as const,
+            label: "Custom quota",
+            usedPercent: 40,
+            windowDurationMins: 90,
+          },
+          {
+            id: "sonnet",
+            kind: "weekly" as const,
+            label: "Weekly Sonnet",
+            usedPercent: 12,
+            windowDurationMins: 10080,
+          },
+          { id: "spend", kind: "monthly" as const, label: "Monthly spend", usedPercent: 23 },
+        ],
+      },
+    } satisfies UsageLimitsReport["accounts"][number];
+
+    expect(composerQuotaSummary([account])).toBe(
+      "5h 12% · 24h 18% · Custom quota 1h 30m 40% · Sonnet 7d 12% · Monthly spend 23%",
+    );
+  });
+
+  it("names multiple accounts and separates same-duration windows", () => {
+    const personal = {
+      ...source,
+      id: "proxy:personal",
+      label: "Proxy · personal",
+      displayName: "Claude",
+      limits: {
+        checkedAt: unavailable.checkedAt,
+        windows: [
+          {
+            id: "sonnet",
+            kind: "weekly" as const,
+            label: "Weekly · Sonnet",
+            usedPercent: 12,
+            windowDurationMins: 10080,
+          },
+          {
+            id: "opus",
+            kind: "weekly" as const,
+            label: "Weekly · Opus",
+            usedPercent: 9,
+            windowDurationMins: 10080,
+          },
+        ],
+      },
+    } satisfies UsageLimitsReport["accounts"][number];
+    const work = {
+      ...source,
+      id: "proxy:work",
+      label: "Proxy · work",
+      displayName: "Claude",
+      limits: {
+        checkedAt: unavailable.checkedAt,
+        windows: [
+          {
+            id: "weekly",
+            kind: "weekly" as const,
+            label: "Claude & GPT (shared) · Weekly",
+            usedPercent: 42,
+            windowDurationMins: 10080,
+          },
+        ],
+      },
+    } satisfies UsageLimitsReport["accounts"][number];
+
+    expect(composerQuotaSummary([personal, work])).toBe(
+      "Proxy · personal Sonnet 7d 12% · Proxy · personal Opus 7d 9% · Proxy · work Claude & GPT (shared) 7d 42%",
+    );
+
+    const sameLabel = [
+      { ...personal, id: "proxy:first", label: "Proxy · team" },
+      { ...work, id: "proxy:second", label: "Proxy · team" },
+    ];
+    expect(composerQuotaSummary(sameLabel)).toBe(
+      "Proxy · team (proxy:first) Sonnet 7d 12% · Proxy · team (proxy:first) Opus 7d 9% · Proxy · team (proxy:second) Claude & GPT (shared) 7d 42%",
+    );
+  });
+
+  it("uses a window id only when otherwise identical windows collide", () => {
+    const account = {
+      ...selected,
+      limits: {
+        checkedAt: unavailable.checkedAt,
+        windows: [
+          {
+            id: "primary",
+            kind: "weekly" as const,
+            label: "Weekly",
+            usedPercent: 12,
+            windowDurationMins: 10080,
+          },
+          {
+            id: "secondary",
+            kind: "weekly" as const,
+            label: "Weekly",
+            usedPercent: 34,
+            windowDurationMins: 10080,
+          },
+        ],
+      },
+    } satisfies UsageLimitsReport["accounts"][number];
+
+    expect(composerQuotaSummary([account])).toBe("7d (primary) 12% · 7d (secondary) 34%");
+  });
 });
 
 const completed: CompletedUsageTurn = {

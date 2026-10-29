@@ -25,12 +25,96 @@ export const selectComposerUsageAccounts = (
         (account) => account.instanceId === instanceId || account.instanceId === undefined,
       );
 
-export const composerQuotaSummary = (accounts: UsageLimitsReport["accounts"]) =>
-  accounts
-    .flatMap((account) =>
-      account.limits.windows.map((window) => `${window.label} ${window.usedPercent.toFixed(0)}%`),
-    )
-    .join(" · ") || "Quota unavailable";
+const MINUTES_PER_HOUR = 60;
+const MINUTES_PER_DAY = 24 * MINUTES_PER_HOUR;
+const MINUTES_PER_WEEK = 7 * MINUTES_PER_DAY;
+
+const WINDOW_DURATION_LABEL =
+  /^(?:session|daily|weekly|monthly|(?:\d+(?:\.\d+)?|five|seven|thirty)[\s-]*(?:minutes?|mins?|m|hours?|hrs?|h|days?|d|weeks?|w|months?))$/i;
+const TRAILING_WINDOW_DURATION =
+  /(?:\s+|\s*\()(?:\d+(?:\.\d+)?[\s-]*(?:minutes?|mins?|m|hours?|hrs?|h|days?|d|weeks?|w|months?))\s*\)?$/i;
+
+const formatWindowDuration = (minutes: number) => {
+  if (minutes >= MINUTES_PER_WEEK && minutes % MINUTES_PER_DAY === 0) {
+    return `${minutes / MINUTES_PER_DAY}d`;
+  }
+  if (minutes >= MINUTES_PER_HOUR && minutes % MINUTES_PER_HOUR === 0) {
+    return `${minutes / MINUTES_PER_HOUR}h`;
+  }
+  if (minutes >= MINUTES_PER_HOUR) {
+    return `${Math.floor(minutes / MINUTES_PER_HOUR)}h ${minutes % MINUTES_PER_HOUR}m`;
+  }
+  return `${minutes}m`;
+};
+
+const compactWindowLabel = (
+  window: UsageLimitsReport["accounts"][number]["limits"]["windows"][number],
+) => {
+  if (window.windowDurationMins === undefined) return window.label.trim();
+
+  const duration = formatWindowDuration(window.windowDurationMins);
+  const name = window.label
+    .trim()
+    .split(/\s*[·|]\s*/)
+    .filter((part) => !WINDOW_DURATION_LABEL.test(part.trim()))
+    .join(" · ")
+    .replace(/^(?:session|daily|weekly|monthly)\s+/i, "")
+    .replace(/\s+(?:session|daily|weekly|monthly)$/i, "")
+    .replace(TRAILING_WINDOW_DURATION, "")
+    .trim();
+  return name ? `${name} ${duration}` : duration;
+};
+
+const accountSummaryName = (account: UsageLimitsReport["accounts"][number]) =>
+  account.displayName?.trim() || account.label || String(account.driver);
+
+const accountSummaryNames = (accounts: UsageLimitsReport["accounts"]) => {
+  const baseNames = accounts.map(accountSummaryName);
+  const baseNameCounts = new Map<string, number>();
+  for (const name of baseNames) {
+    baseNameCounts.set(name, (baseNameCounts.get(name) ?? 0) + 1);
+  }
+
+  const names = accounts.map((account, index) => {
+    const baseName = baseNames[index]!;
+    const label = account.label.trim();
+    return (baseNameCounts.get(baseName) ?? 0) > 1 && label && label !== baseName
+      ? label
+      : baseName;
+  });
+  const nameCounts = new Map<string, number>();
+  for (const name of names) {
+    nameCounts.set(name, (nameCounts.get(name) ?? 0) + 1);
+  }
+
+  return names.map((name, index) =>
+    (nameCounts.get(name) ?? 0) > 1 ? `${name} (${accounts[index]!.id})` : name,
+  );
+};
+
+export const composerQuotaSummary = (accounts: UsageLimitsReport["accounts"]) => {
+  const accountNames = accountSummaryNames(accounts);
+  const includeAccountName = accounts.length > 1;
+  const rows = accounts.flatMap((account, accountIndex) => {
+    const accountName = accountNames[accountIndex]!;
+    const windowNames = account.limits.windows.map(compactWindowLabel);
+    const windowNameCounts = new Map<string, number>();
+    for (const name of windowNames)
+      windowNameCounts.set(name, (windowNameCounts.get(name) ?? 0) + 1);
+
+    return account.limits.windows.map((window, index) => {
+      const baseWindowName = windowNames[index]!;
+      const windowName =
+        (windowNameCounts.get(baseWindowName) ?? 0) > 1
+          ? `${baseWindowName} (${window.id})`
+          : baseWindowName;
+      const name = includeAccountName ? `${accountName} ${windowName}` : windowName;
+      return `${name} ${window.usedPercent.toFixed(0)}%`;
+    });
+  });
+
+  return rows.join(" · ") || "Quota unavailable";
+};
 
 export type CompletedUsageTurn = Pick<
   OrchestrationV2ProviderTurn,

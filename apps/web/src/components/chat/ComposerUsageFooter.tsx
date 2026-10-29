@@ -79,8 +79,7 @@ export const ComposerUsageFooter = (props: {
         icon={<Database className="size-3.5 shrink-0" />}
         summary={
           <>
-            {compactTokenCount(session.totalTokens)} tok · Cache hit{" "}
-            {percent(session.cacheHitPercent)}
+            {compactTokenCount(session.totalTokens)} tok · Cache {percent(session.cacheHitPercent)}
             {costs.totalUsd !== null
               ? ` · ${usageDollars(costs.totalUsd)}${costs.partial ? "+" : ""}`
               : ""}
@@ -242,7 +241,7 @@ export const ComposerUsageFooter = (props: {
             <dl>
               {account.limits.windows.map((window) => (
                 <UsageRow
-                  key={window.label}
+                  key={window.id}
                   label={window.label}
                   value={`${percent(window.usedPercent)} used`}
                 />
@@ -251,7 +250,7 @@ export const ComposerUsageFooter = (props: {
             {account.limits.windows.map(
               (window) =>
                 window.resetsAt && (
-                  <p key={window.label} className="mt-1 text-2xs text-muted-foreground">
+                  <p key={window.id} className="mt-1 text-2xs text-muted-foreground">
                     {window.label} resets {window.resetsAt}
                   </p>
                 ),

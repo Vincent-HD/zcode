@@ -63,9 +63,9 @@ After rebasing this fork onto the upstream release you want to package, run the 
 release version:
 
 ```bash
-./scripts/update-z-code-nix.sh 0.1.4-nightly.20261028.3824
+./scripts/update-z-code-nix.sh 0.1.7-nightly.20261031.3991
 # Preview the candidate pins, then restore nix/default.nix:
-./scripts/update-z-code-nix.sh --dry-run 0.1.4-nightly.20261028.3824
+./scripts/update-z-code-nix.sh --dry-run 0.1.7-nightly.20261031.3991
 ```
 
 The updater proves that the selected upstream tag commit is an ancestor of the fork's current `HEAD`

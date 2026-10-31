@@ -1202,24 +1202,20 @@ export function useComposerSend(input: ComposerSendInput) {
     });
     if (multipleModelSelections !== null) {
       const finishFanout = beginFanoutSend(routeThreadKey);
-      try {
-        await sendToMultipleModels({
-          threadId: threadIdForSend,
-          project: activeProject,
-          branch: activeThreadBranch!,
-          selections: multipleModelSelections,
-          targets: multipleTargets,
-          sendSnapshot,
-          createdAt: messageCreatedAt,
-          attachmentsPromise: turnAttachmentsPromise,
-          usesAttachmentUploads: turnUsesAttachmentUploads,
-          readFileBlockReason: () => readLiveAttachmentCapabilities().fileBlockReason,
-          buildOutgoingMessageContext,
-          isCurrentSend: () => composerSendGenerationRef.current === sendGeneration,
-        });
-      } finally {
-        finishFanout();
-      }
+      await sendToMultipleModels({
+        threadId: threadIdForSend,
+        project: activeProject,
+        branch: activeThreadBranch!,
+        selections: multipleModelSelections,
+        targets: multipleTargets,
+        sendSnapshot,
+        createdAt: messageCreatedAt,
+        attachmentsPromise: turnAttachmentsPromise,
+        usesAttachmentUploads: turnUsesAttachmentUploads,
+        readFileBlockReason: () => readLiveAttachmentCapabilities().fileBlockReason,
+        buildOutgoingMessageContext,
+        isCurrentSend: () => composerSendGenerationRef.current === sendGeneration,
+      }).finally(finishFanout);
       return;
     }
     const optimisticAttachments = optimisticMessageAttachments(composerAttachmentsSnapshot);

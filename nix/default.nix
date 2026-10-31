@@ -1,10 +1,10 @@
 { pkgs, self }:
 
 let
-  version = "0.1.4-nightly.20261028.3824";
-  appImageHash = "sha256-pP0mFbSUxj94y6ZYfSUUSUuqPWqQLwNZHs5lT39kc1M=";
-  upstreamSourceHash = "sha256-ctK3H97PfVLYl+X7ZLic4A6jzjmmetK/AXzIEaLVDYQ=";
-  pnpmDepsHash = "sha256-yfGmIplM2YP276PwCsgE61/NtUmyqeffH1eeQfvojps=";
+  version = "0.1.7-nightly.20261031.3991";
+  appImageHash = "sha256-orO0UXpPKmc+cCCh5wbQePrIkcOj++5MMA6KPFGWkIk=";
+  upstreamSourceHash = "sha256-aWyK6tu1if2k3MGJIVMF9NrfTgo8Cs1+fOg3Gb3C6Tg=";
+  pnpmDepsHash = "sha256-JikGsXejgxFJ9QOpIl18Fh8DGog5SymUJk+9lo43XZ8=";
   spdxLicenseListVersion = "v3.28.0";
   spdxLicenseListRevision = "c4a7237ec8f4654e867546f9f409749300f1bf4c";
 

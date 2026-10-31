@@ -117,13 +117,15 @@ export const JjForgeSection = (props: JjForgeSectionProps) => {
     if (blocked) return;
     setPending(true);
     setFailure(null);
-    try {
-      await action();
-    } catch (cause) {
-      setFailure(jjForgeFailureMessage(cause));
-    } finally {
-      setPending(false);
-    }
+    await Promise.resolve()
+      .then(action)
+      .then(
+        () => setPending(false),
+        (cause) => {
+          setFailure(jjForgeFailureMessage(cause));
+          setPending(false);
+        },
+      );
   };
 
   return (

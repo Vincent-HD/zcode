@@ -1,5 +1,5 @@
 import type { UsageLimitsReport } from "@t3tools/contracts";
-import { limitsNotice } from "@t3tools/shared/usageLimits";
+import { limitsNotice, remainingPercent } from "@t3tools/shared/usageLimits";
 import { CircleGauge, Database, Gauge, Wallet } from "lucide-react";
 import type * as DateTime from "effect/DateTime";
 import type { ContextWindowSnapshot } from "../../lib/contextWindow";
@@ -243,7 +243,7 @@ export const ComposerUsageFooter = (props: {
                 <UsageRow
                   key={window.id}
                   label={window.label}
-                  value={`${percent(window.usedPercent)} used`}
+                  value={`${remainingPercent(window)}% left`}
                 />
               ))}
             </dl>

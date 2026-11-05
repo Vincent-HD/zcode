@@ -4,6 +4,7 @@ import type {
   UsageLimitsReport,
 } from "@t3tools/contracts";
 import * as DateTime from "effect/DateTime";
+import { remainingPercent } from "@t3tools/shared/usageLimits";
 
 const compactCountFormatter = new Intl.NumberFormat("en-US", {
   notation: "compact",
@@ -109,7 +110,7 @@ export const composerQuotaSummary = (accounts: UsageLimitsReport["accounts"]) =>
           ? `${baseWindowName} (${window.id})`
           : baseWindowName;
       const name = includeAccountName ? `${accountName} ${windowName}` : windowName;
-      return `${name} ${window.usedPercent.toFixed(0)}%`;
+      return `${name} ${remainingPercent(window)}%`;
     });
   });
 

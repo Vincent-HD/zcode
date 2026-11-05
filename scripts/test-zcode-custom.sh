@@ -18,6 +18,7 @@ added_tests=(
   apps/server/src/jj/JjForgeService.test.ts
   apps/server/src/jj/JjPanelService.test.ts
   apps/web/src/components/chat/chatViewSend.temporary.test.ts
+  apps/web/src/components/chat/temporaryConversationDestroy.test.ts
   apps/web/src/components/chat/composer-usage.logic.test.ts
   apps/web/src/components/chat/models-dev-pricing.test.ts
   apps/web/src/components/chat/turn-usage.logic.test.ts
@@ -50,7 +51,6 @@ modified_tests=(
 additional_custom_tests=(
   apps/web/src/composer-logic.test.ts
   apps/web/src/threadRoutes.test.ts
-  apps/web/src/components/TemporaryConversationCoordinator.browser.test.tsx
   apps/web/src/components/chat/useComposerSend.logic.test.ts
 )
 
@@ -83,16 +83,14 @@ expected_test_cases=(
   'packages/client-runtime/src/state/commandPermissions.test.ts|requires the destination filesystem grant for Jujutsu diff reads'
   'packages/contracts/src/environment.test.ts|requires an advertised Jujutsu panel capability under version skew'
   'packages/contracts/src/environment.test.ts|advertises expanded Jujutsu actions, diff and publication independently from panel reads'
-  'packages/provider-cursor/src/server/adapter.test.ts|projects Cursor tasks: finished, late model undefined, missing usage false'
-  'packages/provider-cursor/src/server/adapter.test.ts|projects Cursor tasks: cancelled, late model undefined, missing usage false'
-  'packages/provider-cursor/src/server/adapter.test.ts|projects Cursor tasks: error, late model undefined, missing usage false'
-  'packages/provider-cursor/src/server/adapter.test.ts|projects Cursor tasks: finished, late model gpt-6-sol, missing usage false'
-  'packages/provider-cursor/src/server/adapter.test.ts|projects Cursor tasks: finished, late model null, missing usage false'
-  'packages/provider-cursor/src/server/adapter.test.ts|projects Cursor tasks: finished, late model undefined, missing usage true'
+  'packages/provider-cursor/src/server/adapter.test.ts|projects Cursor tasks and unfinished tools: finished, late model undefined, missing usage false'
+  'packages/provider-cursor/src/server/adapter.test.ts|projects Cursor tasks and unfinished tools: cancelled, late model undefined, missing usage false'
+  'packages/provider-cursor/src/server/adapter.test.ts|projects Cursor tasks and unfinished tools: error, late model undefined, missing usage false'
+  'packages/provider-cursor/src/server/adapter.test.ts|projects Cursor tasks and unfinished tools: finished, late model gpt-6-sol, missing usage false'
+  'packages/provider-cursor/src/server/adapter.test.ts|projects Cursor tasks and unfinished tools: finished, late model null, missing usage false'
+  'packages/provider-cursor/src/server/adapter.test.ts|projects Cursor tasks and unfinished tools: finished, late model undefined, missing usage true'
   'apps/web/src/composer-logic.test.ts|disables background send shortcuts for temporary drafts and threads'
   'apps/web/src/threadRoutes.test.ts|confirms a background draft only after its returned draft route is active'
-  'apps/web/src/components/TemporaryConversationCoordinator.browser.test.tsx|mounts the navigation guard for hosted-static routes'
-  'apps/web/src/components/TemporaryConversationCoordinator.browser.test.tsx|does not mount the guard on guest routes'
   'apps/web/src/components/chat/useComposerSend.logic.test.ts|keeps the marker on successive bootstrap retries and blocks background dispatch'
 )
 

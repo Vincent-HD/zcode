@@ -1,4 +1,4 @@
-import * as Crypto from "effect/Crypto";
+import * as SecureRandom from "effect/crypto/SecureRandom";
 import {
   JjPanelError,
   JjCommitId,
@@ -106,7 +106,7 @@ export class JjPanelService extends Context.Service<
 const make = Effect.gen(function* () {
   const process = yield* VcsProcess.VcsProcess;
   const fs = yield* FileSystem.FileSystem;
-  const crypto = yield* Crypto.Crypto;
+  const random = yield* SecureRandom.SecureRandom;
   const path = yield* Path.Path;
   // Repository-scoped resource locks never expire while queued users still hold them.
   const locks = new Map<string, Semaphore.Semaphore>();
@@ -363,9 +363,7 @@ const make = Effect.gen(function* () {
         const command = yield* input.prepare(before);
         if ((yield* head(input.request.cwd)).id !== before.operationId)
           return yield* error("stale-state");
-        const receiptId = yield* crypto
-          .randomUUIDv4()
-          .pipe(Effect.mapError(() => error("command-failed")));
+        const receiptId = yield* random.uuidV4();
         const marker = `t3-jj-${receiptId}`;
         // A unique operation author lets us verify attribution without trusting a moving latest op.
         yield* cli({
@@ -852,4 +850,6 @@ const make = Effect.gen(function* () {
   );
   return JjPanelService.of({ getPanel, describe, squash, revertOperation, runAction, getDiff });
 });
-export const layer = Layer.effect(JjPanelService, make);
+export const layer = Layer.effect(JjPanelService, make).pipe(
+  Layer.provide(SecureRandom.layerWebCrypto),
+);

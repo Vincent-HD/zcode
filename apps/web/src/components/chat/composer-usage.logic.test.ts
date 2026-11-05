@@ -82,7 +82,7 @@ describe("composer quota selection", () => {
 
   it("reports unavailable quota data without implying the authenticated account is unavailable", () => {
     expect(composerQuotaSummary([selected])).toBe("Quota unavailable");
-    expect(composerQuotaSummary([source])).toBe("Weekly 42%");
+    expect(composerQuotaSummary([source])).toBe("Weekly 58%");
   });
 
   it("uses reported durations, keeps named counters, and leaves missing durations named", () => {
@@ -125,7 +125,7 @@ describe("composer quota selection", () => {
     } satisfies UsageLimitsReport["accounts"][number];
 
     expect(composerQuotaSummary([account])).toBe(
-      "5h 12% · 24h 18% · Custom quota 1h 30m 40% · Sonnet 7d 12% · Monthly spend 23%",
+      "5h 88% · 24h 82% · Custom quota 1h 30m 60% · Sonnet 7d 88% · Monthly spend 77%",
     );
   });
 
@@ -175,7 +175,7 @@ describe("composer quota selection", () => {
     } satisfies UsageLimitsReport["accounts"][number];
 
     expect(composerQuotaSummary([personal, work])).toBe(
-      "Proxy · personal Sonnet 7d 12% · Proxy · personal Opus 7d 9% · Proxy · work Claude & GPT (shared) 7d 42%",
+      "Proxy · personal Sonnet 7d 88% · Proxy · personal Opus 7d 91% · Proxy · work Claude & GPT (shared) 7d 58%",
     );
 
     const sameLabel = [
@@ -183,7 +183,7 @@ describe("composer quota selection", () => {
       { ...work, id: "proxy:second", label: "Proxy · team" },
     ];
     expect(composerQuotaSummary(sameLabel)).toBe(
-      "Proxy · team (proxy:first) Sonnet 7d 12% · Proxy · team (proxy:first) Opus 7d 9% · Proxy · team (proxy:second) Claude & GPT (shared) 7d 42%",
+      "Proxy · team (proxy:first) Sonnet 7d 88% · Proxy · team (proxy:first) Opus 7d 91% · Proxy · team (proxy:second) Claude & GPT (shared) 7d 58%",
     );
   });
 
@@ -211,7 +211,7 @@ describe("composer quota selection", () => {
       },
     } satisfies UsageLimitsReport["accounts"][number];
 
-    expect(composerQuotaSummary([account])).toBe("7d (primary) 12% · 7d (secondary) 34%");
+    expect(composerQuotaSummary([account])).toBe("7d (primary) 88% · 7d (secondary) 66%");
   });
 });
 

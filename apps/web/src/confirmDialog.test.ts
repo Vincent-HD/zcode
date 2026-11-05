@@ -89,19 +89,19 @@ describe("confirm dialog coordinator", () => {
   it("uses action-specific button labels when requested", async () => {
     const unregister = mountHost();
     const confirmation = requireConfirmation(
-      requestConfirmDialog("Leave this temporary conversation?", {
+      requestConfirmDialog("Destroy this temporary conversation?", {
         variant: "destructive",
-        cancelLabel: "Stay",
-        confirmLabel: "Leave and discard",
+        cancelLabel: "Keep conversation",
+        confirmLabel: "Destroy conversation",
       }),
     );
 
     expect(readConfirmDialogState()).toEqual({
       status: "confirming",
-      message: "Leave this temporary conversation?",
+      message: "Destroy this temporary conversation?",
       variant: "destructive",
-      cancelLabel: "Stay",
-      confirmLabel: "Leave and discard",
+      cancelLabel: "Keep conversation",
+      confirmLabel: "Destroy conversation",
     });
     respondToConfirmDialog(false);
     await expect(confirmation).resolves.toBe(false);

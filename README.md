@@ -23,9 +23,10 @@ upstream builds and do not include this fork's additions.
   existing jj workspace; it never initializes a repository. Available actions depend on
   environment capabilities and permissions, conflicts are informational, and Squash Onto requires
   jj's experimental `--onto` option.
-- **Temporary conversations:** Mark a draft or conversation temporary to get a prompt to stay or
-  leave and discard when navigating away. Discard uses the normal conversation deletion flow and
-  preserves the workspace and worktree. The temporary marker is local to the browser profile.
+- **Temporary conversations:** Mark a draft or conversation temporary from the header. Leaving it
+  does not discard it. The header trash button confirms, then removes it from history through the
+  normal deletion flow and preserves the workspace and worktree. The temporary marker is local to
+  the browser profile.
   This is not private storage or secure erasure: T3 event records, provider transcripts, remote
   copies, and other data may remain. Closing or refreshing the browser cannot reliably finish
   asynchronous deletion, so the conversation may remain.

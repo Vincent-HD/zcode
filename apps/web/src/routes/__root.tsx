@@ -23,7 +23,6 @@ import { UseInAnotherAppDialogHost } from "../components/mcp/UseInAnotherAppDial
 import { AddProjectToMachineDialogHost } from "../components/AddProjectToMachineDialog";
 import { ConfirmDialogHost } from "../components/ConfirmDialogHost";
 import { DevReplayHost } from "../components/DevReplayHost";
-import { TemporaryConversationCoordinatorGate } from "../components/TemporaryConversationCoordinator";
 import { FirstRunGate } from "../components/onboarding/FirstRunGate";
 import { ConnectOnboardingDialog } from "../components/cloud/ConnectOnboardingDialog";
 import { RelayClientInstallDialog } from "../components/cloud/RelayClientInstallDialog";
@@ -200,7 +199,6 @@ function RootRouteBranch() {
       <SnapShotCoordinator />
       <ReopenClosedViewShortcut />
       <ConfirmDialogHost />
-      <TemporaryConversationCoordinatorGate authGateStatus={authGateState.status} />
       <CustomSnoozeDialogHost />
       <GuestShareDialogHost />
       <ProjectCloneToastCoordinator />
@@ -240,8 +238,7 @@ function RootRouteBranch() {
         </FirstRunGate>
       )}
       {/* Above both shells and the router, so drafts survive navigation, including to /welcome. */}
-      <ThemeEditorHost />
-    </>
+      <ThemeEditorHost />    </>
   );
 }
 

@@ -46,6 +46,8 @@ import { useClientSettings } from "../../hooks/useSettings";
 import { GuestShareIndicator } from "./GuestShareControls";
 import { useUiStateStore } from "../../uiStateStore";
 import { hasPendingDraftSend } from "./chatViewSend";
+import { Button } from "../ui/button";
+import { requestConfirmDialog } from "../../confirmDialog";
 
 interface ChatHeaderProps {
   activeThreadEnvironmentId: EnvironmentId;
@@ -61,6 +63,7 @@ interface ChatHeaderProps {
   onOpenProjectSettings?: (() => void) | undefined;
   onFindInThread?: ((threadRef: ScopedThreadRef) => void) | undefined;
   temporaryConversationKeys?: ReadonlyArray<string>;
+  onDestroyTemporary?: () => Promise<boolean>;
 }
 
 function resolveRenameCommit(input: {
@@ -87,6 +90,7 @@ export const ChatHeader = memo(function ChatHeader({
   onOpenProjectSettings,
   onFindInThread,
   temporaryConversationKeys,
+  onDestroyTemporary,
 }: ChatHeaderProps) {
   const gt = useGT();
   const activeProjectName = activeProject?.isScratch ? gt("No project") : activeProject?.title;
@@ -255,6 +259,32 @@ export const ChatHeader = memo(function ChatHeader({
           onOpenProjectSettings?.();
         }
       });
+  };
+  const makeTemporary = () => {
+    if (markerKeys.some(hasPendingDraftSend)) {
+      toastManager.add({ type: "warning", title: "Wait for the message to finish sending" });
+      return;
+    }
+    for (const key of markerKeys) useUiStateStore.getState().setTemporaryThread(key, true);
+    toastManager.add({ type: "success", title: "Conversation marked temporary" });
+  };
+  const destroyTemporary = async () => {
+    const confirmation = requestConfirmDialog(
+      [
+        "Destroy this temporary conversation?",
+        "T3 will remove it from your history and run available cleanup for linked resources. Database history and provider-side data may remain.",
+      ].join("\n"),
+      {
+        variant: "destructive",
+        cancelLabel: "Keep conversation",
+        confirmLabel: "Destroy conversation",
+      },
+    );
+    if (!(await confirmation)) return;
+    const destroyed = await onDestroyTemporary?.();
+    if (destroyed) {
+      toastManager.add({ type: "success", title: "Temporary conversation destroyed" });
+    }
   };
   const openMenuFromTitle = (event: ReactMouseEvent<HTMLButtonElement>) => {
     if (isTrailingDoubleClick(event.detail)) return;
@@ -466,6 +496,28 @@ export const ChatHeader = memo(function ChatHeader({
           ) : null}
         </WorkspaceBreadcrumbItem>
       </WorkspaceBreadcrumb>
+      {isTemporary ? (
+        <Button
+          variant="destructive"
+          size="xs"
+          aria-label="Destroy temporary conversation"
+          disabled={!canOperateThread || onDestroyTemporary === undefined}
+          onClick={() => void destroyTemporary()}
+        >
+          <Trash2Icon />
+          Destroy temporary
+        </Button>
+      ) : (
+        <Button
+          variant="outline"
+          size="xs"
+          aria-label="Make conversation temporary"
+          onClick={makeTemporary}
+        >
+          <TimerIcon />
+          Make temporary
+        </Button>
+      )}
       {isServerThread ? <GuestShareIndicator threadRef={activeThreadRef} /> : null}
     </div>
   );

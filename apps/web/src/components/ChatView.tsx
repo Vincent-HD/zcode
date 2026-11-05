@@ -205,6 +205,8 @@ import {
 import { useNowMinute } from "../hooks/useNowMinute";
 import { usePanelAnimationSettings, usePanelPresence } from "../panelAnimations";
 import { useNewThreadHandler } from "../hooks/useHandleNewThread";
+import { useThreadActions } from "../hooks/useThreadActions";
+import { destroyTemporaryConversation as destroyTemporaryConversationAction } from "./chat/temporaryConversationDestroy";
 import { useOpenPanelPullRequestUrl } from "../hooks/useOpenPanelPullRequestUrl";
 import { isPreviewFocused } from "../lib/previewFocus";
 import { focusTerminalOnThreadEnter, getTerminalFocusOwner } from "../lib/terminalFocus";
@@ -431,8 +433,10 @@ export default function ChatView(props: ChatViewProps) {
   const canOperateTerminal = useEnvironmentScope(environmentId, AuthTerminalOperateScope);
   const draftId = routeKind === "draft" ? props.draftId : null;
   const handleNewThread = useNewThreadHandler();
+  const navigate = useNavigate();
   const routeThreadRef = scopeThreadRef(environmentId, threadId);
   const routeThreadKey = scopedThreadKey(routeThreadRef);
+  const { deleteThread: deleteThreadAction } = useThreadActions();
   const currentRouteThreadKeyRef = useRef<string | null>(routeThreadKey);
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- publishes the committed route thread key to a ref that async handlers check before applying results
   useLayoutEffect(() => {
@@ -484,6 +488,19 @@ export default function ChatView(props: ChatViewProps) {
     routeThreadKey,
     ...(draftThread?.promotedTo ? [scopedThreadKey(draftThread.promotedTo)] : []),
   ];
+  const destroyTemporaryConversation = () =>
+    destroyTemporaryConversationAction({
+      environmentId,
+      routeKind,
+      draftId,
+      draftThread,
+      routeThreadRef,
+      routeThreadKey,
+      temporaryThreadKeys: temporaryConversationKeys,
+      deleteThread: deleteThreadAction,
+      startNewThread: handleNewThread,
+      navigateAway: () => navigate({ to: "/", replace: true }),
+    });
   const isTemporaryConversation = useUiStateStore((state) =>
     temporaryConversationKeys.some((key) => state.temporaryThreadKeys.includes(key)),
   );
@@ -572,7 +589,6 @@ export default function ChatView(props: ChatViewProps) {
   const settings = useEnvironmentSettings(environmentId);
   const clientSettingsHydrated = useClientSettingsHydrated();
   const timestampFormat = settings.timestampFormat;
-  const navigate = useNavigate();
   // Selects primitives: an object here is new on every router store update, which
   // re-renders ChatView on unrelated navigation state changes.
   const citationHref = useLocation({ select: (location) => location.href });
@@ -3398,6 +3414,7 @@ export default function ChatView(props: ChatViewProps) {
                 routeThreadKey,
                 ...(draftThread?.promotedTo ? [scopedThreadKey(draftThread.promotedTo)] : []),
               ]}
+              onDestroyTemporary={destroyTemporaryConversation}
               {...(activeDraftLogicalProjectKey
                 ? { onOpenProjectSettings: handleOpenDraftProjectSettingsStable }
                 : {})}

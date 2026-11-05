@@ -21,7 +21,6 @@ import { GuestShareDialogHost } from "../components/chat/GuestShareControls";
 import { AddProjectToMachineDialogHost } from "../components/AddProjectToMachineDialog";
 import { ConfirmDialogHost } from "../components/ConfirmDialogHost";
 import { DevReplayHost } from "../components/DevReplayHost";
-import { TemporaryConversationCoordinatorGate } from "../components/TemporaryConversationCoordinator";
 import { FirstRunGate } from "../components/onboarding/FirstRunGate";
 import { ConnectOnboardingDialog } from "../components/cloud/ConnectOnboardingDialog";
 import { RelayClientInstallDialog } from "../components/cloud/RelayClientInstallDialog";
@@ -209,7 +208,6 @@ function RootRouteBranch() {
         <SnapShotCoordinator />
         <ReopenClosedViewShortcut />
         <ConfirmDialogHost />
-        <TemporaryConversationCoordinatorGate authGateStatus={authGateState.status} />
         <CustomSnoozeDialogHost />
         <GuestShareDialogHost />
         <ProjectCloneToastCoordinator />

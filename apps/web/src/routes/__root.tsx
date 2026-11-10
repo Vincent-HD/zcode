@@ -238,7 +238,8 @@ function RootRouteBranch() {
         </FirstRunGate>
       )}
       {/* Above both shells and the router, so drafts survive navigation, including to /welcome. */}
-      <ThemeEditorHost />    </>
+      <ThemeEditorHost />
+    </>
   );
 }
 

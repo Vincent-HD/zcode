@@ -48,22 +48,62 @@ const formatWindowDuration = (minutes: number) => {
   return `${minutes}m`;
 };
 
-const compactWindowLabel = (
-  window: UsageLimitsReport["accounts"][number]["limits"]["windows"][number],
-) => {
-  if (window.windowDurationMins === undefined) return window.label.trim();
+type UsageWindow = UsageLimitsReport["accounts"][number]["limits"]["windows"][number];
 
-  const duration = formatWindowDuration(window.windowDurationMins);
-  const name = window.label
-    .trim()
-    .split(/\s*[·|]\s*/)
-    .filter((part) => !WINDOW_DURATION_LABEL.test(part.trim()))
-    .join(" · ")
-    .replace(/^(?:session|daily|weekly|monthly)\s+/i, "")
-    .replace(/\s+(?:session|daily|weekly|monthly)$/i, "")
-    .replace(TRAILING_WINDOW_DURATION, "")
-    .trim();
+const MINUTES_PER_MONTH = 30 * MINUTES_PER_DAY;
+const BUDGET_WINDOW = /\b(?:spend|credit)\b/i;
+const MODEL_FAMILY = /\b(opus|fable|sonnet|haiku|ghost)\b/i;
+const COMPACT_WINDOW_NAMES = new Map([
+  ["other models", "3rd"],
+  ["cursor models", "Cursor"],
+  ["overall", "all"],
+]);
+
+const windowDurationMins = (window: UsageWindow) => {
+  if (window.windowDurationMins !== undefined) return window.windowDurationMins;
+  if (window.kind === "weekly") return MINUTES_PER_WEEK;
+  if (window.kind === "monthly") return MINUTES_PER_MONTH;
+  return undefined;
+};
+
+const isBudgetWindow = (window: UsageWindow) =>
+  BUDGET_WINDOW.test(window.id) || BUDGET_WINDOW.test(window.label);
+
+const shortWindowName = (name: string) => {
+  const known = COMPACT_WINDOW_NAMES.get(name.toLowerCase());
+  if (known) return known;
+  const family = MODEL_FAMILY.exec(name);
+  const word = family?.[1];
+  if (!word || name.toLowerCase() === word.toLowerCase()) return name;
+  return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+};
+
+const compactWindowLabel = (window: UsageWindow) => {
+  const minutes = windowDurationMins(window);
+  if (minutes === undefined) return shortWindowName(window.label.trim());
+
+  const duration = formatWindowDuration(minutes);
+  const name = shortWindowName(
+    window.label
+      .trim()
+      .split(/\s*[·|]\s*/)
+      .filter((part) => !WINDOW_DURATION_LABEL.test(part.trim()))
+      .join(" · ")
+      .replace(/^(?:session|daily|weekly|monthly)\s+/i, "")
+      .replace(/\s+(?:session|daily|weekly|monthly)$/i, "")
+      .replace(TRAILING_WINDOW_DURATION, "")
+      .trim(),
+  );
   return name ? `${name} ${duration}` : duration;
+};
+
+const compactWindows = (windows: ReadonlyArray<UsageWindow>) => {
+  const timed = windows.filter((window) => !isBudgetWindow(window));
+  const shown = timed.length > 0 ? timed : windows;
+  const hasBothCursorPools =
+    shown.some((window) => window.id === "autoPercentUsed") &&
+    shown.some((window) => window.id === "apiPercentUsed");
+  return hasBothCursorPools ? shown.filter((window) => window.id !== "totalPercentUsed") : shown;
 };
 
 const accountSummaryName = (account: UsageLimitsReport["accounts"][number]) =>
@@ -98,12 +138,13 @@ export const composerQuotaSummary = (accounts: UsageLimitsReport["accounts"]) =>
   const includeAccountName = accounts.length > 1;
   const rows = accounts.flatMap((account, accountIndex) => {
     const accountName = accountNames[accountIndex]!;
-    const windowNames = account.limits.windows.map(compactWindowLabel);
+    const windows = compactWindows(account.limits.windows);
+    const windowNames = windows.map(compactWindowLabel);
     const windowNameCounts = new Map<string, number>();
     for (const name of windowNames)
       windowNameCounts.set(name, (windowNameCounts.get(name) ?? 0) + 1);
 
-    return account.limits.windows.map((window, index) => {
+    return windows.map((window, index) => {
       const baseWindowName = windowNames[index]!;
       const windowName =
         (windowNameCounts.get(baseWindowName) ?? 0) > 1

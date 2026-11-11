@@ -1,7 +1,7 @@
 # zcode
 
 `zcode` is a community-maintained fork of T3 Code. This section describes the features maintained
-in this fork and how to install or update its Linux x86_64 Nix package. The Original T3 Code README
+in this fork and how to install or update its Linux x86_64 and macOS arm64 Nix package. The Original T3 Code README
 below retains the upstream CLI and desktop installation instructions; those commands install
 upstream builds and do not include this fork's additions.
 
@@ -37,10 +37,11 @@ This fork runs its focused regression suite on every push and pull request throu
 The workflow runs [`scripts/test-zcode-custom.sh`](./scripts/test-zcode-custom.sh); upstream CI
 skips this repository, and this workflow runs only in `Vincent-HD/zcode`.
 
-## Linux installation and updates (Nix flake)
+## Linux and macOS installation and updates (Nix flake)
 
 The flake builds the renderer and server from this checkout, then repacks them into the matching
-upstream x86_64 AppImage to retain its Electron runtime, native modules, and desktop assets. Before
+upstream x86_64 AppImage on Linux, or the arm64 zip on macOS, to retain its Electron runtime, native
+modules, and desktop assets. Before
 fetching the pnpm closure, the build checks the lockfile, workspace configuration, and dependency
 fields in every workspace manifest against the source tag for that AppImage version. It also compares
 `apps/desktop`, `native`, `packages/shared`, `packages/ssh`, and `packages/tailscale` source trees
@@ -55,7 +56,11 @@ nix build .#z-code --no-link
 nix run .#z-code
 ```
 
-The package is Linux x86_64 only. It provides the `z-code`, `zcode`, and `t3code` commands and
+The package supports Linux x86_64 and macOS arm64. On macOS it ships `Applications/T3 Code (Nightly).app`.
+Repacking `app.asar` invalidates the upstream Developer ID signature, so the build rewrites the
+`ElectronAsarIntegrity` header hash in `Info.plist` and re-signs every Mach-O file ad hoc. macOS may ask
+again for Keychain access the first time, because the app's signing identity changed. It provides the
+`z-code`, `zcode`, and `t3code` commands and
 flake package/app aliases. The app keeps its upstream T3 Code identity and uses the same
 `~/.t3/userdata` state, so existing data is shared with the upstream desktop app. Back up that
 state before switching versions; downgrading the binary does not reverse database migrations.
@@ -64,15 +69,15 @@ After rebasing this fork onto the upstream release you want to package, run the 
 release version:
 
 ```bash
-./scripts/update-z-code-nix.sh 0.1.8-nightly.20261105.4218
+./scripts/update-z-code-nix.sh 0.1.9-nightly.20261110.4478
 # Preview the candidate pins, then restore nix/default.nix:
-./scripts/update-z-code-nix.sh --dry-run 0.1.8-nightly.20261105.4218
+./scripts/update-z-code-nix.sh --dry-run 0.1.9-nightly.20261110.4478
 ```
 
 The updater proves that the selected upstream tag commit is an ancestor of the fork's current `HEAD`
 without fetching or changing Git refs. It reads the `upstream` remote by default; set
 `Z_CODE_UPSTREAM_REMOTE` if that remote has a different name. It then synchronizes the version,
-AppImage hash, upstream source hash, and pnpm closure hash. It refreshes the fixed-output pnpm
+AppImage hash, macOS zip hash, upstream source hash, and pnpm closure hash. It refreshes the fixed-output pnpm
 closure to derive its hash; it does not build the complete package. Tracked dirty changes are
 included in the flake source and the preflight. Untracked files are refused because Git flakes omit
 them. A mismatch in the lockfile, workspace configuration, license configuration, workspace package

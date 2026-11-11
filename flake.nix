@@ -1,24 +1,36 @@
 {
-  description = "Linux T3 Code fork packaged with its pinned upstream AppImage runtime";
+  description = "T3 Code fork packaged with its pinned upstream desktop runtime for Linux and macOS";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
   outputs =
     { self, nixpkgs }:
     let
-      system = "x86_64-linux";
-      pkgs = import nixpkgs { inherit system; };
-      zCode = import ./nix/default.nix { inherit pkgs self; };
+      systems = [
+        "x86_64-linux"
+        "aarch64-darwin"
+      ];
+      forEachSystem =
+        mkOutput:
+        nixpkgs.lib.genAttrs systems (
+          system:
+          mkOutput (
+            import ./nix/default.nix {
+              pkgs = import nixpkgs { inherit system; };
+              inherit self;
+            }
+          )
+        );
     in
     {
-      packages.${system} = {
+      packages = forEachSystem (zCode: {
         default = zCode;
         z-code = zCode;
         zcode = zCode;
         t3code = zCode;
-      };
+      });
 
-      apps.${system} = {
+      apps = forEachSystem (zCode: {
         z-code = {
           type = "app";
           program = "${zCode}/bin/z-code";
@@ -31,6 +43,6 @@
           type = "app";
           program = "${zCode}/bin/t3code";
         };
-      };
+      });
     };
 }

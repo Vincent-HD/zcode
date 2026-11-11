@@ -87,6 +87,7 @@ else
 fi
 
 app_image_url="https://github.com/pingdotgg/t3code/releases/download/v${version}/T3-Code-${version}-x86_64.AppImage"
+mac_zip_url="https://github.com/pingdotgg/t3code/releases/download/v${version}/T3-Code-${version}-arm64.zip"
 upstream_source_url="https://github.com/pingdotgg/t3code/archive/refs/tags/v${version}.tar.gz"
 
 printf 'Prefetching upstream v%s AppImage...\n' "$version"
@@ -95,6 +96,15 @@ app_image_hash="$(printf '%s' "$app_image_json" | node --input-type=module -e '
   import fs from "node:fs";
   const result = JSON.parse(fs.readFileSync(0, "utf8"));
   if (typeof result.hash !== "string") throw new Error("Nix did not return an AppImage hash.");
+  process.stdout.write(result.hash);
+')"
+
+printf 'Prefetching upstream v%s macOS arm64 zip...\n' "$version"
+mac_zip_json="$(nix store prefetch-file --json "$mac_zip_url")"
+mac_zip_hash="$(printf '%s' "$mac_zip_json" | node --input-type=module -e '
+  import fs from "node:fs";
+  const result = JSON.parse(fs.readFileSync(0, "utf8"));
+  if (typeof result.hash !== "string") throw new Error("Nix did not return a macOS zip hash.");
   process.stdout.write(result.hash);
 ')"
 
@@ -146,6 +156,7 @@ set_pin() {
 
 set_pin version "$version"
 set_pin appImageHash "$app_image_hash"
+set_pin macZipHash "$mac_zip_hash"
 set_pin upstreamSourceHash "$upstream_source_hash"
 set_pin pnpmDepsHash "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
 
@@ -168,6 +179,7 @@ set_pin pnpmDepsHash "$pnpm_deps_hash"
 
 printf '\nPins for upstream v%s:\n' "$version"
 printf '  appImageHash = "%s";\n' "$app_image_hash"
+printf '  macZipHash = "%s";\n' "$mac_zip_hash"
 printf '  upstreamSourceHash = "%s";\n' "$upstream_source_hash"
 printf '  pnpmDepsHash = "%s";\n' "$pnpm_deps_hash"
 printf 'The fixed-output pnpm closure was refreshed. The complete package build is a separate optional user check documented in README.md.\n'

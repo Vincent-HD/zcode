@@ -82,7 +82,7 @@ describe("composer quota selection", () => {
 
   it("reports unavailable quota data without implying the authenticated account is unavailable", () => {
     expect(composerQuotaSummary([selected])).toBe("Quota unavailable");
-    expect(composerQuotaSummary([source])).toBe("Weekly 58%");
+    expect(composerQuotaSummary([source])).toBe("7d 58%");
   });
 
   it("uses reported durations, keeps named counters, and leaves missing durations named", () => {
@@ -125,8 +125,16 @@ describe("composer quota selection", () => {
     } satisfies UsageLimitsReport["accounts"][number];
 
     expect(composerQuotaSummary([account])).toBe(
-      "5h 88% · 24h 82% · Custom quota 1h 30m 60% · Sonnet 7d 88% · Monthly spend 77%",
+      "5h 88% · 24h 82% · Custom quota 1h 30m 60% · Sonnet 7d 88%",
     );
+    expect(
+      composerQuotaSummary([
+        {
+          ...account,
+          limits: { checkedAt: unavailable.checkedAt, windows: [account.limits.windows[4]!] },
+        },
+      ]),
+    ).toBe("spend 30d 77%");
   });
 
   it("names multiple accounts and separates same-duration windows", () => {
@@ -212,6 +220,74 @@ describe("composer quota selection", () => {
     } satisfies UsageLimitsReport["accounts"][number];
 
     expect(composerQuotaSummary([account])).toBe("7d (primary) 88% · 7d (secondary) 66%");
+  });
+
+  it("shortens Cursor pools and model windows, and hides a combined total", () => {
+    const cursor = {
+      ...selected,
+      limits: {
+        checkedAt: unavailable.checkedAt,
+        windows: [
+          { id: "totalPercentUsed", kind: "monthly" as const, label: "Overall", usedPercent: 8 },
+          {
+            id: "autoPercentUsed",
+            kind: "monthly" as const,
+            label: "Cursor Models",
+            usedPercent: 10,
+          },
+          {
+            id: "apiPercentUsed",
+            kind: "monthly" as const,
+            label: "Other Models",
+            usedPercent: 100,
+          },
+        ],
+      },
+    } satisfies UsageLimitsReport["accounts"][number];
+    const claude = {
+      ...selected,
+      limits: {
+        checkedAt: unavailable.checkedAt,
+        windows: [
+          {
+            id: "five_hour",
+            kind: "session" as const,
+            label: "Session",
+            usedPercent: 0,
+            windowDurationMins: 300,
+          },
+          {
+            id: "seven_day",
+            kind: "weekly" as const,
+            label: "Weekly",
+            usedPercent: 7,
+            windowDurationMins: 10080,
+          },
+          {
+            id: "seven_day_opus",
+            kind: "weekly" as const,
+            label: "Weekly · Claude Opus 4.6",
+            usedPercent: 0,
+            windowDurationMins: 10080,
+          },
+          { id: "monthly_spend", kind: "monthly" as const, label: "Monthly spend", usedPercent: 0 },
+        ],
+      },
+    } satisfies UsageLimitsReport["accounts"][number];
+
+    expect(composerQuotaSummary([cursor])).toBe("Cursor 30d 90% · 3rd 30d 0%");
+    expect(composerQuotaSummary([claude])).toBe("5h 100% · 7d 93% · Opus 7d 100%");
+    expect(
+      composerQuotaSummary([
+        {
+          ...cursor,
+          limits: {
+            checkedAt: unavailable.checkedAt,
+            windows: [cursor.limits.windows[0]!],
+          },
+        },
+      ]),
+    ).toBe("all 30d 92%");
   });
 });
 

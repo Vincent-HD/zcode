@@ -1,5 +1,10 @@
 import type { ContextMenuItem } from "@t3tools/contracts";
 import type { SnoozePreset } from "@t3tools/client-runtime/state/thread-settled";
+import {
+  ZCODE_THREAD_ACTIONS_WITHOUT_OPERATE,
+  zcodeThreadActionMenuItems,
+  type ZcodeThreadActionMenuId,
+} from "../zcode/thread-action-menu";
 
 export type ThreadActionMenuId =
   | "find"
@@ -21,8 +26,7 @@ export type ThreadActionMenuId =
   | "regenerate-title"
   | "mark-unread"
   | "share-guest"
-  | "make-temporary"
-  | "keep-permanent"
+  | ZcodeThreadActionMenuId
   | "copy"
   | "copy-path"
   | "copy-branch"
@@ -83,7 +87,7 @@ export interface ThreadActionMenuState {
   readonly isSnoozed: boolean;
   readonly canSnoozeNow: boolean;
   readonly isRegeneratingTitle: boolean;
-  readonly isTemporary: boolean;
+  readonly isTemporary?: boolean;
   /** Archive rejects attached providers, so disable it while running. */
   readonly isRunning: boolean;
   readonly supports: {
@@ -108,8 +112,7 @@ export function threadActionRequiresOperate(action: ThreadActionMenuId): boolean
     "project-settings",
     "mark-unread",
     "share-guest",
-    "make-temporary",
-    "keep-permanent",
+    ...ZCODE_THREAD_ACTIONS_WITHOUT_OPERATE,
     "copy",
     "copy-path",
     "copy-branch",
@@ -183,9 +186,7 @@ export function buildThreadActionMenuItems(
         ]
       : []),
     { id: "mark-unread", label: "Mark unread", icon: "mail-open" },
-    state.isTemporary
-      ? { id: "keep-permanent", label: "Keep permanently", icon: "circle-check" }
-      : { id: "make-temporary", label: "Make temporary", icon: "timer", separatorBefore: true },
+    ...zcodeThreadActionMenuItems(state),
     ...(state.canShareWithGuest
       ? [{ id: "share-guest" as const, label: "Share with guest", icon: "user-plus" }]
       : []),

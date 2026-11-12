@@ -25,7 +25,7 @@ import type { useUsageLimitsPanel } from "./useUsageLimitsPanel";
 interface ComposerResumeInput {
   readonly environmentId: EnvironmentId;
   readonly routeThreadKey: string;
-  readonly draftId: string | null;
+  readonly draftId?: string | null | undefined;
   readonly currentRouteThreadKeyRef: { readonly current: string | null };
   readonly activeThread: EnvironmentThreadShell | undefined;
   readonly resumableRunId: RunId | null;
@@ -57,7 +57,6 @@ export function useComposerResume(input: ComposerResumeInput) {
   const {
     environmentId,
     routeThreadKey,
-    draftId,
     currentRouteThreadKeyRef,
     activeThread,
     resumableRunId,
@@ -95,7 +94,10 @@ export function useComposerResume(input: ComposerResumeInput) {
       isRevertingCheckpoint ||
       threadDetailLoading ||
       activeEnvironmentUnavailable ||
-      isTemporaryConversationSendBlocked({ draftId, threadKey: routeThreadKey }) ||
+      isTemporaryConversationSendBlocked({
+        draftId: input.draftId ?? null,
+        threadKey: routeThreadKey,
+      }) ||
       sendInFlightRef.current
     ) {
       return;

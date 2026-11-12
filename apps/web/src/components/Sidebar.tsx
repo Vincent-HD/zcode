@@ -237,9 +237,10 @@ import {
   useActiveRowReveal,
 } from "./sidebar/routeReveal";
 import { stackedThreadToast, toastManager } from "./ui/toast";
+import { handleZcodeThreadAction } from "../zcode/thread-actions";
+import { isTemporaryThreadKey } from "../zcode/temporary-conversation-store";
 import { copyThreadReference } from "../lib/copyThreadReference";
 import { threadChipCopyTarget } from "@t3tools/client-runtime/thread-reference";
-import { hasPendingDraftSend } from "./chat/chatViewSend";
 import { Button } from "./ui/button";
 import { isProjectPinShortcut, ProjectPinButton } from "./ProjectPinButton";
 import {
@@ -2643,7 +2644,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
               isSnoozed,
               canSnoozeNow: canSnooze(thread, { now: new Date().toISOString() }),
               isRegeneratingTitle,
-              isTemporary: useUiStateStore.getState().temporaryThreadKeys.includes(threadKey),
+              isTemporary: isTemporaryThreadKey(threadKey),
               isRunning: !threadRuntimeCanArchive(thread.runtime),
               canShareWithGuest: appAtomRegistry.get(
                 canShareWithGuestAtom(threadRef.environmentId),
@@ -2676,6 +2677,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
           if (preset) attemptSnooze(threadRef, preset);
           return;
         }
+        if (handleZcodeThreadAction(clicked.value, threadKey)) return;
         switch (clicked.value) {
           case "filter-by-project":
             if (threadProjectGroup) {
@@ -2793,21 +2795,6 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
           }
           case "mark-unread":
             markThreadUnread(threadRef);
-            return;
-          case "make-temporary":
-            if (hasPendingDraftSend(threadKey)) {
-              toastManager.add({
-                type: "warning",
-                title: "Wait for the message to finish sending",
-              });
-              return;
-            }
-            useUiStateStore.getState().setTemporaryThread(threadKey, true);
-            toastManager.add({ type: "success", title: "Conversation marked temporary" });
-            return;
-          case "keep-permanent":
-            useUiStateStore.getState().setTemporaryThread(threadKey, false);
-            toastManager.add({ type: "success", title: "Conversation will be kept" });
             return;
           case "copy-path":
             if (!threadWorkspacePath) {

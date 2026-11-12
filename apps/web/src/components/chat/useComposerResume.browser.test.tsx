@@ -48,7 +48,6 @@ function ResumeButton(props: {
   const { onResume } = useComposerResume({
     environmentId: EnvironmentId.make("environment:test"),
     routeThreadKey: "environment:test:thread:a",
-    draftId: null,
     currentRouteThreadKeyRef: { current: "environment:test:thread:a" },
     activeThread: { id: threadA } as never,
     resumableRunId: RunId.make("run:interrupted"),

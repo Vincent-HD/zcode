@@ -4,15 +4,38 @@ import {
   scopeThreadRef,
 } from "@t3tools/client-runtime/environment";
 import { EnvironmentId, ProjectId, ThreadId } from "@t3tools/contracts";
-import { describe, expect, it, vi } from "vite-plus/test";
+import { describe, expect, it } from "vite-plus/test";
 
-import { DraftId, useComposerDraftStore } from "../../composerDraftStore";
-import { useUiStateStore } from "../../uiStateStore";
 import {
+  DraftId,
+  restoreFailedDraftThread,
+  useComposerDraftStore,
+  type DraftSessionState,
+} from "../../composerDraftStore";
+import { newThreadId } from "~/lib/utils";
+import { useTemporaryConversationStore } from "../../zcode/temporary-conversation-store";
+import {
+  blocksTemporaryBackgroundSend,
+  captureTemporaryMarkerKeys,
   isTemporaryComposerConversation,
-  restoreFailedDraftSend,
-  runTemporaryConversationSendGuard,
+  transferTemporaryMarkersToRestoredDraft,
 } from "./useComposerSend.logic";
+
+// Mirrors useComposerSend's failure path: capture markers, restore the draft, carry them over.
+const restoreFailedDraftSend = (input: {
+  readonly environmentId: EnvironmentId;
+  readonly routeThreadKey: string;
+  readonly draftId: DraftId;
+  readonly draftThread: DraftSessionState;
+  readonly threadIdForSend: ThreadId;
+  readonly bootstrapThreadDeleted: boolean;
+}) => {
+  const markerKeys = captureTemporaryMarkerKeys(input);
+  const retryThreadId = input.bootstrapThreadDeleted ? newThreadId() : input.threadIdForSend;
+  restoreFailedDraftThread(input.draftId, input.draftThread, retryThreadId);
+  transferTemporaryMarkersToRestoredDraft({ markerKeys, draftId: input.draftId });
+  return retryThreadId;
+};
 
 describe("useComposerSend failure and temporary-conversation guards", () => {
   it("keeps the marker on successive bootstrap retries and blocks background dispatch", () => {
@@ -22,9 +45,12 @@ describe("useComposerSend failure and temporary-conversation guards", () => {
     const initialThreadId = ThreadId.make("temporary-send-bootstrap");
     const initialThreadRef = scopeThreadRef(environmentId, initialThreadId);
     const initialThreadKey = scopedThreadKey(initialThreadRef);
-    const previousTemporaryKeys = useUiStateStore.getState().temporaryThreadKeys;
+    const previousTemporaryKeys = useTemporaryConversationStore.getState().temporaryThreadKeys;
     const markerKeys = new Set([initialThreadKey]);
-    useUiStateStore.setState((state) => ({ ...state, temporaryThreadKeys: [initialThreadKey] }));
+    useTemporaryConversationStore.setState((state) => ({
+      ...state,
+      temporaryThreadKeys: [initialThreadKey],
+    }));
     useComposerDraftStore.getState().setProjectDraftThreadId(projectRef, draftId, {
       threadId: initialThreadId,
     });
@@ -49,7 +75,7 @@ describe("useComposerSend failure and temporary-conversation guards", () => {
 
       expect(firstRetryThreadId).not.toBe(initialThreadId);
       expect(firstRetrySession.threadId).toBe(firstRetryThreadId);
-      expect(useUiStateStore.getState().temporaryThreadKeys).toEqual([firstRetryKey]);
+      expect(useTemporaryConversationStore.getState().temporaryThreadKeys).toEqual([firstRetryKey]);
 
       const secondRetryThreadId = restoreFailedDraftSend({
         environmentId,
@@ -65,34 +91,27 @@ describe("useComposerSend failure and temporary-conversation guards", () => {
       expect(useComposerDraftStore.getState().getDraftSession(draftId)?.threadId).toBe(
         secondRetryThreadId,
       );
-      expect(useUiStateStore.getState().temporaryThreadKeys).toEqual([secondRetryKey]);
+      expect(useTemporaryConversationStore.getState().temporaryThreadKeys).toEqual([
+        secondRetryKey,
+      ]);
 
-      const startThreadTurn = vi.fn(() => Promise.resolve("started"));
-      const showBlockedNotice = vi.fn();
       const retryDraftSession = useComposerDraftStore.getState().getDraftSession(draftId);
       if (!retryDraftSession)
         throw new Error("Expected the second failed send to restore its draft");
-      const result = runTemporaryConversationSendGuard(
-        {
-          submissionIntent: "background",
-          isTemporaryConversation: isTemporaryComposerConversation({
-            routeThreadKey: secondRetryKey,
-            draftId,
-            draftThread: retryDraftSession,
-          }),
-          onBlocked: showBlockedNotice,
-        },
-        startThreadTurn,
-      );
+      const isTemporary = () =>
+        isTemporaryComposerConversation({
+          routeThreadKey: secondRetryKey,
+          draftId,
+          draftThread: retryDraftSession,
+        });
 
-      expect(result).toBeUndefined();
-      expect(showBlockedNotice).toHaveBeenCalledOnce();
-      expect(startThreadTurn).not.toHaveBeenCalled();
+      expect(blocksTemporaryBackgroundSend("background", isTemporary)).toBe(true);
+      expect(blocksTemporaryBackgroundSend("foreground", isTemporary)).toBe(false);
     } finally {
       for (const key of markerKeys) {
-        useUiStateStore.getState().setTemporaryThread(key, false);
+        useTemporaryConversationStore.getState().setTemporaryThread(key, false);
       }
-      useUiStateStore.setState((state) => ({
+      useTemporaryConversationStore.setState((state) => ({
         ...state,
         temporaryThreadKeys: previousTemporaryKeys,
       }));

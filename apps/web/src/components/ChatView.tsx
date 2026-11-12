@@ -44,7 +44,6 @@ import { isScratchProject } from "@t3tools/client-runtime/state/projects";
 import { visibleThreadPullRequests } from "@t3tools/shared/threadPullRequests";
 import type { UsageLimitSourceSnapshots } from "@t3tools/contracts";
 import { feedbackBannerItem } from "./chat/ComposerFeedback";
-import { collectProviderUsageLimits } from "@t3tools/shared/usageLimits";
 import { freshSessionBannerItem } from "./chat/ComposerFreshSession";
 import { armFreshSession, disarmFreshSession, useFreshSessionArmed } from "./chat/freshSessionArms";
 import { useUsageLimitsPanel } from "./chat/useUsageLimitsPanel";
@@ -134,7 +133,7 @@ import {
 } from "@t3tools/client-runtime/state/runtime";
 import { AsyncResult } from "effect/reactivity";
 import { isElectron } from "../env";
-import { selectThreadDiffPanelSelection, useDiffPanelStore } from "../diffPanelStore";
+import { useDiffPanelStore } from "../diffPanelStore";
 import { useActiveThreadRef } from "../hooks/useActiveThreadRef";
 import { composerRequiresModifier } from "../composer-logic";
 import {
@@ -208,8 +207,7 @@ import {
 import { useNowMinute } from "../hooks/useNowMinute";
 import { usePanelAnimationSettings, usePanelPresence } from "../panelAnimations";
 import { useNewThreadHandler } from "../hooks/useHandleNewThread";
-import { useThreadActions } from "../hooks/useThreadActions";
-import { destroyTemporaryConversation as destroyTemporaryConversationAction } from "./chat/temporaryConversationDestroy";
+import { isJjDiffSelection, useZcodeChatView, ZcodeComposerUsageFooter } from "../zcode/chat-view";
 import { useOpenPanelPullRequestUrl } from "../hooks/useOpenPanelPullRequestUrl";
 import { isPreviewFocused } from "../lib/previewFocus";
 import { focusTerminalOnThreadEnter, getTerminalFocusOwner } from "../lib/terminalFocus";
@@ -229,7 +227,6 @@ import {
   useComposerDraftStore,
   DraftId,
 } from "../composerDraftStore";
-import { useUiStateStore } from "../uiStateStore";
 import { type TerminalContextDraft } from "../lib/terminalContext";
 import { collectInlineContextIds } from "../lib/composerContextReferences";
 import { selectThreadTerminalUiState, useTerminalUiStateStore } from "../terminalUiStateStore";
@@ -265,9 +262,6 @@ import {
   useThreadCheckpointSummaries,
 } from "../state/entities";
 import { useEnvironmentShellHasSnapshot } from "../state/shell";
-import { resolveUsageTurn } from "./chat/turn-usage.logic";
-import { selectComposerUsageAccounts } from "./chat/composer-usage.logic";
-import { ComposerUsageFooter } from "./chat/ComposerUsageFooter";
 import { ChatComposer, type ChatComposerHandle } from "./chat/ChatComposer";
 import { DraftHeroHeadline } from "./chat/DraftHeroHeadline";
 import { ExpandedImageDialogHost, openExpandedImagePreview } from "./chat/ExpandedImageDialog";
@@ -436,10 +430,8 @@ export default function ChatView(props: ChatViewProps) {
   const canOperateTerminal = useEnvironmentScope(environmentId, AuthTerminalOperateScope);
   const draftId = routeKind === "draft" ? props.draftId : null;
   const handleNewThread = useNewThreadHandler();
-  const navigate = useNavigate();
   const routeThreadRef = scopeThreadRef(environmentId, threadId);
   const routeThreadKey = scopedThreadKey(routeThreadRef);
-  const { deleteThread: deleteThreadAction } = useThreadActions();
   const currentRouteThreadKeyRef = useRef<string | null>(routeThreadKey);
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- publishes the committed route thread key to a ref that async handlers check before applying results
   useLayoutEffect(() => {
@@ -486,26 +478,6 @@ export default function ChatView(props: ChatViewProps) {
       : draftId
         ? store.getDraftSession(draftId)
         : null,
-  );
-  const temporaryConversationKeys = [
-    routeThreadKey,
-    ...(draftThread?.promotedTo ? [scopedThreadKey(draftThread.promotedTo)] : []),
-  ];
-  const destroyTemporaryConversation = () =>
-    destroyTemporaryConversationAction({
-      environmentId,
-      routeKind,
-      draftId,
-      draftThread,
-      routeThreadRef,
-      routeThreadKey,
-      temporaryThreadKeys: temporaryConversationKeys,
-      deleteThread: deleteThreadAction,
-      startNewThread: handleNewThread,
-      navigateAway: () => navigate({ to: "/", replace: true }),
-    });
-  const isTemporaryConversation = useUiStateStore((state) =>
-    temporaryConversationKeys.some((key) => state.temporaryThreadKeys.includes(key)),
   );
   const serverThreadShell = useQuietThreadShell(routeThreadRef);
   const routeThreadDetailRef = resolveThreadDetailRef(routeThreadRef, {
@@ -592,6 +564,7 @@ export default function ChatView(props: ChatViewProps) {
   const settings = useEnvironmentSettings(environmentId);
   const clientSettingsHydrated = useClientSettingsHydrated();
   const timestampFormat = settings.timestampFormat;
+  const navigate = useNavigate();
   // Selects primitives: an object here is new on every router store update, which
   // re-renders ChatView on unrelated navigation state changes.
   const citationHref = useLocation({ select: (location) => location.href });
@@ -1059,9 +1032,6 @@ export default function ChatView(props: ChatViewProps) {
     selectActiveRightPanel(state.byThreadKey, activeThreadRef),
   );
   const diffOpen = activeRightPanelKind === "diff";
-  const isJjDiffSelected = useDiffPanelStore(
-    (state) => selectThreadDiffPanelSelection(state.byThreadKey, activeThreadRef).kind === "jj",
-  );
   const explicitDiffOpenRef = useRef<ScopedThreadRef | null>(null);
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- resets the diff panel store to branch scope when the diff opens without an explicit request
   useLayoutEffect(() => {
@@ -1071,9 +1041,8 @@ export default function ChatView(props: ChatViewProps) {
       diffOpen &&
       activeThreadRef &&
       explicitThreadRef !== activeThreadRef &&
-      !useDiffPanelStore.getState().consumeKeepSelectionOnOpen(activeThreadRef) &&
-      selectThreadDiffPanelSelection(useDiffPanelStore.getState().byThreadKey, activeThreadRef)
-        .kind !== "jj"
+      !isJjDiffSelection(activeThreadRef) &&
+      !useDiffPanelStore.getState().consumeKeepSelectionOnOpen(activeThreadRef)
     ) {
       useDiffPanelStore.getState().selectGitScope(activeThreadRef, "branch");
     }
@@ -1411,7 +1380,6 @@ export default function ChatView(props: ChatViewProps) {
           activeThread?.latestRun?.runId ?? "",
           activePendingApproval?.requestId ?? activePendingUserInput?.requestId ?? "",
         ].join(":");
-  const usageLimitSources = serverConfig?.usageLimitSources ?? EMPTY_USAGE_LIMIT_SOURCES;
   const {
     banner: usageLimitsBanner,
     offered: usageLimitsOffered,
@@ -1424,22 +1392,8 @@ export default function ChatView(props: ChatViewProps) {
     providerInstanceId: activeProviderInstanceId,
     providerDriver: activeProviderStatus?.driver ?? null,
     providers: providerStatuses,
-    sources: usageLimitSources,
+    sources: serverConfig?.usageLimitSources ?? EMPTY_USAGE_LIMIT_SOURCES,
   });
-  // Leave this unmemoized. A manual useMemo here bails the React Compiler out of
-  // ChatView, and the uncompiled render-phase state adjustments then loop.
-  const composerUsageAccounts =
-    activeProviderInstanceId === null || activeProviderStatus === null
-      ? []
-      : selectComposerUsageAccounts(
-          collectProviderUsageLimits(
-            activeProviderInstanceId,
-            providerStatuses,
-            usageLimitSources,
-            Date.parse(activeProviderStatus.checkedAt),
-          )?.accounts ?? [],
-          activeProviderInstanceId,
-        );
   const {
     beginLocalDispatch,
     resetLocalDispatch,
@@ -1496,29 +1450,6 @@ export default function ChatView(props: ChatViewProps) {
     activeThreadLiveTokenUsage,
     activeProviderThread,
   );
-  const composerUsageSession = (() => {
-    const turns =
-      serverProjection?.providerTurns.filter(
-        (turn) => turn.providerThreadId === serverProjection.thread.activeProviderThreadId,
-      ) ?? [];
-    const completedTurnIds = new Set(
-      turns.filter((turn) => turn.status === "completed").map((turn) => turn.id),
-    );
-    const toolCalls =
-      serverProjection?.nodes.filter(
-        (node) =>
-          node.kind === "tool_call" &&
-          node.providerTurnId !== null &&
-          completedTurnIds.has(node.providerTurnId),
-      ) ?? [];
-    const usageTurns = serverProjection
-      ? turns.flatMap((turn) => {
-          const data = resolveUsageTurn({ projection: serverProjection, providerTurnId: turn.id });
-          return data ? [data] : [];
-        })
-      : [];
-    return { turns, toolCalls, usageTurns };
-  })();
   const pendingBackgroundTasks = deriveThreadPendingBackgroundTasks(serverProjection);
   const activeWorkStartedAt =
     deriveActiveWorkStartedAt(activeActivityRun, activeRuntime, localDispatchStartedAt) ??
@@ -1675,6 +1606,18 @@ export default function ChatView(props: ChatViewProps) {
         worktreePath: activeThread?.worktreePath ?? null,
       })
     : null;
+  const zcode = useZcodeChatView({
+    environmentId,
+    routeKind,
+    draftId,
+    draftThread,
+    routeThreadRef,
+    routeThreadKey,
+    activeThreadRef,
+    gitCwd,
+    projectId: activeThread?.projectId ?? null,
+    isServerThread,
+  });
   const gitStatusCwd = activeThread?.worktreePath ?? gitCwd;
   const gitStatusAtom =
     gitStatusCwd === null
@@ -2415,7 +2358,6 @@ export default function ChatView(props: ChatViewProps) {
     createBrowserSurfaceStable,
     moveRightPanelSurfaceStable,
     onOpenToolDiffStable,
-    onOpenJjDiffStable,
     onOpenTurnDiffStable,
     openChangesFromThreadPanelStable,
     openFileSurfaceStable,
@@ -3259,11 +3201,9 @@ export default function ChatView(props: ChatViewProps) {
       workspaceMutationId={workspaceMutationId}
       getShortcutContext={getShortcutContextStable}
       onSendAnnotation={sendPreviewAnnotationStable}
-      cwd={gitCwd}
-      projectId={activeThread.projectId}
-      onOpenJjDiff={onOpenJjDiffStable}
       onCloseSurface={closeRightPanelSurface}
       sideChatParentPanel={sideChatParentPanel}
+      zcode={zcode.rightPanel}
       terminal={{
         launchContext: activeTerminalLaunchContext ?? null,
         keybindings,
@@ -3398,11 +3338,7 @@ export default function ChatView(props: ChatViewProps) {
               onOpenThread={onOpenRelatedThreadStable}
               rightPanelOpen={inlineRightPanelOwnsTitleBar}
               onNewThreadInProject={handleNewThreadInActiveProjectStable}
-              temporaryConversationKeys={[
-                routeThreadKey,
-                ...(draftThread?.promotedTo ? [scopedThreadKey(draftThread.promotedTo)] : []),
-              ]}
-              onDestroyTemporary={destroyTemporaryConversation}
+              zcodeTemporary={zcode.temporary}
               {...(activeDraftLogicalProjectKey
                 ? { onOpenProjectSettings: handleOpenDraftProjectSettingsStable }
                 : {})}
@@ -3660,6 +3596,7 @@ export default function ChatView(props: ChatViewProps) {
                                 supportsQuestionAttachments={supportsQuestionAttachments}
                                 maxFileAttachmentBytes={maxFileAttachmentBytes}
                                 routeKind={routeKind}
+                                isTemporaryConversation={zcode.isTemporaryConversation}
                                 routeThreadRef={routeThreadRef}
                                 draftId={draftId}
                                 activeThreadId={activeThreadId}
@@ -3742,22 +3679,16 @@ export default function ChatView(props: ChatViewProps) {
                                 activeThreadModelSelection={activeThread?.modelSelection}
                                 activeProjectId={activeProject?.id ?? null}
                                 projectName={activeProject?.title}
-                                isTemporaryConversation={isTemporaryConversation}
                                 usageFooter={
-                                  <ComposerUsageFooter
-                                    accounts={composerUsageAccounts}
-                                    context={activeContextWindow}
-                                    toolCalls={composerUsageSession.toolCalls}
-                                    turns={composerUsageSession.turns}
-                                    usageTurns={composerUsageSession.usageTurns}
-                                    lastTurn={
-                                      serverProjection?.providerTurns.findLast(
-                                        (turn) =>
-                                          turn.status === "completed" &&
-                                          turn.providerThreadId ===
-                                            serverProjection.thread.activeProviderThreadId,
-                                      ) ?? null
+                                  <ZcodeComposerUsageFooter
+                                    activeProviderInstanceId={activeProviderInstanceId}
+                                    activeProviderStatus={activeProviderStatus}
+                                    providerStatuses={providerStatuses}
+                                    usageLimitSources={
+                                      serverConfig?.usageLimitSources ?? EMPTY_USAGE_LIMIT_SOURCES
                                     }
+                                    projection={serverProjection}
+                                    context={activeContextWindow}
                                     onOpenLimits={openUsageLimits}
                                   />
                                 }
@@ -4069,11 +4000,7 @@ export default function ChatView(props: ChatViewProps) {
           onAddBrowserInProfile={createBrowserSurfaceStable}
           onAddTerminal={addTerminalSurfaceStable}
           onAddDiff={addDiffSurfaceStable}
-          onAddJj={
-            gitCwd && activeThreadRef
-              ? () => useRightPanelStore.getState().open(activeThreadRef, "jj")
-              : undefined
-          }
+          zcodeLaunchers={zcode.launchers}
           onAddFiles={addFilesSurfaceStable}
           onAddPullRequest={addPullRequestSurfaceStable}
           onAddPullRequests={addPullRequestsSurfaceStable}
@@ -4081,7 +4008,7 @@ export default function ChatView(props: ChatViewProps) {
           onAddSideChat={sideChatsOffered ? openSideChatStable : undefined}
           browserAvailable={canOperatePreview && browserAvailable}
           terminalAvailable={activeProject !== null && canOperateTerminal}
-          diffAvailable={isServerThread && (isGitRepo || isJjDiffSelected)}
+          diffAvailable={isServerThread && (isGitRepo || zcode.isJjDiffSelected)}
           filesAvailable={activeProject !== null}
           pullRequestAvailable={pullRequestSurfaceAvailable}
           pullRequestsAvailable={pullRequestsSurfaceAvailable}

@@ -2,14 +2,11 @@ import { scopedThreadKey, scopeThreadRef } from "@t3tools/client-runtime/environ
 import type { EnvironmentId, ScopedThreadRef, ThreadId } from "@t3tools/contracts";
 import type { ComposerSubmissionIntent } from "../../composer-logic";
 import {
-  clearBackgroundDraftSubmissionByRef,
-  restoreFailedDraftThread,
   useComposerDraftStore,
   type DraftSessionState,
   type DraftId,
 } from "../../composerDraftStore";
-import { newThreadId } from "~/lib/utils";
-import { useUiStateStore } from "../../uiStateStore";
+import { useTemporaryConversationStore } from "../../zcode/temporary-conversation-store";
 
 /** Resolves temporary markers across a draft's current and promoted thread identities. */
 export function isTemporaryComposerConversation(input: {
@@ -40,62 +37,59 @@ export function isTemporaryComposerConversation(input: {
         ]
       : []),
   ]);
-  const temporaryThreadKeys = useUiStateStore.getState().temporaryThreadKeys;
+  const temporaryThreadKeys = useTemporaryConversationStore.getState().temporaryThreadKeys;
   return [...threadKeys].some((key) => temporaryThreadKeys.includes(key));
 }
 
-/** Runs a send only when a temporary conversation allows its submission intent. */
-export function runTemporaryConversationSendGuard<T>(
-  input: {
-    readonly submissionIntent: ComposerSubmissionIntent;
-    readonly isTemporaryConversation: boolean;
-    readonly onBlocked: () => void;
-  },
-  continueSend: () => T,
-): T | undefined {
-  if (input.submissionIntent === "background" && input.isTemporaryConversation) {
-    input.onBlocked();
-    return undefined;
-  }
-  return continueSend();
+/** Temporary conversations stay open, so they never send in the background. */
+export function blocksTemporaryBackgroundSend(
+  submissionIntent: ComposerSubmissionIntent,
+  isTemporaryConversation: () => boolean,
+): boolean {
+  return submissionIntent === "background" && isTemporaryConversation();
 }
 
-/** Restores a failed draft and carries its temporary marker onto the retry thread id. */
-export function restoreFailedDraftSend(input: {
+/** Thread keys that may hold a draft's temporary marker before a failed send restores it. */
+export function captureTemporaryMarkerKeys(input: {
   readonly environmentId: EnvironmentId;
   readonly routeThreadKey: string;
   readonly draftId: DraftId;
   readonly draftThread: DraftSessionState;
   readonly threadIdForSend: ThreadId;
-  readonly bootstrapThreadDeleted: boolean;
-}): ThreadId {
+}): ReadonlyArray<string> {
   const currentDraftSession = useComposerDraftStore.getState().getDraftSession(input.draftId);
-  const temporaryMarkerSourceKeys = new Set([
-    input.routeThreadKey,
-    scopedThreadKey(scopeThreadRef(input.environmentId, input.threadIdForSend)),
-    scopedThreadKey(scopeThreadRef(input.draftThread.environmentId, input.draftThread.threadId)),
-    ...(input.draftThread.promotedTo ? [scopedThreadKey(input.draftThread.promotedTo)] : []),
-    ...(currentDraftSession
-      ? [
-          scopedThreadKey(
-            scopeThreadRef(currentDraftSession.environmentId, currentDraftSession.threadId),
-          ),
-          ...(currentDraftSession.promotedTo
-            ? [scopedThreadKey(currentDraftSession.promotedTo)]
-            : []),
-        ]
-      : []),
-  ]);
-  const retryThreadId = input.bootstrapThreadDeleted ? newThreadId() : input.threadIdForSend;
-  restoreFailedDraftThread(input.draftId, input.draftThread, retryThreadId);
+  return [
+    ...new Set([
+      input.routeThreadKey,
+      scopedThreadKey(scopeThreadRef(input.environmentId, input.threadIdForSend)),
+      scopedThreadKey(scopeThreadRef(input.draftThread.environmentId, input.draftThread.threadId)),
+      ...(input.draftThread.promotedTo ? [scopedThreadKey(input.draftThread.promotedTo)] : []),
+      ...(currentDraftSession
+        ? [
+            scopedThreadKey(
+              scopeThreadRef(currentDraftSession.environmentId, currentDraftSession.threadId),
+            ),
+            ...(currentDraftSession.promotedTo
+              ? [scopedThreadKey(currentDraftSession.promotedTo)]
+              : []),
+          ]
+        : []),
+    ]),
+  ];
+}
+
+/** Carries captured temporary markers onto the thread id the restored draft retries with. */
+export function transferTemporaryMarkersToRestoredDraft(input: {
+  readonly markerKeys: ReadonlyArray<string>;
+  readonly draftId: DraftId;
+}): void {
   const restoredDraftSession = useComposerDraftStore.getState().getDraftSession(input.draftId);
+  if (!restoredDraftSession) return;
   const retryThreadRef: ScopedThreadRef = scopeThreadRef(
-    restoredDraftSession?.environmentId ?? input.draftThread.environmentId,
-    retryThreadId,
+    restoredDraftSession.environmentId,
+    restoredDraftSession.threadId,
   );
-  useUiStateStore
+  useTemporaryConversationStore
     .getState()
-    .transferTemporaryThreads([...temporaryMarkerSourceKeys], scopedThreadKey(retryThreadRef));
-  clearBackgroundDraftSubmissionByRef(scopeThreadRef(input.environmentId, input.threadIdForSend));
-  return retryThreadId;
+    .transferTemporaryThreads(input.markerKeys, scopedThreadKey(retryThreadRef));
 }

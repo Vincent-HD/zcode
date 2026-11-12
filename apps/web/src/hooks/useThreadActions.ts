@@ -59,6 +59,7 @@ import { showThreadUndoNotice } from "./showThreadUndoNotice";
 import { useAtomCommand } from "../state/use-atom-command";
 import { useOrchestrationCommand } from "../state/use-orchestration-command";
 import { useAtomQueryRunner } from "../state/use-atom-query-runner";
+import { clearZcodeThreadState, type ZcodeDeleteThreadOptions } from "../zcode/thread-cleanup";
 
 export class ThreadArchiveBlockedError extends Schema.TaggedError<ThreadArchiveBlockedError>()(
   "ThreadArchiveBlockedError",
@@ -244,6 +245,7 @@ function clearDeletedThreadPanelState(ref: ScopedThreadRef) {
   useRightPanelStore.getState().removeThread(ref);
   useDiffPanelStore.getState().removeThread(ref);
   usePreviewMiniPlayerStore.getState().removeThread(ref);
+  clearZcodeThreadState(ref);
 }
 
 /** A No project thread that already has its own folder, on a server that can promote it. */
@@ -341,7 +343,6 @@ export function useThreadActions() {
   );
   const clearTerminalUiState = useTerminalUiStateStore((state) => state.clearTerminalUiState);
   const markThreadVisited = useUiStateStore((state) => state.markThreadVisited);
-  const setTemporaryThread = useUiStateStore((state) => state.setTemporaryThread);
   const router = useRouter();
   const handleNewThread = useNewThreadHandler();
 
@@ -439,11 +440,7 @@ export function useThreadActions() {
 
   const deleteThread = async (
     target: ScopedThreadRef,
-    opts: {
-      deletedThreadKeys?: ReadonlySet<string>;
-      navigateToFallback?: boolean;
-      deleteWorktree?: boolean;
-    } = {},
+    opts: { deletedThreadKeys?: ReadonlySet<string> } & ZcodeDeleteThreadOptions = {},
   ) => {
     const permissionFailure = threadOperationFailure(target);
     if (permissionFailure) return permissionFailure;
@@ -484,7 +481,6 @@ export function useThreadActions() {
         refreshArchivedThreadsForEnvironment(target.environmentId);
         clearTerminalUiState(target);
         clearDeletedThreadPanelState(target);
-        setTemporaryThread(scopedThreadKey(target), false);
       }
       return result;
     }
@@ -554,12 +550,9 @@ export function useThreadActions() {
     }
     let shouldDeleteWorktree = false;
     const environmentSettings = environmentConfig?.settings;
-    const automaticWorktreeCleanup =
-      opts.deleteWorktree === false
-        ? false
-        : environmentSettings
-          ? resolveWorktreeCleanup(environmentSettings, thread.projectId).worktreeOnDelete
-          : false;
+    const automaticWorktreeCleanup = environmentSettings
+      ? resolveWorktreeCleanup(environmentSettings, thread.projectId).worktreeOnDelete
+      : false;
     if (canDeleteWorktree && localApi && !automaticWorktreeCleanup) {
       const confirmationResult = await settlePromise(() =>
         localApi.dialogs.confirm(
@@ -588,7 +581,6 @@ export function useThreadActions() {
     const deletedThreadIds = deletedIds ?? new Set<ThreadId>();
     const currentRouteThreadRef = getCurrentRouteThreadRef();
     const shouldNavigateToFallback =
-      opts.navigateToFallback !== false &&
       currentRouteThreadRef?.threadId === threadRef.threadId &&
       currentRouteThreadRef.environmentId === threadRef.environmentId;
     const fallbackThreadId = getFallbackThreadIdAfterDelete({
@@ -624,7 +616,6 @@ export function useThreadActions() {
     );
     clearTerminalUiState(threadRef);
     clearDeletedThreadPanelState(threadRef);
-    setTemporaryThread(scopedThreadKey(threadRef), false);
 
     if (shouldNavigateToFallback) {
       const fallbackThread = fallbackThreadId

@@ -107,18 +107,6 @@ export function resolveThreadRouteTarget(
   };
 }
 
-export function isRequestedDraftRouteTarget(
-  target: ThreadRouteTarget | null,
-  draftId: DraftId | null | undefined,
-): boolean {
-  return (
-    draftId !== null &&
-    draftId !== undefined &&
-    target?.kind === "draft" &&
-    target.draftId === draftId
-  );
-}
-
 export function resolveActiveThreadRouteRef(
   target: ThreadRouteTarget | null,
   draftThread: DraftThreadRouteState | null,

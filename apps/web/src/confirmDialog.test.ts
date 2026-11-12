@@ -34,8 +34,6 @@ describe("confirm dialog coordinator", () => {
       status: "closing",
       message: "Delete the project?",
       variant: "default",
-      cancelLabel: "Cancel",
-      confirmLabel: "Confirm",
     });
 
     completeConfirmDialogClose();
@@ -43,8 +41,6 @@ describe("confirm dialog coordinator", () => {
       status: "confirming",
       message: "Delete the worktree too?",
       variant: "default",
-      cancelLabel: "Cancel",
-      confirmLabel: "Confirm",
     });
 
     respondToConfirmDialog(true);
@@ -84,27 +80,5 @@ describe("confirm dialog coordinator", () => {
     expect(readConfirmDialogState()).toEqual({ status: "idle" });
     unregister();
     return expect(confirmation).resolves.toBe(true);
-  });
-
-  it("uses action-specific button labels when requested", async () => {
-    const unregister = mountHost();
-    const confirmation = requireConfirmation(
-      requestConfirmDialog("Destroy this temporary conversation?", {
-        variant: "destructive",
-        cancelLabel: "Keep conversation",
-        confirmLabel: "Destroy conversation",
-      }),
-    );
-
-    expect(readConfirmDialogState()).toEqual({
-      status: "confirming",
-      message: "Destroy this temporary conversation?",
-      variant: "destructive",
-      cancelLabel: "Keep conversation",
-      confirmLabel: "Destroy conversation",
-    });
-    respondToConfirmDialog(false);
-    await expect(confirmation).resolves.toBe(false);
-    unregister();
   });
 });

@@ -11,6 +11,7 @@ import {
   type ThreadRightPanelState,
   useRightPanelStore,
 } from "./rightPanelStore";
+import { zcodeSurfaceRequiresWorkspace } from "./zcode/right-panel-kinds";
 
 export interface ReopenOwnerState {
   environmentKnown: boolean;
@@ -115,11 +116,10 @@ export async function reopenClosedView(
     return true;
   }
   const surface = view.surface;
+  if (!options.workspaceAvailable && zcodeSurfaceRequiresWorkspace(surface)) return false;
   if (
     !options.workspaceAvailable &&
-    (surface.kind === "jj" ||
-      surface.kind === "files" ||
-      (surface.kind === "file" && !surface.attachment))
+    (surface.kind === "files" || (surface.kind === "file" && !surface.attachment))
   )
     return false;
   switch (surface.kind) {

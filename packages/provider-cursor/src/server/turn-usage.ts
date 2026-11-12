@@ -43,3 +43,51 @@ export const cursorTurnTokenUsage = (input: {
   };
   return isTurnTokenUsage(normalized) ? normalized : unavailable;
 };
+
+interface CursorTurnUsageState {
+  missingUsage: boolean;
+  usage: RunResult["usage"];
+}
+
+// Keyed by the adapter's active turn, so the adapter itself carries no fork state.
+const usageByTurn = new WeakMap<object, CursorTurnUsageState>();
+
+const usageState = (turn: object): CursorTurnUsageState => {
+  const existing = usageByTurn.get(turn);
+  if (existing) return existing;
+  const created: CursorTurnUsageState = { missingUsage: false, usage: undefined };
+  usageByTurn.set(turn, created);
+  return created;
+};
+
+/** Remembers a turn-ended update that arrived without usage. */
+export const recordCursorTurnUpdate = (
+  turn: object,
+  update: { readonly type: string; readonly usage?: unknown },
+) => {
+  if (update.type !== "turn-ended") return;
+  const state = usageState(turn);
+  state.missingUsage ||= update.usage === undefined;
+};
+
+export const recordCursorRunUsage = (turn: object, usage: RunResult["usage"]) => {
+  usageState(turn).usage = usage;
+};
+
+/** Usage fields for a provider turn payload; only completed turns report usage. */
+export const cursorTurnUsageFields = (input: {
+  readonly context: { readonly subagents: { readonly size: number } };
+  readonly status: OrchestrationV2ProviderTurn["status"];
+  readonly completedAt: unknown;
+}): { readonly turnTokenUsage?: TurnTokenUsage } => {
+  if (input.completedAt === null) return {};
+  const state = usageByTurn.get(input.context);
+  return {
+    turnTokenUsage: cursorTurnTokenUsage({
+      usage: state?.usage,
+      status: input.status,
+      hasSubagents: input.context.subagents.size > 0,
+      hasMissingUsage: state?.missingUsage ?? false,
+    }),
+  };
+};

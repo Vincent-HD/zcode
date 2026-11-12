@@ -4,13 +4,13 @@ import {
   type ScopedThreadRef,
   type ThreadId,
 } from "@t3tools/contracts";
-import { scopeThreadRef, scopedThreadKey } from "@t3tools/client-runtime/environment";
+import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
 import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
-import { ChevronDownIcon, TimerIcon, Trash2Icon } from "lucide-react";
+import { ChevronDownIcon } from "lucide-react";
 import {
   memo,
   useEffect,
@@ -42,10 +42,13 @@ import { cn } from "~/lib/utils";
 import { textDirection } from "~/textDirection";
 import { useClientSettings } from "../../hooks/useSettings";
 import { GuestShareIndicator } from "./GuestShareControls";
-import { useUiStateStore } from "../../uiStateStore";
-import { hasPendingDraftSend } from "./chatViewSend";
-import { Button } from "../ui/button";
-import { requestConfirmDialog } from "../../confirmDialog";
+import {
+  ZcodeDraftConversationTitle,
+  ZcodeTemporaryBadge,
+  ZcodeTemporaryHeaderActions,
+  useZcodeTemporaryHeader,
+  type ZcodeTemporaryConversation,
+} from "../../zcode/temporary-header";
 
 interface ChatHeaderProps {
   activeThreadEnvironmentId: EnvironmentId;
@@ -60,8 +63,7 @@ interface ChatHeaderProps {
   onNewThreadInProject: () => void;
   onOpenProjectSettings?: (() => void) | undefined;
   onFindInThread?: ((threadRef: ScopedThreadRef) => void) | undefined;
-  temporaryConversationKeys?: ReadonlyArray<string>;
-  onDestroyTemporary?: () => Promise<boolean>;
+  zcodeTemporary?: ZcodeTemporaryConversation | undefined;
 }
 
 function resolveRenameCommit(input: {
@@ -87,8 +89,7 @@ export const ChatHeader = memo(function ChatHeader({
   onNewThreadInProject,
   onOpenProjectSettings,
   onFindInThread,
-  temporaryConversationKeys,
-  onDestroyTemporary,
+  zcodeTemporary,
 }: ChatHeaderProps) {
   const activeProjectName = activeProject?.isScratch ? "No project" : activeProject?.title;
   const activeProjectCwd = activeProject?.workspaceRoot ?? null;
@@ -96,11 +97,11 @@ export const ChatHeader = memo(function ChatHeader({
   const breadcrumbContainerRef = useRef<HTMLDivElement>(null);
   const [collapseParentTitle, setCollapseParentTitle] = useState(false);
   const activeThreadRef = scopeThreadRef(activeThreadEnvironmentId, activeThreadId);
-  const activeThreadKey = scopedThreadKey(activeThreadRef);
-  const markerKeys = temporaryConversationKeys ?? [activeThreadKey];
-  const isTemporary = useUiStateStore((state) =>
-    markerKeys.some((key) => state.temporaryThreadKeys.includes(key)),
-  );
+  const temporary = useZcodeTemporaryHeader({
+    conversation: zcodeTemporary,
+    activeThreadRef,
+    onOpenProjectSettings,
+  });
   const canOperateThread = useEnvironmentScope(
     activeThreadEnvironmentId,
     AuthOrchestrationOperateScope,
@@ -216,73 +217,6 @@ export const ChatHeader = memo(function ChatHeader({
     onFind: onFindInThread,
     canShareWithGuest,
   });
-  const openConversationMenuAt = (position: { x: number; y: number }) => {
-    if (isServerThread) {
-      openMenu(position);
-      return;
-    }
-    const api = readLocalApi();
-    if (!api) return;
-    void api.contextMenu
-      .show(
-        [
-          {
-            id: isTemporary ? "keep-permanent" : "make-temporary",
-            label: isTemporary ? "Keep permanently" : "Make temporary",
-            icon: isTemporary ? "circle-check" : "timer",
-          },
-          ...(onOpenProjectSettings === undefined
-            ? []
-            : [{ id: "project-settings", label: "Project settings", icon: "settings" }]),
-        ],
-        position,
-      )
-      .then((action) => {
-        if (action === "make-temporary") {
-          if (markerKeys.some(hasPendingDraftSend)) {
-            toastManager.add({ type: "warning", title: "Wait for the message to finish sending" });
-            return;
-          }
-          for (const key of markerKeys) {
-            useUiStateStore.getState().setTemporaryThread(key, true);
-          }
-          toastManager.add({ type: "success", title: "Conversation marked temporary" });
-        } else if (action === "keep-permanent") {
-          for (const key of markerKeys) {
-            useUiStateStore.getState().setTemporaryThread(key, false);
-          }
-          toastManager.add({ type: "success", title: "Conversation will be kept" });
-        } else if (action === "project-settings") {
-          onOpenProjectSettings?.();
-        }
-      });
-  };
-  const makeTemporary = () => {
-    if (markerKeys.some(hasPendingDraftSend)) {
-      toastManager.add({ type: "warning", title: "Wait for the message to finish sending" });
-      return;
-    }
-    for (const key of markerKeys) useUiStateStore.getState().setTemporaryThread(key, true);
-    toastManager.add({ type: "success", title: "Conversation marked temporary" });
-  };
-  const destroyTemporary = async () => {
-    const confirmation = requestConfirmDialog(
-      [
-        "Destroy this temporary conversation?",
-        "T3 will remove it from your history and run available cleanup for linked resources. Database history and provider-side data may remain.",
-      ].join("\n"),
-      {
-        variant: "destructive",
-        cancelLabel: "Keep conversation",
-        confirmLabel: "Destroy conversation",
-      },
-    );
-    if (!(await confirmation)) return;
-    const destroyed = await onDestroyTemporary?.();
-    if (destroyed) {
-      toastManager.add({ type: "success", title: "Temporary conversation destroyed" });
-    }
-  };
   const openMenuFromTitle = (event: ReactMouseEvent<HTMLButtonElement>) => {
     if (isTrailingDoubleClick(event.detail)) return;
     const rect = event.currentTarget.getBoundingClientRect();
@@ -297,8 +231,23 @@ export const ChatHeader = memo(function ChatHeader({
   };
   const handleHeaderContextMenu = (event: ReactMouseEvent) => {
     if (renamingTitle !== null) return;
+    if (!isServerThread) return temporary.openDraftMenu(event);
+    if (!isServerThread && onOpenProjectSettings === undefined) return;
     event.preventDefault();
-    openConversationMenuAt({ x: event.clientX, y: event.clientY });
+    if (!isServerThread) {
+      const api = readLocalApi();
+      if (!api) return;
+      void api.contextMenu
+        .show([{ id: "project-settings", label: "Project settings", icon: "settings" }], {
+          x: event.clientX,
+          y: event.clientY,
+        })
+        .then((action) => {
+          if (action === "project-settings") onOpenProjectSettings?.();
+        });
+      return;
+    }
+    openMenu({ x: event.clientX, y: event.clientY });
   };
   const handleRenameKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
     if (event.nativeEvent.isComposing || event.keyCode === 229) return;
@@ -406,25 +355,18 @@ export const ChatHeader = memo(function ChatHeader({
               onFocus={(event) => event.currentTarget.select()}
               onKeyDown={handleRenameKeyDown}
             />
-          ) : (
+          ) : !isServerThread ? (
+            <ZcodeDraftConversationTitle title={activeThreadTitle} header={temporary} />
+          ) : isServerThread ? (
             <Tooltip>
               <TooltipTrigger
                 render={
                   <button
                     type="button"
-                    aria-label={`${isServerThread ? "Thread" : "Draft conversation"} actions for ${activeThreadTitle}`}
+                    aria-label={`Thread actions for ${activeThreadTitle}`}
                     aria-haspopup="menu"
-                    onClick={(event) => {
-                      if (isServerThread) {
-                        openMenuFromTitle(event);
-                        return;
-                      }
-                      const rect = event.currentTarget.getBoundingClientRect();
-                      openConversationMenuAt({ x: rect.left, y: rect.bottom + 4 });
-                    }}
-                    onDoubleClick={
-                      isServerThread && canOperateThread ? handleTitleDoubleClick : undefined
-                    }
+                    onClick={openMenuFromTitle}
+                    onDoubleClick={canOperateThread ? handleTitleDoubleClick : undefined}
                     className="group/thread-title inline-flex min-w-0 max-w-full cursor-pointer items-center gap-1 rounded-sm text-left focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                   />
                 }
@@ -434,21 +376,28 @@ export const ChatHeader = memo(function ChatHeader({
                   dir={textDirection(activeThreadTitle)}
                 >
                   <WorkspaceBreadcrumbText>{activeThreadTitle}</WorkspaceBreadcrumbText>
-                  {isTemporary ? (
-                    <span
-                      aria-label="Temporary conversation"
-                      data-testid="temporary-conversation-indicator"
-                      className="shrink-0 rounded-sm bg-muted px-1.5 py-0.5 text-3xs font-medium text-muted-foreground"
-                    >
-                      Temporary
-                    </span>
-                  ) : null}
+                  <ZcodeTemporaryBadge header={temporary} />
                 </h2>
                 <ChevronDownIcon
                   aria-hidden
                   data-thread-title-chevron
                   className="size-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover/thread-title:opacity-100 group-focus-visible/thread-title:opacity-100"
                 />
+              </TooltipTrigger>
+              <TooltipPopup side="top">{activeThreadTitle}</TooltipPopup>
+            </Tooltip>
+          ) : (
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <h2
+                    aria-label={activeThreadTitle}
+                    className="min-w-0 flex-1"
+                    dir={textDirection(activeThreadTitle)}
+                  />
+                }
+              >
+                <WorkspaceBreadcrumbText>{activeThreadTitle}</WorkspaceBreadcrumbText>
               </TooltipTrigger>
               <TooltipPopup side="top">{activeThreadTitle}</TooltipPopup>
             </Tooltip>
@@ -465,28 +414,7 @@ export const ChatHeader = memo(function ChatHeader({
           ) : null}
         </WorkspaceBreadcrumbItem>
       </WorkspaceBreadcrumb>
-      {isTemporary ? (
-        <Button
-          variant="destructive"
-          size="xs"
-          aria-label="Destroy temporary conversation"
-          disabled={!canOperateThread || onDestroyTemporary === undefined}
-          onClick={() => void destroyTemporary()}
-        >
-          <Trash2Icon />
-          Destroy temporary
-        </Button>
-      ) : (
-        <Button
-          variant="outline"
-          size="xs"
-          aria-label="Make conversation temporary"
-          onClick={makeTemporary}
-        >
-          <TimerIcon />
-          Make temporary
-        </Button>
-      )}
+      <ZcodeTemporaryHeaderActions header={temporary} canOperateThread={canOperateThread} />
       {isServerThread ? <GuestShareIndicator threadRef={activeThreadRef} /> : null}
     </div>
   );

@@ -14,8 +14,12 @@ import SideChatPane from "./SideChatPane";
 import type { ComposerImageAttachment, DraftId } from "../../composerDraftStore";
 import type { ShortcutMatchContext } from "../../keybindings";
 import type { SideChatParentPanel } from "../../lib/sideChatPane";
-import { type JjDiffContext } from "../../diffPanelStore";
 import { type RightPanelSurface, useRightPanelStore } from "../../rightPanelStore";
+import { isZcodeRightPanelSurface } from "../../zcode/right-panel-kinds";
+import {
+  ZcodeRightPanelSurfaceContent,
+  type ZcodeRightPanelContext,
+} from "../../zcode/right-panel-surfaces";
 import {
   PersistentThreadTerminalPanel,
   type PersistentThreadTerminalPanelProps,
@@ -29,7 +33,6 @@ import { ThreadPullRequestsPanel } from "../pullRequest/ThreadPullRequestsPanel"
 const PreviewPanel = lazy(() =>
   import("../preview/PreviewPanel").then((module) => ({ default: module.PreviewPanel })),
 );
-const JjPanel = lazy(() => import("../jj/JjPanel"));
 const DiffPanel = lazy(() => import("../DiffPanel"));
 const DevicePanel = lazy(() =>
   import("../device/DevicePanel").then((module) => ({ default: module.DevicePanel })),
@@ -77,20 +80,16 @@ export function RightPanelSurfaceContent(props: {
     image: ComposerImageAttachment | null,
   ) => void;
   readonly onCloseSurface: (surface: RightPanelSurface) => void;
-  readonly cwd: string | null;
-  readonly projectId: ProjectId | null;
-  readonly onOpenJjDiff: (
-    revisionCommitId: string,
-    filePath: string,
-    context?: JjDiffContext,
-  ) => void;
   readonly terminal: RightPanelTerminalProps;
   readonly pullRequest: RightPanelPullRequestProps;
   readonly files: RightPanelFileProps;
   readonly sideChatParentPanel: SideChatParentPanel;
+  readonly zcode: ZcodeRightPanelContext;
 }) {
   const { surface, threadRef, visible, onCloseSurface } = props;
   if (surface === null) return null;
+  if (isZcodeRightPanelSurface(surface))
+    return <ZcodeRightPanelSurfaceContent {...props} surface={surface} />;
   switch (surface.kind) {
     case "preview":
       return (
@@ -113,28 +112,6 @@ export function RightPanelSurfaceContent(props: {
           threadRef={threadRef}
           surface={surface}
         />
-      );
-    case "jj":
-      return (
-        <Suspense fallback={null}>
-          <JjPanel
-            key={`${props.environmentId}:${props.cwd}`}
-            environmentId={props.environmentId}
-            cwd={props.cwd}
-            visible={visible && props.activeSurfaceId === surface.id}
-            onOpenDiff={props.onOpenJjDiff}
-            projectId={props.projectId ?? undefined}
-            onOpenPullRequest={({ environmentId, reference }) => {
-              if (environmentId !== props.environmentId) return;
-              useRightPanelStore.getState().openPullRequest(threadRef, {
-                projectId: reference.projectId,
-                repository: reference.repository,
-                number: reference.number,
-                ...(reference.host ? { host: reference.host } : {}),
-              });
-            }}
-          />
-        </Suspense>
       );
     case "diff":
       return (

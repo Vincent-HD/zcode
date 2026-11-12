@@ -82,22 +82,6 @@ describe("surface shortcuts", () => {
     ).toBeNull();
   });
 
-  it("opens an available Jujutsu launcher from J", () => {
-    const actions = [
-      { shortcut: "J", available: true, label: "Jujutsu" },
-      { shortcut: "D", available: true, label: "Diff" },
-    ] as const;
-    expect(surfaceShortcutActionForKey(actions, shortcutEvent("j"))?.label).toBe("Jujutsu");
-    expect(
-      surfaceShortcutActionForKey(
-        actions.map((action) =>
-          action.shortcut === "J" ? { ...action, available: false } : action,
-        ),
-        shortcutEvent("j"),
-      ),
-    ).toBeNull();
-  });
-
   it("leaves modified, composing, and already-handled key events alone", () => {
     expect(surfaceShortcutActionForKey(actions, shortcutEvent("b", { metaKey: true }))).toBeNull();
     expect(

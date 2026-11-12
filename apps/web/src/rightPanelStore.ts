@@ -11,10 +11,15 @@ import { useClosedViewStore } from "./closedViewStore";
 import { resolveStorage } from "./lib/storage";
 import type { ThreadPanelPresentation } from "./rightPanelLayout";
 import type { ChatFileAttachment } from "./types";
+import {
+  ZCODE_RIGHT_PANEL_KINDS,
+  isZcodeRightPanelKind,
+  zcodeSingletonSurface,
+  type ZcodeRightPanelSurface,
+} from "./zcode/right-panel-kinds";
 
 const RIGHT_PANEL_KINDS = [
   "diff",
-  "jj",
   "files",
   "file",
   "preview",
@@ -23,6 +28,7 @@ const RIGHT_PANEL_KINDS = [
   "pull-request",
   "pull-requests",
   "side-chat",
+  ...ZCODE_RIGHT_PANEL_KINDS,
 ] as const;
 export type RightPanelKind = (typeof RIGHT_PANEL_KINDS)[number];
 
@@ -47,7 +53,6 @@ export type RightPanelSurface =
       activeTerminalId: string;
       splitDirection?: "horizontal" | "vertical";
     }
-  | { id: "jj"; kind: "jj" }
   | { id: "diff"; kind: "diff" }
   | {
       id: "files";
@@ -78,7 +83,8 @@ export type RightPanelSurface =
       detailTab?: PullRequestDetailTab;
     }
   | { id: "pull-requests"; kind: "pull-requests" }
-  | { id: `side-chat:${string}`; kind: "side-chat"; threadId: ThreadId };
+  | { id: `side-chat:${string}`; kind: "side-chat"; threadId: ThreadId }
+  | ZcodeRightPanelSurface;
 
 const RIGHT_PANEL_STORAGE_KEY = "t3code:right-panel-state:v2";
 const RIGHT_PANEL_STORAGE_VERSION = 14;
@@ -212,9 +218,8 @@ const DEFAULT_THREAD_PANEL_VISIBILITY: ThreadPanelVisibility = {
 const singletonSurface = (
   kind: Exclude<RightPanelKind, "file" | "preview" | "terminal" | "pull-request" | "side-chat">,
 ): RightPanelSurface => {
+  if (isZcodeRightPanelKind(kind)) return zcodeSingletonSurface(kind);
   switch (kind) {
-    case "jj":
-      return { id: "jj", kind };
     case "diff":
       return { id: "diff", kind };
     case "files":

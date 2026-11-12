@@ -6,13 +6,7 @@ import {
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
 import { safeErrorLogAttributes } from "@t3tools/client-runtime/errors";
-import {
-  AuthFilesystemReadScope,
-  type JjDiffResult,
-  type ReviewBranchCommitsResult,
-  type ScopedThreadRef,
-  type RunId,
-} from "@t3tools/contracts";
+import type { ReviewBranchCommitsResult, ScopedThreadRef, RunId } from "@t3tools/contracts";
 import {
   ArrowRightIcon,
   CheckIcon,
@@ -100,13 +94,12 @@ import {
   DropdownMenuTrigger,
 } from "./ui/menu";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
-import { formatEnvironmentQueryError, useEnvironmentQuery } from "../state/query";
+import { useEnvironmentQuery } from "../state/query";
 import { useAtomCommand } from "../state/use-atom-command";
 import { serverEnvironment } from "../state/server";
 import { reviewEnvironment } from "../state/review";
 import { vcsEnvironment } from "../state/vcs";
-import { jjEnvironment } from "../state/jj";
-import { useEnvironmentScope } from "../state/session";
+import { JjDiffScopeItem, useJjDiff } from "../zcode/use-jj-diff";
 import { buildBaseRefChoices, filterBaseRefChoices } from "../lib/baseRefChoices";
 import { createGitDiffFileContentsLoader } from "../lib/diffFileContents";
 
@@ -277,145 +270,23 @@ export default function DiffPanel({
     serverConfig?.availableEditors ?? [],
   );
   const getDiffFileContents = useAtomCommand(reviewEnvironment.diffFileContents);
-  const getJjPanel = useAtomCommand(jjEnvironment.getPanel, {
-    reportFailure: false,
-    reportDefect: false,
-  });
-  const getJjDiff = useAtomCommand(jjEnvironment.getDiff, {
-    reportFailure: false,
-    reportDefect: false,
-  });
-  const diffSelection = useDiffPanelStore((state) =>
-    selectThreadDiffPanelSelection(state.byThreadKey, routeThreadRef),
-  );
-  const selectedJjRevision = diffSelection.kind === "jj" ? diffSelection : null;
-  const canReadJj = useEnvironmentScope(
-    activeThread?.environmentId ?? null,
-    AuthFilesystemReadScope,
-  );
-  const supportsJj = serverConfig?.environment.capabilities.jjPanelDiff === true;
-  const [jjRefreshId, setJjRefreshId] = useState(0);
-  const [jjDiffState, setJjDiffState] = useState<{
-    scope: string;
-    pending: boolean;
-    data: JjDiffResult | null;
-    error: string | null;
-  } | null>(null);
-  const jjEnvironmentId = routeThreadRef?.environmentId;
-  const jjThreadId = routeThreadRef?.threadId;
-  const jjRequestScope = JSON.stringify([
-    jjEnvironmentId,
-    jjThreadId,
+  const jjDiff = useJjDiff({
+    routeThreadRef,
+    environmentId: activeThread?.environmentId ?? null,
     activeCwd,
-    selectedJjRevision,
-    jjRefreshId,
-  ]);
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- loads the selected remote Jujutsu diff and drops stale replies
-  useEffect(() => {
-    if (
-      !selectedJjRevision ||
-      !jjEnvironmentId ||
-      !jjThreadId ||
-      !activeCwd ||
-      !canReadJj ||
-      !supportsJj
-    )
-      return;
-    const threadRef = { environmentId: jjEnvironmentId, threadId: jjThreadId };
-    let cancelled = false;
-    const load = async () => {
-      setJjDiffState({ scope: jjRequestScope, pending: true, data: null, error: null });
-      // Older restored selections acquire one operation; retries never silently move it.
-      if (!selectedJjRevision.context) {
-        const result = await getJjPanel({
-          environmentId: jjEnvironmentId,
-          input: { cwd: activeCwd },
-        });
-        if (cancelled) return;
-        if (result._tag === "Failure" || result.value.status !== "ready") {
-          setJjDiffState({
-            scope: jjRequestScope,
-            pending: false,
-            data: null,
-            error:
-              result._tag === "Failure"
-                ? formatEnvironmentQueryError(result.cause)
-                : result.value.status === "unavailable" &&
-                    result.value.reason === "missing-executable"
-                  ? "Jujutsu is not installed in this environment."
-                  : "This directory is not a Jujutsu workspace.",
-          });
-          return;
-        }
-        if (
-          selectThreadDiffPanelSelection(useDiffPanelStore.getState().byThreadKey, threadRef) !==
-          selectedJjRevision
-        )
-          return;
-        useDiffPanelStore
-          .getState()
-          .selectJjRevision(
-            threadRef,
-            selectedJjRevision.revisionCommitId,
-            selectedJjRevision.filePath ?? undefined,
-            {
-              workspaceIdentity: result.value.workspaceIdentity,
-              expectedOperationId: result.value.operationId,
-            },
-          );
-        return;
-      }
-      const result = await getJjDiff({
-        environmentId: jjEnvironmentId,
-        input: {
-          cwd: activeCwd,
-          ...selectedJjRevision.context,
-          revisionCommitId: selectedJjRevision.revisionCommitId,
-          ...(selectedJjRevision.filePath ? { filePath: selectedJjRevision.filePath } : {}),
-        },
-      });
-      if (cancelled) return;
-      const matchesSelection =
-        result._tag === "Success" &&
-        result.value.commitId === selectedJjRevision.revisionCommitId &&
-        result.value.operationId === selectedJjRevision.context.expectedOperationId;
-      setJjDiffState({
-        scope: jjRequestScope,
-        pending: false,
-        data: matchesSelection ? result.value : null,
-        error:
-          result._tag === "Failure"
-            ? formatEnvironmentQueryError(result.cause)
-            : matchesSelection
-              ? null
-              : "The Jujutsu diff no longer matches the selected revision or operation. Refresh the Jujutsu panel and open the file again.",
-      });
-    };
-    queueMicrotask(() => {
-      if (!cancelled) void load();
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    activeCwd,
-    canReadJj,
-    getJjDiff,
-    getJjPanel,
-    jjRequestScope,
-    jjEnvironmentId,
-    jjThreadId,
-    selectedJjRevision,
-    supportsJj,
-  ]);
-  const currentJjDiff = jjDiffState?.scope === jjRequestScope ? jjDiffState : null;
+    supportsJjDiff: serverConfig?.environment.capabilities.jjPanelDiff,
+    serverConfigLoaded: Boolean(serverConfig),
+  });
   const gitStatusQuery = useEnvironmentQuery(
-    !selectedJjRevision && activeThread !== null && activeThread !== undefined && activeCwd != null
+    !jjDiff && activeThread !== null && activeThread !== undefined && activeCwd != null
       ? vcsEnvironment.status({
           environmentId: activeThread.environmentId,
           input: { cwd: activeCwd },
         })
       : null,
+  );
+  const diffSelection = useDiffPanelStore((state) =>
+    selectThreadDiffPanelSelection(state.byThreadKey, routeThreadRef),
   );
   const rememberedBaseRef = useDiffPanelStore((state) =>
     selectThreadBranchBaseRef(state, routeThreadRef),
@@ -464,11 +335,9 @@ export default function DiffPanel({
       ? diffSelection.baseRef
       : null;
   const selectedFilePath =
-    diffSelection.kind === "turn" || diffSelection.kind === "jj" ? diffSelection.filePath : null;
+    diffSelection.kind === "turn" ? diffSelection.filePath : (jjDiff?.filePath ?? null);
   const selectedFileRevealRequestId =
-    diffSelection.kind === "turn" || diffSelection.kind === "jj"
-      ? diffSelection.revealRequestId
-      : 0;
+    diffSelection.kind === "turn" ? diffSelection.revealRequestId : (jjDiff?.revealRequestId ?? 0);
   const selectedTurn =
     selectedRunId === null
       ? undefined
@@ -478,13 +347,11 @@ export default function DiffPanel({
   const latestTurn = orderedTurnDiffSummaries[0];
   const reviewSectionId = toolCallSelection
     ? `tool-call:${toolCallSelection.threadId}:${toolCallSelection.itemId}`
-    : selectedJjRevision
-      ? `jj:${JSON.stringify([activeCwd, selectedJjRevision.context, selectedJjRevision.revisionCommitId, selectedJjRevision.filePath])}`
-      : selectedTurn
-        ? `turn:${selectedTurn.runId}`
-        : selectedCommitSha !== null
-          ? `commit:${selectedCommitSha}`
-          : selectedGitScope;
+    : selectedTurn
+      ? `turn:${selectedTurn.runId}`
+      : selectedCommitSha !== null
+        ? `commit:${selectedCommitSha}`
+        : (jjDiff?.sectionId ?? selectedGitScope);
   const collapseScopeKey = routeThreadRef
     ? `${routeThreadRef.environmentId}:${routeThreadRef.threadId}:${reviewSectionId}`
     : null;
@@ -556,17 +423,15 @@ export default function DiffPanel({
     ? `${routeThreadRef.environmentId}:${routeThreadRef.threadId}`
     : null;
 
-  const selectedGitSource = !selectedJjRevision
-    ? branchDiffPreview.data?.sources.find(
-        (source) =>
-          source.kind ===
-          (selectedGitScope === "unstaged"
-            ? "working-tree"
-            : selectedGitScope === "commit"
-              ? "commit"
-              : "branch-range"),
-      )
-    : undefined;
+  const selectedGitSource = branchDiffPreview.data?.sources.find(
+    (source) =>
+      source.kind ===
+      (selectedGitScope === "unstaged"
+        ? "working-tree"
+        : selectedGitScope === "commit"
+          ? "commit"
+          : "branch-range"),
+  );
   const comparisonHeadRef = selectedGitSource?.headRef ?? gitStatusQuery.data?.refName ?? "HEAD";
   const comparisonBaseRef = selectedGitSource?.baseRef ?? selectedBaseRef ?? "Automatic";
   const selectedCommitSubject =
@@ -578,25 +443,21 @@ export default function DiffPanel({
       ? (selectedCommitSubject ?? `Commit ${selectedCommitSha.slice(0, 7)}`)
       : selectedGitScope === "unstaged"
         ? "Uncommitted"
-        : "Changes";
+        : (jjDiff?.label ?? "Changes");
   const selectedScopeLabel = toolCallSelection
     ? "Tool call"
-    : selectedJjRevision
-      ? `JJ ${selectedJjRevision.revisionCommitId.slice(0, 12)}`
-      : selectedRunId === null
-        ? selectedCommitSha !== null
-          ? (selectedCommitSubject ?? "Commit")
-          : selectedGitScopeLabel
-        : selectedTurn?.runId === latestTurn?.runId
-          ? "Latest turn"
-          : `Turn ${selectedCheckpointTurnCount ?? "?"}`;
+    : selectedRunId === null
+      ? selectedCommitSha !== null
+        ? (selectedCommitSubject ?? "Commit")
+        : selectedGitScopeLabel
+      : selectedTurn?.runId === latestTurn?.runId
+        ? "Latest turn"
+        : `Turn ${selectedCheckpointTurnCount ?? "?"}`;
   const reviewSectionTitle = toolCallSelection
     ? "Tool call"
-    : selectedJjRevision
-      ? selectedScopeLabel
-      : selectedTurn
-        ? `Turn ${selectedCheckpointTurnCount ?? "?"}`
-        : selectedGitScopeLabel;
+    : selectedTurn
+      ? `Turn ${selectedCheckpointTurnCount ?? "?"}`
+      : selectedGitScopeLabel;
   const headerCommitSha = selectedRunId === null ? selectedCommitSha : null;
   const selectedCommitUrl =
     headerCommitSha !== null
@@ -612,43 +473,36 @@ export default function DiffPanel({
     void openLink(url, { event });
   };
   const refreshPreviewQuery = branchDiffPreview.refresh;
-  const refreshDiffFromUserAction = selectedJjRevision
-    ? () => setJjRefreshId((current) => current + 1)
-    : refreshPreviewQuery;
+  const refreshDiffFromUserAction = jjDiff?.refresh ?? refreshPreviewQuery;
 
   const preview = branchDiffPreview.data;
-  const gitDiff = selectedGitSource?.diff;
+  const gitDiff = jjDiff ? jjDiff.patch : selectedGitSource?.diff;
+
   const toolCallPreview =
     toolCallSelection && toolCallItem?.type === "file_change" ? toolCallDiff(toolCallItem) : null;
   const selectedPatch = toolCallSelection
     ? toolCallPreview?.patch
-    : selectedJjRevision
-      ? currentJjDiff?.data?.diff
-      : selectedTurn
-        ? activeCheckpointDiff.data?.diff
-        : gitDiff;
+    : selectedTurn
+      ? activeCheckpointDiff.data?.diff
+      : gitDiff;
   const isSelectedPatchTruncated =
     toolCallPreview?.truncated === true ||
-    (selectedJjRevision
-      ? currentJjDiff?.data?.truncated === true
-      : isGitSelection && selectedGitSource?.truncated === true);
+    (isGitSelection && selectedGitSource?.truncated === true) ||
+    jjDiff?.truncated === true;
   const selectedPatchQuery = toolCallSelection
     ? toolCallDetail
     : selectedTurn
       ? activeCheckpointDiff
-      : branchDiffPreview;
-  const isLoadingSelectedPatch = selectedJjRevision
-    ? !currentJjDiff || currentJjDiff.pending
-    : selectedPatchQuery.isPending &&
-      (selectedPatchQuery.data === null ||
-        (isGitSelection && preview?.incomplete === true && selectedGitSource?.files?.length === 0));
+      : (jjDiff ?? branchDiffPreview);
+  const isLoadingSelectedPatch =
+    selectedPatchQuery.isPending &&
+    (selectedPatchQuery.data === null ||
+      (isGitSelection && preview?.incomplete === true && selectedGitSource?.files?.length === 0));
   const selectedPatchError = toolCallSelection
     ? toolCallDetail.error
-    : selectedJjRevision
-      ? (currentJjDiff?.error ?? null)
-      : selectedTurn
-        ? activeCheckpointDiff.error
-        : branchDiffPreview.error;
+    : selectedTurn
+      ? activeCheckpointDiff.error
+      : (jjDiff ?? branchDiffPreview).error;
   const hasResolvedPatch = typeof selectedPatch === "string";
   const hasNoNetChanges =
     hasResolvedPatch &&
@@ -665,8 +519,8 @@ export default function DiffPanel({
     lazySource ? undefined : selectedPatch,
     `diff-panel:${resolvedTheme}`,
     {
-      compactPartialHunkOffsets: isGitSelection || Boolean(selectedJjRevision),
-      ignoreWhitespace: Boolean(toolCallSelection || selectedJjRevision) && diffIgnoreWhitespace,
+      compactPartialHunkOffsets: isGitSelection || jjDiff !== null,
+      ...(toolCallSelection || jjDiff ? { ignoreWhitespace: diffIgnoreWhitespace } : {}),
     },
   );
   const recordedToolCallFileCount =
@@ -790,7 +644,7 @@ export default function DiffPanel({
     },
   );
 
-  const isRefreshingDiff = selectedJjRevision
+  const isRefreshingDiff = jjDiff
     ? isLoadingSelectedPatch
     : branchDiffPreview.isPending || areFilePatchesPending;
   const pathOccurrences = new Map<string, number>();
@@ -951,9 +805,7 @@ export default function DiffPanel({
   const selectedScopeValue = toolCallSelection
     ? ""
     : selectedRunId === null
-      ? selectedJjRevision
-        ? "jj"
-        : selectedCommitValue || selectedGitScope
+      ? (jjDiff?.scopeValue ?? (selectedCommitValue || selectedGitScope))
       : selectedTurn?.runId === latestTurn?.runId
         ? "latest"
         : selectedTurnValue;
@@ -1013,11 +865,7 @@ export default function DiffPanel({
           ) : null}
           <DropdownMenuContent align="start">
             <DropdownMenuRadioGroup value={selectedScopeValue} onValueChange={selectScopeValue}>
-              {selectedJjRevision && (
-                <DropdownMenuRadioItem value="jj" closeOnClick>
-                  <span>{selectedScopeLabel}</span>
-                </DropdownMenuRadioItem>
-              )}
+              {jjDiff && <JjDiffScopeItem label={jjDiff.label} />}
               <DropdownMenuRadioItem value="branch" closeOnClick>
                 <span>Changes</span>
               </DropdownMenuRadioItem>
@@ -1291,7 +1139,7 @@ export default function DiffPanel({
             layout="inline"
           />
         ) : null}
-        {(canRefreshGitDiff || (selectedJjRevision && canReadJj && supportsJj)) && (
+        {(canRefreshGitDiff || jjDiff?.canRefresh) && (
           <Tooltip>
             <TooltipTrigger
               render={
@@ -1447,7 +1295,7 @@ export default function DiffPanel({
         <div className="flex flex-1 items-center justify-center px-5 text-center text-xs text-muted-foreground/70">
           Select a thread to inspect turn diffs.
         </div>
-      ) : !isGitRepo && !toolCallSelection && !selectedJjRevision ? (
+      ) : !isGitRepo && !toolCallSelection ? (
         <div className="flex flex-1 items-center justify-center px-5 text-center text-xs text-muted-foreground/70">
           Turn diffs are unavailable because this project is not a git repository.
         </div>
@@ -1455,17 +1303,11 @@ export default function DiffPanel({
         <div className="flex flex-1 items-center justify-center px-5 text-center text-xs text-muted-foreground/70">
           No completed turns yet.
         </div>
-      ) : selectedJjRevision && !supportsJj ? (
+      ) : jjDiff?.blockedMessage ? (
         <div className="flex flex-1 items-center justify-center px-5 text-center text-xs text-muted-foreground/70">
-          {serverConfig
-            ? "This environment's T3 Code server does not support Jujutsu diffs. Update that server to use them."
-            : "Waiting for the environment…"}
+          {jjDiff.blockedMessage}
         </div>
-      ) : selectedJjRevision && !canReadJj ? (
-        <div className="flex flex-1 items-center justify-center px-5 text-center text-xs text-muted-foreground/70">
-          This connection needs filesystem read permission to view Jujutsu diffs.
-        </div>
-      ) : !selectedJjRevision && isGitSelection && !canReadFiles ? (
+      ) : isGitSelection && !canReadFiles ? (
         fileAccess.isPending ? (
           <DiffPanelLoadingState label="Checking file access..." />
         ) : (
@@ -1501,8 +1343,6 @@ export default function DiffPanel({
               <div className="px-3">
                 <p role="alert" className="mb-2 text-2xs text-error/80">
                   {selectedPatchError}
-                  {selectedJjRevision &&
-                    " Refresh the Jujutsu panel and open the file again if its operation has changed."}
                 </p>
               </div>
             )}
@@ -1533,13 +1373,11 @@ export default function DiffPanel({
                       ? "Loading tool call diff..."
                       : selectedTurn
                         ? "Loading checkpoint diff..."
-                        : selectedJjRevision
-                          ? "Loading Jujutsu diff..."
-                          : selectedGitScope === "unstaged"
-                            ? "Loading uncommitted changes..."
-                            : selectedGitScope === "commit"
-                              ? "Loading commit..."
-                              : "Loading changes..."
+                        : selectedGitScope === "unstaged"
+                          ? "Loading uncommitted changes..."
+                          : selectedGitScope === "commit"
+                            ? "Loading commit..."
+                            : (jjDiff?.loadingLabel ?? "Loading changes...")
                   }
                 />
               ) : (

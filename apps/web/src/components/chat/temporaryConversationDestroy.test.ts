@@ -3,7 +3,7 @@ import { EnvironmentId, ThreadId } from "@t3tools/contracts";
 import { AsyncResult } from "effect/reactivity";
 import { describe, expect, it, vi } from "vite-plus/test";
 
-import { useUiStateStore } from "../../uiStateStore";
+import { useTemporaryConversationStore } from "../../zcode/temporary-conversation-store";
 import { destroyTemporaryConversation } from "./temporaryConversationDestroy";
 
 describe("destroyTemporaryConversation", () => {
@@ -13,8 +13,8 @@ describe("destroyTemporaryConversation", () => {
       ThreadId.make("temporary-destroy-thread"),
     );
     const threadKey = scopedThreadKey(threadRef);
-    const previousKeys = useUiStateStore.getState().temporaryThreadKeys;
-    useUiStateStore.setState({ temporaryThreadKeys: [...previousKeys, threadKey] });
+    const previousKeys = useTemporaryConversationStore.getState().temporaryThreadKeys;
+    useTemporaryConversationStore.setState({ temporaryThreadKeys: [...previousKeys, threadKey] });
     const deleteThread = vi.fn(async () => AsyncResult.success({ sequence: 1 }));
 
     try {
@@ -34,9 +34,9 @@ describe("destroyTemporaryConversation", () => {
       ).resolves.toBe(true);
 
       expect(deleteThread).toHaveBeenCalledWith(threadRef, { deleteWorktree: false });
-      expect(useUiStateStore.getState().temporaryThreadKeys).not.toContain(threadKey);
+      expect(useTemporaryConversationStore.getState().temporaryThreadKeys).not.toContain(threadKey);
     } finally {
-      useUiStateStore.setState({ temporaryThreadKeys: previousKeys });
+      useTemporaryConversationStore.setState({ temporaryThreadKeys: previousKeys });
     }
   });
 });

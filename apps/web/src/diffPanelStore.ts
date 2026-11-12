@@ -1,13 +1,8 @@
 import type { ThreadStructureVisibleTurnItem } from "@t3tools/client-runtime/state/shell";
 import { turnItemDetailRevision } from "@t3tools/client-runtime/work-log/item-detail";
 import { scopedThreadKey } from "@t3tools/client-runtime/environment";
-import type {
-  JjWorkspaceIdentity,
-  RunId,
-  ScopedThreadRef,
-  ThreadId,
-  TurnItemId,
-} from "@t3tools/contracts";
+import type { RunId, ScopedThreadRef, ThreadId, TurnItemId } from "@t3tools/contracts";
+import type { JjDiffPanelSelection } from "./zcode/jj-diff-selection";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
@@ -19,24 +14,13 @@ export interface ToolCallDiffTarget {
   readonly revision: string;
 }
 
-export interface JjDiffContext {
-  readonly workspaceIdentity: JjWorkspaceIdentity;
-  readonly expectedOperationId: string;
-}
-
 export type DiffPanelSelection =
   | ({ kind: "tool-call" } & ToolCallDiffTarget)
   | { kind: "branch"; baseRef: string | null }
   | { kind: "unstaged" }
   | { kind: "commit"; sha: string; baseRef: string | null }
   | { kind: "turn"; turnId: RunId; filePath: string | null; revealRequestId: number }
-  | {
-      kind: "jj";
-      revisionCommitId: string;
-      filePath: string | null;
-      revealRequestId: number;
-      context?: JjDiffContext;
-    };
+  | JjDiffPanelSelection;
 
 const DEFAULT_SELECTION: DiffPanelSelection = { kind: "branch", baseRef: null };
 
@@ -51,12 +35,6 @@ interface DiffPanelStoreState {
   selectTurn: (ref: ScopedThreadRef, turnId: RunId, filePath?: string) => void;
   selectCommit: (ref: ScopedThreadRef, sha: string, keepOnOpen?: boolean) => void;
   consumeKeepSelectionOnOpen: (ref: ScopedThreadRef) => boolean;
-  selectJjRevision: (
-    ref: ScopedThreadRef,
-    revisionCommitId: string,
-    filePath?: string,
-    context?: JjDiffContext,
-  ) => void;
   reconcileTurnSelection: (ref: ScopedThreadRef, availableTurnIds: ReadonlyArray<RunId>) => void;
   removeThread: (ref: ScopedThreadRef) => void;
 }
@@ -159,23 +137,6 @@ export const useDiffPanelStore = create<DiffPanelStoreState>()(
         set({ keepSelectionOnOpenThreadKey: null });
         return true;
       },
-      selectJjRevision: (ref, revisionCommitId, filePath, context) =>
-        set((state) => {
-          const threadKey = scopedThreadKey(ref);
-          const previous = state.byThreadKey[threadKey];
-          return {
-            byThreadKey: {
-              ...state.byThreadKey,
-              [threadKey]: {
-                kind: "jj",
-                revisionCommitId,
-                filePath: filePath?.trim() || null,
-                revealRequestId: previous?.kind === "jj" ? previous.revealRequestId + 1 : 1,
-                ...(context ? { context } : {}),
-              },
-            },
-          };
-        }),
       reconcileTurnSelection: (ref, availableTurnIds) =>
         set((state) => {
           const threadKey = scopedThreadKey(ref);

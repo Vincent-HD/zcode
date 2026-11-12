@@ -6,6 +6,7 @@ import {
   AuthSourceControlWriteScope,
   EnvironmentId,
   WS_METHODS,
+  type AuthEnvironmentScope,
   type AuthSessionState,
 } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
@@ -22,7 +23,7 @@ const sessions = Atom.family((_id: EnvironmentId) =>
 );
 const env = EnvironmentId.make("target");
 const other = EnvironmentId.make("other");
-const grant = (scopes: AuthSessionState["scopes"]): AuthSessionState => ({
+const grant = (scopes: ReadonlyArray<AuthEnvironmentScope>): AuthSessionState => ({
   authenticated: true,
   auth: {
     policy: "remote-reachable",

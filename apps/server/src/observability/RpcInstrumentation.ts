@@ -6,20 +6,13 @@ import type * as RpcGroup from "effect/rpc/RpcGroup";
 import * as RpcMiddleware from "effect/rpc/RpcMiddleware";
 
 import { rpcRequestDuration, rpcRequestsTotal, withMetrics } from "./Metrics.ts";
+import { ZCODE_RPC_AGGREGATES } from "../zcode/rpc.ts";
 
 type WsRpcMethod = RpcGroup.Rpcs<typeof WsRpcGroup>["_tag"];
 
 // Trace queries and dashboards depend on these labels, including deviations from method prefixes.
 const RPC_AGGREGATES = {
-  [WS_METHODS.jjRunAction]: "jj",
-  [WS_METHODS.jjGetDiff]: "jj",
-  [WS_METHODS.jjForgePreview]: "jj",
-  [WS_METHODS.jjForgePublish]: "jj",
-  [WS_METHODS.jjForgeStatus]: "jj",
-  [WS_METHODS.jjGetPanel]: "jj",
-  [WS_METHODS.jjDescribe]: "jj",
-  [WS_METHODS.jjSquash]: "jj",
-  [WS_METHODS.jjRevertOperation]: "jj",
+  ...ZCODE_RPC_AGGREGATES,
   [ORCHESTRATION_V2_WS_METHODS.dispatchCommand]: "orchestrationV2",
   [ORCHESTRATION_V2_WS_METHODS.getWorkflowScript]: "orchestration",
   [ORCHESTRATION_V2_WS_METHODS.getNativeChildWork]: "orchestration",

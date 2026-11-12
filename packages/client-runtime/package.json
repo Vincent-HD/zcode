@@ -199,10 +199,6 @@
       "types": "./src/state/git.ts",
       "default": "./src/state/git.ts"
     },
-    "./state/jj": {
-      "types": "./src/state/jj.ts",
-      "default": "./src/state/jj.ts"
-    },
     "./state/command-output": {
       "types": "./src/state/commandOutput.ts",
       "default": "./src/state/commandOutput.ts"

@@ -4,6 +4,7 @@ import {
   PROVIDER_SEND_TURN_MAX_FILE_BYTES,
   type ExecutionEnvironmentDescriptor,
 } from "@t3tools/contracts";
+import { ZCODE_ENVIRONMENT_CAPABILITIES } from "../zcode/environment.ts";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import * as Context from "effect/Context";
 import * as SecureRandom from "effect/crypto/SecureRandom";
@@ -225,10 +226,7 @@ export const make = Effect.gen(function* () {
       questionAttachments: true,
       fileAttachments: { maxUploadBytes: PROVIDER_SEND_TURN_MAX_FILE_BYTES },
       pullRequests: true,
-      jjPanel: true,
-      jjPanelActions: true,
-      jjPanelDiff: true,
-      jjPanelForge: true,
+      ...ZCODE_ENVIRONMENT_CAPABILITIES,
       pullRequestChecks: true,
       sideChats: true,
       vcsBranchStatus: true,

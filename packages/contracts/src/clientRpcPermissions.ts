@@ -9,12 +9,12 @@ import {
   AuthProvidersManageScope,
   AuthSettingsWriteScope,
   AuthSourceControlWriteScope,
-  AuthFilesystemReadScope,
   AuthTerminalOperateScope,
   type AuthEnvironmentScope,
 } from "./auth.ts";
 import { ORCHESTRATION_V2_WS_METHODS } from "./orchestrationV2.ts";
 import { WS_METHODS } from "./rpc.ts";
+import { ZCODE_CLIENT_GUARDED_RPC_SCOPES } from "./zcode-rpc.ts";
 
 /** Incremental client enforcement; the server still authorizes every request. */
 export const CLIENT_GUARDED_RPC_SCOPES = {
@@ -53,12 +53,7 @@ export const CLIENT_GUARDED_RPC_SCOPES = {
   [WS_METHODS.projectCloneStart]: AuthSourceControlWriteScope,
   [WS_METHODS.projectCloneCancel]: AuthSourceControlWriteScope,
   [WS_METHODS.projectCloneRetry]: AuthSourceControlWriteScope,
-  [WS_METHODS.jjRunAction]: AuthSourceControlWriteScope,
-  [WS_METHODS.jjForgePublish]: AuthSourceControlWriteScope,
-  [WS_METHODS.jjGetDiff]: AuthFilesystemReadScope,
-  [WS_METHODS.jjDescribe]: AuthSourceControlWriteScope,
-  [WS_METHODS.jjSquash]: AuthSourceControlWriteScope,
-  [WS_METHODS.jjRevertOperation]: AuthSourceControlWriteScope,
+  ...ZCODE_CLIENT_GUARDED_RPC_SCOPES,
   [WS_METHODS.vcsPull]: AuthSourceControlWriteScope,
   [WS_METHODS.gitRunStackedAction]: AuthSourceControlWriteScope,
   [WS_METHODS.gitPreparePullRequestThread]: AuthSourceControlWriteScope,

@@ -9,6 +9,7 @@ import {
   TrimmedNonEmptyString,
 } from "./baseSchemas.ts";
 import { SourceControlProviderKind } from "./sourceControl.ts";
+import { zcodeEnvironmentCapabilityFields } from "./zcode-environment.ts";
 
 export const ORCHESTRATION_PROTOCOL_VERSION = 2;
 export const ORCHESTRATION_PROTOCOL_VERSION_TEXT = "2";
@@ -85,11 +86,7 @@ export const ExecutionEnvironmentCapabilities = Schema.Struct({
     }),
   ),
   pullRequests: Schema.optionalKey(Schema.Boolean),
-  /** Missing on unpatched servers; clients must not probe Jujutsu RPCs there. */
-  jjPanel: Schema.optionalKey(Schema.Boolean),
-  jjPanelActions: Schema.optionalKey(Schema.Boolean),
-  jjPanelDiff: Schema.optionalKey(Schema.Boolean),
-  jjPanelForge: Schema.optionalKey(Schema.Boolean),
+  ...zcodeEnvironmentCapabilityFields,
   pullRequestChecks: Schema.optionalKey(Schema.Boolean),
   /** Side chats: hidden `lineage.sideChat` forks. Older servers ignore the fork flag. */
   sideChats: Schema.optionalKey(Schema.Boolean),

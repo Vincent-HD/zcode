@@ -146,7 +146,7 @@ const make = Effect.gen(function* () {
     JjPanelError
   > {
     const version = yield* run({ cwd: input.cwd, args: ["--version"] }).pipe(
-      Effect.map(() => true),
+      Effect.as(true),
       Effect.catchTags({ VcsProcessSpawnError: () => Effect.succeed(false) }),
       Effect.mapError(() => error("command-failed")),
     );

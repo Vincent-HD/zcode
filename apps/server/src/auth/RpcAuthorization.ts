@@ -18,7 +18,6 @@ import {
   AuthDiagnosticsReadScope,
   AuthOrchestrationOperateScope,
   AuthOrchestrationReadScope,
-  AuthSourceControlWriteScope,
   AuthPreviewOperateScope,
   AuthRelayReadScope,
   AuthRelayWriteScope,
@@ -36,10 +35,13 @@ import * as Schema from "effect/Schema";
 import * as Layer from "effect/Layer";
 import type * as RpcGroup from "effect/rpc/RpcGroup";
 
+import { ZCODE_RPC_REQUIRED_SCOPES } from "../zcode/rpc.ts";
+
 type WsRpcMethod = RpcGroup.Rpcs<typeof WsRpcGroup>["_tag"];
 
 export const RPC_REQUIRED_SCOPES = {
   ...CLIENT_GUARDED_RPC_SCOPES,
+  ...ZCODE_RPC_REQUIRED_SCOPES,
   [ORCHESTRATION_V2_WS_METHODS.dispatchCommand]: AuthOrchestrationOperateScope,
   [ORCHESTRATION_V2_WS_METHODS.getWorkflowScript]: AuthOrchestrationReadScope,
   [ORCHESTRATION_V2_WS_METHODS.getNativeChildWork]: AuthOrchestrationReadScope,
@@ -177,15 +179,6 @@ export const RPC_REQUIRED_SCOPES = {
   [WS_METHODS.subscribeWorktreeSetup]: AuthOrchestrationReadScope,
   [WS_METHODS.worktreeSetupCancel]: AuthOrchestrationOperateScope,
   [WS_METHODS.subscribeResourceTelemetry]: AuthDiagnosticsReadScope,
-  [WS_METHODS.jjRunAction]: AuthSourceControlWriteScope,
-  [WS_METHODS.jjGetDiff]: AuthFilesystemReadScope,
-  [WS_METHODS.jjForgePreview]: AuthOrchestrationReadScope,
-  [WS_METHODS.jjForgeStatus]: AuthOrchestrationReadScope,
-  [WS_METHODS.jjForgePublish]: AuthSourceControlWriteScope,
-  [WS_METHODS.jjGetPanel]: AuthOrchestrationReadScope,
-  [WS_METHODS.jjDescribe]: AuthSourceControlWriteScope,
-  [WS_METHODS.jjSquash]: AuthSourceControlWriteScope,
-  [WS_METHODS.jjRevertOperation]: AuthSourceControlWriteScope,
   [WS_METHODS.vcsRefreshStatus]: AuthOrchestrationReadScope,
   [WS_METHODS.gitResolvePullRequest]: AuthOrchestrationReadScope,
   [WS_METHODS.vcsListRefs]: AuthOrchestrationReadScope,

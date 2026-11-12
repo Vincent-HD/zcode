@@ -1,8 +1,7 @@
-import * as JjPanelService from "./jj/JjPanelService.ts";
-import * as JjForgeService from "./jj/JjForgeService.ts";
 import * as ProviderEventLoggers from "@t3tools/provider-core/server/ProviderEventLoggers";
 import type { RelayManagedEndpointRuntimeConfig } from "@t3tools/contracts/relay";
 import * as Random from "effect/Random";
+import * as ZcodeServer from "./zcode/layer.ts";
 import * as EnvironmentKeys from "./cloud/environmentKeys.ts";
 import * as AssetSigner from "./assets/AssetSigner.ts";
 import * as DatabaseStorage from "./persistence/DatabaseStorage.ts";
@@ -464,8 +463,7 @@ const layerReview = ReviewService.layer.pipe(
 
 const layerVcs = Layer.empty.pipe(
   Layer.provideMerge(
-    JjForgeService.layer.pipe(
-      Layer.provideMerge(JjPanelService.layer),
+    ZcodeServer.layer.pipe(
       Layer.provide(layerPullRequestService),
       Layer.provide(RuntimeLayer.layerProjectService),
       Layer.provide(layerSourceControlProviderRegistry),

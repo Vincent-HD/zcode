@@ -3,7 +3,8 @@
 `zcode` is a community-maintained fork of T3 Code. This section describes the features maintained
 in this fork and how to install or update its Linux x86_64 and macOS arm64 Nix package. The Original T3 Code README
 below retains the upstream CLI and desktop installation instructions; those commands install
-upstream builds and do not include this fork's additions.
+upstream builds and do not include this fork's additions. Fork development rules and the list of
+upstream entry points to re-check after a rebase are in [`ZCODE.md`](./ZCODE.md).
 
 ## Features in this community fork
 
@@ -33,9 +34,12 @@ upstream builds and do not include this fork's additions.
 
 ## Fork-specific CI
 
-This fork runs its focused regression suite on every push and pull request through GitHub Actions.
-The workflow runs [`scripts/test-zcode-custom.sh`](./scripts/test-zcode-custom.sh); upstream CI
-skips this repository, and this workflow runs only in `Vincent-HD/zcode`.
+This fork runs its focused regression suite on every push and pull request through
+[`zcode-custom-tests.yml`](./.github/workflows/zcode-custom-tests.yml), which runs
+[`scripts/test-zcode-custom.sh`](./scripts/test-zcode-custom.sh). Upstream workflows stay
+byte-identical and are disabled in the repository settings instead. Workflows added upstream arrive
+enabled, so rerun [`scripts/zcode-disable-upstream-workflows.sh`](./scripts/zcode-disable-upstream-workflows.sh)
+after every rebase push.
 
 ## Linux and macOS installation and updates (Nix flake)
 
@@ -65,8 +69,9 @@ flake package/app aliases. The app keeps its upstream T3 Code identity and uses 
 `~/.t3/userdata` state, so existing data is shared with the upstream desktop app. Back up that
 state before switching versions; downgrading the binary does not reverse database migrations.
 
-After rebasing this fork onto the upstream release you want to package, run the updater with that
-release version:
+After rebasing this fork onto the upstream release you want to package, re-check the entry points
+listed in [`ZCODE.md`](./ZCODE.md), push, and rerun
+`scripts/zcode-disable-upstream-workflows.sh`. Then run the updater with that release version:
 
 ```bash
 ./scripts/update-z-code-nix.sh 0.1.9-nightly.20261110.4478

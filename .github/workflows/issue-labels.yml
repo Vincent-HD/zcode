@@ -14,7 +14,6 @@ permissions:
 
 jobs:
   sync:
-    if: github.repository != 'Vincent-HD/zcode'
     name: Sync issue labels
     runs-on: ubuntu-24.04
     steps:

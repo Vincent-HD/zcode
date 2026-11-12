@@ -123,7 +123,6 @@ permissions:
 
 jobs:
   build:
-    if: github.repository != 'Vincent-HD/zcode'
     name: Build ${{ inputs.label }}
     runs-on: ${{ inputs.runner }}
     # Windows waits for the Linux CLI archive inside its own budget (see
@@ -845,11 +844,7 @@ jobs:
   verify:
     name: Verify
     needs: [build]
-    if: >-
-      github.repository != 'Vincent-HD/zcode' &&
-      (
-        inputs.verify_runner != ''
-      )
+    if: inputs.verify_runner != ''
     runs-on: ${{ inputs.verify_runner }}
     timeout-minutes: 15
     steps:

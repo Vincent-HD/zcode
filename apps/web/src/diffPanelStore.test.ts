@@ -1,24 +1,13 @@
 import { EnvironmentId, RunId, ThreadId, TurnItemId } from "@t3tools/contracts";
 import * as DateTime from "effect/DateTime";
+import { scopedThreadKey } from "@t3tools/client-runtime/environment";
 import { beforeEach, describe, expect, it } from "vite-plus/test";
 
 import {
   resolveToolCallDiffTarget,
-  selectThreadDiffPanelSelection,
   useDiffPanelSessionStore,
   useDiffPanelStore,
 } from "./diffPanelStore";
-
-const THREAD_REF = scopeThreadRef(EnvironmentId.make("environment-1"), ThreadId.make("thread-1"));
-const JJ_CONTEXT = {
-  workspaceIdentity: {
-    workspaceRoot: "/workspace",
-    repositoryPath: "/workspace/.jj/repo",
-    workspaceId: "default",
-  },
-  expectedOperationId: "a".repeat(128),
-};
-const JJ_COMMIT_ID = "b".repeat(40);
 
 describe("diffPanelStore", () => {
   beforeEach(() => {

@@ -24,8 +24,7 @@ export type ThreadActionMenuId =
   | "regenerate-title"
   | "mark-unread"
   | "share-guest"
-  | "make-temporary"
-  | "keep-permanent"
+  | ZcodeThreadActionMenuId
   | "copy"
   | "copy-path"
   | "copy-branch"
@@ -111,7 +110,7 @@ export interface ThreadActionMenuState {
   readonly isSnoozed: boolean;
   readonly canSnoozeNow: boolean;
   readonly isRegeneratingTitle: boolean;
-  readonly isTemporary: boolean;
+  readonly isTemporary?: boolean;
   /** Archive rejects attached providers, so disable it while running. */
   readonly isRunning: boolean;
   readonly supports: {
@@ -136,8 +135,7 @@ export function threadActionRequiresOperate(action: ThreadActionMenuId): boolean
     "project-settings",
     "mark-unread",
     "share-guest",
-    "make-temporary",
-    "keep-permanent",
+    ...ZCODE_THREAD_ACTIONS_WITHOUT_OPERATE,
     "copy",
     "copy-path",
     "copy-branch",

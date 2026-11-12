@@ -57,7 +57,7 @@ import {
   useJjDescriptionDraftStore,
 } from "./jj-description-draft-store";
 import { JjActionDialog, jjTargetRevisions, type JjActionPreview } from "./jj-action-dialog";
-import type { JjDiffContext } from "~/diffPanelStore";
+import type { JjDiffContext } from "~/zcode/jj-diff-selection";
 import type { ProjectId } from "@t3tools/contracts";
 import { JjForgePanel } from "./jj-forge-panel";
 import type { JjForgeSectionProps } from "./JjForgeSection";

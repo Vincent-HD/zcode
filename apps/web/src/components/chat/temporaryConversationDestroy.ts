@@ -12,7 +12,7 @@ import {
 } from "../../composerDraftStore";
 import { releaseComposerDraftUploads } from "../../lib/composerDraftUploads";
 import { readThreadShell } from "../../state/entities";
-import { useUiStateStore } from "../../uiStateStore";
+import { useTemporaryConversationStore } from "../../zcode/temporary-conversation-store";
 import {
   setTemporaryConversationDiscarding,
   temporaryConversationRouteKey,
@@ -20,7 +20,7 @@ import {
 import type { useThreadActions } from "../../hooks/useThreadActions";
 import type { NewThreadHandler } from "../../hooks/useHandleNewThread";
 import { toastManager } from "../ui/toast";
-import { hasPendingDraftSend } from "./chatViewSend";
+import { hasPendingDraftSend } from "../../zcode/temporary-conversation-send";
 
 type DeleteThreadAction = ReturnType<typeof useThreadActions>["deleteThread"];
 
@@ -57,7 +57,7 @@ export async function destroyTemporaryConversation(input: {
       releaseComposerDraftUploads(input.draftId);
       useComposerDraftStore.getState().clearDraftThread(input.draftId);
       for (const key of input.temporaryThreadKeys) {
-        useUiStateStore.getState().setTemporaryThread(key, false);
+        useTemporaryConversationStore.getState().setTemporaryThread(key, false);
       }
       if (input.draftThread !== null) {
         await input.startNewThread(
@@ -90,7 +90,7 @@ export async function destroyTemporaryConversation(input: {
       useComposerDraftStore.getState().clearDraftThread(input.draftId);
     }
     for (const key of [...input.temporaryThreadKeys, scopedThreadKey(target)]) {
-      useUiStateStore.getState().setTemporaryThread(key, false);
+      useTemporaryConversationStore.getState().setTemporaryThread(key, false);
     }
     if (input.draftId !== null && scopedThreadKey(target) !== input.routeThreadKey) {
       await input.navigateAway();

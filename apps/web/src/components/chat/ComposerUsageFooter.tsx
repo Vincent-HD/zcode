@@ -2,7 +2,7 @@ import type { UsageLimitsReport } from "@t3tools/contracts";
 import { limitsNotice, remainingPercent } from "@t3tools/shared/usageLimits";
 import { CircleGauge, Database, Gauge, Wallet } from "lucide-react";
 import type * as DateTime from "effect/DateTime";
-import type { ContextWindowSnapshot } from "../../lib/contextWindow";
+import type { ContextWindowSnapshot } from "@t3tools/client-runtime/state/context-window";
 import { useModelsDevPricing } from "./use-models-dev-pricing";
 import { sessionPricing, usageDollars, pricingAssumption } from "./usage-pricing";
 import { UsagePopover, UsageRow } from "./usage-popover";

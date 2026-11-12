@@ -60,8 +60,8 @@ const isClosedViewEntry = (entry: unknown): entry is ClosedViewEntry => {
   if (view.kind !== "panel-tab") return false;
   const surface = view.surface;
   if (!surface || typeof surface.id !== "string") return false;
+  if (isZcodeRightPanelSurface(surface)) return surface.id === surface.kind;
   switch (surface.kind) {
-    case "jj":
     case "diff":
     case "files":
     case "pull-requests":

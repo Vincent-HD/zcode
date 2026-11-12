@@ -26,6 +26,8 @@ import {
   resolveThreadRouteRenderState,
   type ThreadRouteTarget,
 } from "../threadRoutes";
+import { isTemporaryConversationDiscarding } from "../temporaryConversationNavigation";
+import { useTemporaryMarkerPromotion } from "../zcode/temporary-conversation-promotion";
 
 /**
  * Keeps the family of an open thread the shell leaves out (an older settled thread) in the shell
@@ -139,34 +141,12 @@ export function ThreadRouteView({
     draftThreadExists: draftThread !== null,
   });
   const environmentHasAnyThreads = environmentThreadRefs.length > 0 || environmentHasDraftThreads;
-  const reservedDraftThreadKey = draftSession
-    ? scopedThreadKey(scopeThreadRef(draftSession.environmentId, draftSession.threadId))
-    : null;
-  const promotedDraftThreadKey = draftSession?.promotedTo
-    ? scopedThreadKey(draftSession.promotedTo)
-    : null;
+  useTemporaryMarkerPromotion(draftSession);
 
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- carries the temporary marker across draft promotion
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- clears pending file drops and navigates the router home once a server thread is confirmed missing
   useEffect(() => {
-    if (
-      reservedDraftThreadKey === null ||
-      promotedDraftThreadKey === null ||
-      reservedDraftThreadKey === promotedDraftThreadKey
-    ) {
-      return;
-    }
-    useUiStateStore
-      .getState()
-      .transferTemporaryThread(reservedDraftThreadKey, promotedDraftThreadKey);
-  }, [promotedDraftThreadKey, reservedDraftThreadKey]);
-
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- clears pending drops and navigates away when a server thread is confirmed missing
-  useEffect(() => {
-    if (
-      target.kind !== "server" ||
-      !bootstrapComplete ||
-      isTemporaryConversationDiscarding(target)
-    ) {
+    if (target.kind === "server" && isTemporaryConversationDiscarding(target)) return;
+    if (target.kind !== "server" || !bootstrapComplete) {
       return;
     }
     if (renderState === "missing") {

@@ -19,10 +19,15 @@ import {
 } from "./linkedThreadSurface";
 import type { ThreadPanelPresentation } from "./rightPanelLayout";
 import type { ChatFileAttachment } from "./types";
+import {
+  ZCODE_RIGHT_PANEL_KINDS,
+  isZcodeRightPanelKind,
+  zcodeSingletonSurface,
+  type ZcodeRightPanelSurface,
+} from "./zcode/right-panel-kinds";
 
 const RIGHT_PANEL_KINDS = [
   "diff",
-  "jj",
   "files",
   "file",
   "preview",
@@ -57,7 +62,6 @@ export type RightPanelSurface =
       activeTerminalId: string;
       splitDirection?: "horizontal" | "vertical";
     }
-  | { id: "jj"; kind: "jj" }
   | { id: "diff"; kind: "diff" }
   | {
       id: "files";
@@ -292,9 +296,8 @@ const singletonSurface = (
     "file" | "preview" | "terminal" | "pull-request" | "issue" | "thread" | "linked-thread"
   >,
 ): RightPanelSurface => {
+  if (isZcodeRightPanelKind(kind)) return zcodeSingletonSurface(kind);
   switch (kind) {
-    case "jj":
-      return { id: "jj", kind };
     case "diff":
       return { id: "diff", kind };
     case "files":

@@ -1,13 +1,8 @@
 import type { ThreadStructureVisibleTurnItem } from "@t3tools/client-runtime/state/shell";
 import { turnItemDetailRevision } from "@t3tools/client-runtime/work-log/item-detail";
 import { scopedThreadKey } from "@t3tools/client-runtime/environment";
-import type {
-  JjWorkspaceIdentity,
-  RunId,
-  ScopedThreadRef,
-  ThreadId,
-  TurnItemId,
-} from "@t3tools/contracts";
+import type { RunId, ScopedThreadRef, ThreadId, TurnItemId } from "@t3tools/contracts";
+import type { JjDiffPanelSelection } from "./zcode/jj-diff-selection";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
@@ -17,11 +12,6 @@ export interface ToolCallDiffTarget {
   readonly threadId: ThreadId;
   readonly itemId: TurnItemId;
   readonly revision: string;
-}
-
-export interface JjDiffContext {
-  readonly workspaceIdentity: JjWorkspaceIdentity;
-  readonly expectedOperationId: string;
 }
 
 export type DiffPanelSelection =

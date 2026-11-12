@@ -106,7 +106,6 @@ export function composerCommandKeyHandler(input: {
     getShortcutContext,
     sendShortcut,
     routeKind,
-    isTemporaryConversation,
     phase,
     canSteer,
     followUpBehavior,

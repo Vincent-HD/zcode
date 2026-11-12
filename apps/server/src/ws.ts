@@ -6,6 +6,7 @@ import * as HostProcess from "@t3tools/shared/HostProcess";
 import * as Context from "effect/Context";
 import * as NodeHttpServerRequest from "@effect/platform-node/NodeHttpServerRequest";
 import * as SecureRandom from "effect/crypto/SecureRandom";
+import { makeZcodeWsHandlers } from "./zcode/ws-handlers.ts";
 import * as Orchestrator from "./orchestration-v2/Orchestrator.ts";
 import * as PeerClientPairing from "./peer/PeerClientPairing.ts";
 import * as PeerLinkRequests from "./peer/PeerLinkRequests.ts";
@@ -1551,8 +1552,6 @@ export const layerWsRpc = (
       const externalLauncher = yield* ExternalLauncher.ExternalLauncher;
       const remoteOpenTargets = yield* RemoteOpenTargets.RemoteOpenTargets;
       const directEndpoints = yield* DirectEndpoints.DirectEndpoints;
-      const jjPanel = yield* JjPanelService.JjPanelService;
-      const jjForge = yield* JjForgeService.JjForgeService;
       const gitWorkflow = yield* GitWorkflowService.GitWorkflowService;
       const review = yield* ReviewService.ReviewService;
       const vcsProvisioning = yield* VcsProvisioningService.VcsProvisioningService;
@@ -3239,17 +3238,9 @@ export const layerWsRpc = (
           worktreeSetupTracker
             .cancel(input.threadId)
             .pipe(Effect.map((cancelled) => ({ cancelled }))),
+        ...(yield* makeZcodeWsHandlers),
         [WS_METHODS.vcsRefreshStatus]: (input) =>
           vcsStatusBroadcaster.refreshStatus(input.cwd, { localOnly: input.localOnly ?? false }),
-        [WS_METHODS.jjRunAction]: (input) => jjPanel.runAction(input),
-        [WS_METHODS.jjForgePreview]: (input) => jjForge.preview(input),
-        [WS_METHODS.jjForgePublish]: (input) => jjForge.publish(input),
-        [WS_METHODS.jjForgeStatus]: (input) => jjForge.getStatus(input),
-        [WS_METHODS.jjGetDiff]: (input) => jjPanel.getDiff(input),
-        [WS_METHODS.jjGetPanel]: (input) => jjPanel.getPanel(input),
-        [WS_METHODS.jjDescribe]: (input) => jjPanel.describe(input),
-        [WS_METHODS.jjSquash]: (input) => jjPanel.squash(input),
-        [WS_METHODS.jjRevertOperation]: (input) => jjPanel.revertOperation(input),
         [WS_METHODS.vcsPull]: (input) =>
           gitWorkflow.pullCurrentBranch(input.cwd).pipe(
             Effect.matchCauseEffect({

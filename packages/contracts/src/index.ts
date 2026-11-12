@@ -78,6 +78,4 @@ export * from "./agentFeedback.ts";
 export * from "./secretReference.ts";
 export * from "./settingsSecretValue.ts";
 export * from "./clientRpcPermissions.ts";
-
-export * from "./jj.ts";
-export * from "./jj-forge.ts";
+export * from "./zcode.ts";

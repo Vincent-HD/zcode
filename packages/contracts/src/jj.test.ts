@@ -2,7 +2,6 @@ import { describe, expect, it } from "@effect/vitest";
 import * as Schema from "effect/Schema";
 import {
   JjDescribeInput,
-  JjSquashInput,
   JjRevertOperationInput,
   JjRunActionInput,
   JjGetDiffInput,
@@ -19,7 +18,7 @@ const common = {
   expectedOperationId: "a".repeat(128),
 };
 const describeInput = Schema.decodeUnknownSync(JjDescribeInput);
-const squashInput = Schema.decodeUnknownSync(JjSquashInput);
+const actionInput = Schema.decodeUnknownSync(JjRunActionInput);
 const revertInput = Schema.decodeUnknownSync(JjRevertOperationInput);
 const filePathInput = Schema.decodeUnknownSync(JjFilePath);
 
@@ -31,10 +30,14 @@ describe("jj mutation boundaries", () => {
         describeInput({ ...common, revisionCommitId, description: "message" }),
       ).toThrow();
       expect(() =>
-        squashInput({
+        actionInput({
           ...common,
-          sourceCommitId: "a".repeat(40),
-          destinationCommitId: revisionCommitId,
+          action: {
+            type: "squash",
+            sourceCommitId: "a".repeat(40),
+            destinationCommitId: revisionCommitId,
+            mode: "into",
+          },
         }),
       ).toThrow();
     },
@@ -53,7 +56,6 @@ describe("jj mutation boundaries", () => {
 });
 
 describe("expanded jj boundaries", () => {
-  const actionInput = Schema.decodeUnknownSync(JjRunActionInput);
   it.each([
     "",
     "/tmp/file",

@@ -25,7 +25,8 @@ upstream entry points to re-check after a rebase are in [`ZCODE.md`](./ZCODE.md)
   or ancestor, rebase onto the selection, merge, bookmarks, push and PR/MR publication through
   the existing forge integrations. Drag a revision onto another to rebase its branch; hold R to
   rebase only the revision, S to squash into, Shift+S to squash onto, D to duplicate or M to
-  merge. Drag a bookmark to move it. The header undoes and redoes jj operations. It requires
+  merge. Drag a bookmark to move it. The header undoes and redoes the workspace's own jj operations; once files change after an
+  operation, Undo refuses rather than discarding those edits. It requires
   `jj` in the thread's environment and an existing jj workspace; it never initializes a
   repository. Destructive actions ask first, available actions depend on environment
   capabilities and permissions, and Squash Onto requires jj's experimental `--onto` option.

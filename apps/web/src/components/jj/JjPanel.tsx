@@ -54,7 +54,7 @@ import {
   JjRevisionRow,
 } from "./jj-graph-rows";
 import { JJ_LOG_PAGE, jjRefreshInput, mergeJjSnapshot, type JjLogView } from "./jj-log-state";
-import { formatJjPanelError } from "./jj-panel-state";
+import { formatJjPanelError, historyLabel } from "./jj-panel-state";
 import { JjRevisionDetailsPanel } from "./jj-revision-details";
 
 const OVERSCAN_PX = 400;
@@ -581,16 +581,14 @@ const JjPanel = (props: {
                   variant="ghost"
                   size="icon-xs"
                   aria-label="Undo last operation"
-                  disabled={!panel || blocked}
+                  disabled={!panel?.undo || blocked}
                   onClick={() => run({ type: "undo" }, "Operation undone")}
                 />
               }
             >
               <Undo2 />
             </TooltipTrigger>
-            <TooltipPopup>
-              {panel ? `Undo: ${panel.operationDescription || "last operation"}` : "Undo"}
-            </TooltipPopup>
+            <TooltipPopup>{historyLabel("Undo", panel?.undo)}</TooltipPopup>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger
@@ -599,14 +597,14 @@ const JjPanel = (props: {
                   variant="ghost"
                   size="icon-xs"
                   aria-label="Redo operation"
-                  disabled={!panel || blocked}
+                  disabled={!panel?.redo || blocked}
                   onClick={() => run({ type: "redo" }, "Operation redone")}
                 />
               }
             >
               <Redo2 />
             </TooltipTrigger>
-            <TooltipPopup>Redo the last undone operation</TooltipPopup>
+            <TooltipPopup>{historyLabel("Redo", panel?.redo)}</TooltipPopup>
           </Tooltip>
           <span
             className="min-w-0 flex-1 truncate px-1 text-xs text-muted-foreground"

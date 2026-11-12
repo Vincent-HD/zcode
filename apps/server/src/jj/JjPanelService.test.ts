@@ -10,7 +10,6 @@ import {
   type JjRevisionDetails,
   type JjRunAction,
   type JjRunActionInput,
-  type JjSquashInput,
   WS_METHODS,
   WsRpcGroup,
   AuthOrchestrationReadScope,
@@ -124,7 +123,6 @@ const fixture = Effect.gen(function* () {
   const service = {
     ...raw,
     describe: (input: JjDescribeInput) => viewResult(raw.describe(input)),
-    squash: (input: JjSquashInput) => viewResult(raw.squash(input)),
     revertOperation: (input: JjRevertOperationInput) => viewResult(raw.revertOperation(input)),
     runAction: (input: JjRunActionInput) => viewResult(raw.runAction(input)),
   };
@@ -340,10 +338,14 @@ describe("JjPanelService real jj repositories", () => {
         const before = yield* f.panel();
         const destination = before.revisions[1];
         if (!destination) return yield* Effect.die("Missing ancestor");
-        const result = yield* f.service.squash({
+        const result = yield* f.service.runAction({
           ...f.expected(before),
-          sourceCommitId: before.workingCopyCommitId,
-          destinationCommitId: destination.commitId,
+          action: {
+            type: "squash",
+            sourceCommitId: before.workingCopyCommitId,
+            destinationCommitId: destination.commitId,
+            mode: "into",
+          },
         });
         expect(result.receipt.undoAvailable).toBe(true);
         expect(result.panel.revisions[0]?.empty).toBe(true);
@@ -357,57 +359,54 @@ describe("JjPanelService real jj repositories", () => {
         const next = yield* f.panel();
         const nextDestination = next.revisions[1];
         if (!nextDestination) return yield* Effect.die("Missing ancestor");
-        const replaced = yield* f.service.squash({
+        const replaced = yield* f.service.runAction({
           ...f.expected(next),
-          sourceCommitId: next.workingCopyCommitId,
-          destinationCommitId: nextDestination.commitId,
-          messagePolicy: { type: "replace", description: "" },
+          action: {
+            type: "squash",
+            sourceCommitId: next.workingCopyCommitId,
+            destinationCommitId: nextDestination.commitId,
+            mode: "into",
+            messagePolicy: { type: "replace", description: "" },
+          },
         });
         expect(replaced.panel.revisions[1]?.description).toBe("");
       }).pipe(Effect.provide(live)),
   );
 
-  it.live(
-    "rejects squash into a non-ancestor merge sibling and conflicted endpoints, but permits conflicted descriptions",
-    () =>
-      Effect.gen(function* () {
-        const f = yield* fixture;
-        yield* f.fs.writeFileString(`${f.cwd}/file`, "base\n");
-        yield* f.cli(["new", "-m", "left"]);
-        yield* f.fs.writeFileString(`${f.cwd}/file`, "left\n");
-        const left = (yield* f.panel()).workingCopyCommitId;
-        yield* f.cli(["new", "@-", "-m", "right"]);
-        yield* f.fs.writeFileString(`${f.cwd}/file`, "right\n");
-        const right = (yield* f.panel()).workingCopyCommitId;
-        yield* f.cli(["new", left, right, "-m", "merge"]);
-        const merge = yield* f.panel();
-        expect(merge.revisions[0]?.conflict).toBe(true);
-        expect(merge.revisions[0]?.parentIds).toHaveLength(2);
-        const described = yield* f.service.describe({
-          ...f.expected(merge),
-          revisionCommitId: merge.workingCopyCommitId,
-          description: "conflicted description",
-        });
-        expect(described.panel.revisions[0]?.conflict).toBe(true);
-        expect(
-          (yield* f.service
-            .squash({
-              ...f.expected(described.panel),
+  it.live("rejects squash from a conflicted merge but permits conflicted descriptions", () =>
+    Effect.gen(function* () {
+      const f = yield* fixture;
+      yield* f.fs.writeFileString(`${f.cwd}/file`, "base\n");
+      yield* f.cli(["new", "-m", "left"]);
+      yield* f.fs.writeFileString(`${f.cwd}/file`, "left\n");
+      const left = (yield* f.panel()).workingCopyCommitId;
+      yield* f.cli(["new", "@-", "-m", "right"]);
+      yield* f.fs.writeFileString(`${f.cwd}/file`, "right\n");
+      const right = (yield* f.panel()).workingCopyCommitId;
+      yield* f.cli(["new", left, right, "-m", "merge"]);
+      const merge = yield* f.panel();
+      expect(merge.revisions[0]?.conflict).toBe(true);
+      expect(merge.revisions[0]?.parentIds).toHaveLength(2);
+      const described = yield* f.service.describe({
+        ...f.expected(merge),
+        revisionCommitId: merge.workingCopyCommitId,
+        description: "conflicted description",
+      });
+      expect(described.panel.revisions[0]?.conflict).toBe(true);
+      expect(
+        (yield* f.service
+          .runAction({
+            ...f.expected(described.panel),
+            action: {
+              type: "squash",
               sourceCommitId: described.panel.workingCopyCommitId,
               destinationCommitId: left,
-            })
-            .pipe(Effect.flip)).reason,
-        ).toBe("conflicted");
-        expect(
-          (yield* f.service
-            .squash({
-              ...f.expected(described.panel),
-              sourceCommitId: left,
-              destinationCommitId: right,
-            })
-            .pipe(Effect.flip)).reason,
-        ).toBe("invalid-target");
-      }).pipe(Effect.provide(live)),
+              mode: "into",
+            },
+          })
+          .pipe(Effect.flip)).reason,
+      ).toBe("conflicted");
+    }).pipe(Effect.provide(live)),
   );
 
   it.live("withholds undo after an external operation and serializes sibling requests", () =>
@@ -465,10 +464,14 @@ describe("JjPanelService real jj repositories", () => {
       ).toBe("immutable");
       expect(
         (yield* f.service
-          .squash({
+          .runAction({
             ...f.expected(before),
-            sourceCommitId: before.workingCopyCommitId,
-            destinationCommitId: ancestor.commitId,
+            action: {
+              type: "squash",
+              sourceCommitId: before.workingCopyCommitId,
+              destinationCommitId: ancestor.commitId,
+              mode: "into",
+            },
           })
           .pipe(Effect.flip)).reason,
       ).toBe("immutable");
@@ -531,7 +534,6 @@ describe("JjPanelService real jj repositories", () => {
         );
         for (const method of [
           WS_METHODS.jjDescribe,
-          WS_METHODS.jjSquash,
           WS_METHODS.jjRevertOperation,
           WS_METHODS.jjRunAction,
         ]) {
@@ -839,16 +841,33 @@ describe("expanded JjPanelService actions", () => {
   );
 
   it.live(
-    "undoes and redoes an external operation with pinned freshness independently of panel receipts",
+    "reverts the last action and blocks Undo past working-copy edits instead of discarding them",
     () =>
       Effect.gen(function* () {
         const f = yield* fixture;
         yield* f.cli(["describe", "-m", "external"]);
         const before = yield* f.panel();
+        expect(before.undo?.description).toMatch(/^describe commit /);
+        expect(before.redo).toBeUndefined();
         const undone = yield* f.action({ type: "undo" });
         expect(undone.panel.revisions[0]?.description).toBe("");
+        expect(undone.panel.redo?.description).toMatch(/^describe commit /);
         const redone = yield* f.action({ type: "redo" });
         expect(redone.panel.revisions[0]?.description).toBe("external\n");
+        expect(redone.panel.redo).toBeUndefined();
+
+        yield* f.cli(["bookmark", "create", "mark", "-r", "@"]);
+        const unmarked = yield* f.action({ type: "undo" });
+        expect(unmarked.panel.revisions[0]?.bookmarks).toEqual([]);
+        expect((yield* f.panel()).operationId).toBe(unmarked.panel.operationId);
+
+        yield* f.cli(["bookmark", "create", "mark", "-r", "@"]);
+        yield* f.fs.writeFileString(`${f.cwd}/kept`, "agent edit\n");
+        expect((yield* f.panel()).undo).toMatchObject({ blocked: true });
+        expect((yield* f.action({ type: "undo" }).pipe(Effect.flip)).reason).toBe(
+          "history-blocked",
+        );
+        expect(yield* f.fs.readFileString(`${f.cwd}/kept`)).toBe("agent edit\n");
         expect(
           (yield* f.service
             .runAction({ ...f.expected(before), action: { type: "undo" } })
@@ -1145,7 +1164,7 @@ describe("JjPanelService graph log", () => {
         yield* f.cli(["new", "-m", "top"]);
         f.log.jj.length = 0;
         const cold = yield* f.ready();
-        expect(commandsOf(f.log.jj)).toEqual(["config", "git", "log", "op"]);
+        expect(commandsOf(f.log.jj)).toEqual(["config", "git", "log", "op", "workspace"]);
         expect(cold.revset).toBe("builtin_log()");
         expect(cold.rows.map((row) => row.summary)).toEqual(["top", "base", ""]);
         expect(cold.rows[0]).toMatchObject({ current: true, empty: true });
@@ -1230,7 +1249,7 @@ describe("JjPanelService graph log", () => {
       const first = yield* f.ready(view);
       expect(first.rows).toHaveLength(100);
       expect(first.hasMore).toBe(true);
-      expect(commandsOf(f.log.jj)).toEqual(["git", "log", "op"]);
+      expect(commandsOf(f.log.jj)).toEqual(["git", "log", "op", "workspace"]);
       f.log.jj.length = 0;
       const more = yield* f.ready({
         ...view,
@@ -1412,5 +1431,92 @@ describe("JjPanelService row mapping", () => {
       ),
     ).toBe("Failed to parse revset: Syntax error Caused by:  --> 1:5");
     expect(JjPanelService.jjErrorDetail("plain failure")).toBeUndefined();
+  });
+});
+
+describe("JjPanelService operation history", () => {
+  // Newest first, like `jj op log`. Flags: s = snapshot, o = another workspace.
+  const ops = (
+    ...entries: ReadonlyArray<readonly [id: string, description: string, flags?: string]>
+  ) =>
+    [...entries, ["0", "add workspace 'default'"] as const].map(
+      ([id, description, flags = ""]) => ({
+        id,
+        parents: ["f"],
+        username: "test",
+        description,
+        is_snapshot: flags.includes("s"),
+        workspace_name: flags.includes("o") ? "other" : "default",
+      }),
+    );
+  const entry = (operationId: string, description: string) => ({
+    operationId,
+    description,
+  });
+
+  const blocked = (operationId: string, description: string) => ({
+    ...entry(operationId, description),
+    blocked: true,
+  });
+
+  it.each([
+    {
+      name: "ignores other workspaces' snapshots",
+      operations: ops(["b", "snapshot working copy", "so"], ["a", "new"]),
+      expected: { undo: entry("a", "new") },
+    },
+    {
+      name: "blocks past this workspace's snapshots",
+      operations: ops(["b", "snapshot working copy", "s"], ["a", "new"]),
+      expected: { undo: blocked("a", "new") },
+    },
+    {
+      name: "blocks past other workspaces' actions",
+      operations: ops(["b", "edit", "o"], ["a", "new"]),
+      expected: { undo: blocked("a", "new") },
+    },
+    {
+      name: "walks back past undone operations",
+      operations: ops(["d", "revert operation b"], ["b", "describe"], ["a", "new"]),
+      expected: { undo: entry("a", "new"), redo: entry("d", "describe") },
+    },
+    {
+      name: "redoes the most recently undone operation first",
+      operations: ops(
+        ["e", "revert operation a"],
+        ["d", "revert operation b"],
+        ["b", "describe"],
+        ["a", "new"],
+      ),
+      expected: { redo: entry("e", "new") },
+    },
+    {
+      name: "undoes a redone operation and keeps the remaining redo",
+      operations: ops(
+        ["f1", "revert operation e"],
+        ["e", "revert operation a"],
+        ["d", "revert operation b"],
+        ["b", "describe"],
+        ["a", "new"],
+      ),
+      expected: { undo: entry("a", "new"), redo: entry("d", "describe") },
+    },
+    {
+      name: "drops redo after a new action",
+      operations: ops(
+        ["e", "rebase"],
+        ["d", "revert operation b"],
+        ["b", "describe"],
+        ["a", "new"],
+      ),
+      expected: { undo: entry("e", "rebase") },
+    },
+    {
+      name: "stops at the workspace creation",
+      operations: ops(["a", "snapshot working copy", "s"]),
+      expected: {},
+    },
+  ])("$name", ({ operations, expected }) => {
+    expect(JjPanelService.operationHistory(operations, "default")).toEqual(expected);
   });
 });

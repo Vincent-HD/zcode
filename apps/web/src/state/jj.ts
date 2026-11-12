@@ -35,10 +35,6 @@ export const jjEnvironment = {
     label: "environment-data:jj:describe",
     tag: WS_METHODS.jjDescribe,
   }),
-  squash: createEnvironmentRpcCommand(connectionAtomRuntime, {
-    label: "environment-data:jj:squash",
-    tag: WS_METHODS.jjSquash,
-  }),
   revertOperation: createEnvironmentRpcCommand(connectionAtomRuntime, {
     label: "environment-data:jj:revert-operation",
     tag: WS_METHODS.jjRevertOperation,

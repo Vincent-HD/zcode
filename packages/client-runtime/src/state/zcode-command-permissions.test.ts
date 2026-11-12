@@ -54,7 +54,6 @@ it.effect("requires the destination source-control grant for every Jujutsu rewri
       registry.set(sessions(other), AsyncResult.success(grant([AuthSourceControlWriteScope])));
       for (const tag of [
         WS_METHODS.jjDescribe,
-        WS_METHODS.jjSquash,
         WS_METHODS.jjRevertOperation,
         WS_METHODS.jjRunAction,
         WS_METHODS.jjForgePublish,

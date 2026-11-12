@@ -17,7 +17,6 @@ import {
   JjRevisionDetails,
   JjRevertOperationInput,
   JjRunActionInput,
-  JjSquashInput,
 } from "./jj.ts";
 import {
   JjForgeError,
@@ -38,7 +37,6 @@ export const ZCODE_WS_METHODS = {
   jjForgePublish: "jj.forgePublish",
   jjForgeStatus: "jj.forgeStatus",
   jjDescribe: "jj.describe",
-  jjSquash: "jj.squash",
   jjRevertOperation: "jj.revertOperation",
 } as const;
 
@@ -86,11 +84,6 @@ export const ZCODE_WS_RPCS = [
     success: JjMutationResult,
     error: JjPanelRpcError,
   }),
-  Rpc.make(ZCODE_WS_METHODS.jjSquash, {
-    payload: JjSquashInput,
-    success: JjMutationResult,
-    error: JjPanelRpcError,
-  }),
   Rpc.make(ZCODE_WS_METHODS.jjRevertOperation, {
     payload: JjRevertOperationInput,
     success: JjMutationResult,
@@ -103,6 +96,5 @@ export const ZCODE_CLIENT_GUARDED_RPC_SCOPES = {
   [ZCODE_WS_METHODS.jjForgePublish]: AuthSourceControlWriteScope,
   [ZCODE_WS_METHODS.jjGetDiff]: AuthFilesystemReadScope,
   [ZCODE_WS_METHODS.jjDescribe]: AuthSourceControlWriteScope,
-  [ZCODE_WS_METHODS.jjSquash]: AuthSourceControlWriteScope,
   [ZCODE_WS_METHODS.jjRevertOperation]: AuthSourceControlWriteScope,
 } as const;

@@ -9,7 +9,6 @@ import {
   type JjGetRevisionInput,
   type JjRevertOperationInput,
   type JjRunActionInput,
-  type JjSquashInput,
 } from "@t3tools/contracts";
 import type * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -43,8 +42,6 @@ export const makeZcodeWsHandlers = Effect.gen(function* () {
       jjPanel((service) => service.getDiff(input)),
     [ZCODE_WS_METHODS.jjDescribe]: (input: JjDescribeInput) =>
       jjPanel((service) => service.describe(input)),
-    [ZCODE_WS_METHODS.jjSquash]: (input: JjSquashInput) =>
-      jjPanel((service) => service.squash(input)),
     [ZCODE_WS_METHODS.jjRevertOperation]: (input: JjRevertOperationInput) =>
       jjPanel((service) => service.revertOperation(input)),
     [ZCODE_WS_METHODS.jjForgePreview]: (input: JjForgePreviewInput) =>

@@ -8,7 +8,6 @@ jobs:
   ios:
     name: EAS Preview (iOS)
     if: |
-      github.repository != 'Vincent-HD/zcode' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       contains(github.event.pull_request.labels.*.name, '🚀 Mobile Continuous Deployment') &&
       (github.event.action != 'labeled' || github.event.label.name == '🚀 Mobile Continuous Deployment')
@@ -131,7 +130,6 @@ jobs:
   android:
     name: EAS Preview (Android)
     if: |
-      github.repository != 'Vincent-HD/zcode' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       contains(github.event.pull_request.labels.*.name, '🚀 Mobile Continuous Deployment') &&
       (github.event.action != 'labeled' || github.event.label.name == '🚀 Mobile Continuous Deployment')

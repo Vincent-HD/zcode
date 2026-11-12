@@ -107,12 +107,9 @@ jobs:
   preflight:
     name: Preflight
     needs: [resolve_commit]
-    if: >-
-      github.repository != 'Vincent-HD/zcode' &&
-      (
-        needs.resolve_commit.result == 'success' &&
-        (github.event_name != 'schedule' || needs.resolve_commit.outputs.has_changes == 'true')
-      )
+    if: |
+      needs.resolve_commit.result == 'success' &&
+      (github.event_name != 'schedule' || needs.resolve_commit.outputs.has_changes == 'true')
     runs-on: blacksmith-8vcpu-ubuntu-2404
     timeout-minutes: 10
     outputs:
@@ -237,11 +234,7 @@ jobs:
   quality:
     name: Release quality checks
     needs: [preflight]
-    if: >-
-      github.repository != 'Vincent-HD/zcode' &&
-      (
-        !failure() && !cancelled() && needs.preflight.result == 'success'
-      )
+    if: ${{ !failure() && !cancelled() && needs.preflight.result == 'success' }}
     runs-on: blacksmith-8vcpu-ubuntu-2404
     timeout-minutes: 10
     steps:
@@ -273,11 +266,7 @@ jobs:
   test:
     name: Release tests
     needs: [preflight]
-    if: >-
-      github.repository != 'Vincent-HD/zcode' &&
-      (
-        !failure() && !cancelled() && needs.preflight.result == 'success'
-      )
+    if: ${{ !failure() && !cancelled() && needs.preflight.result == 'success' }}
     runs-on: blacksmith-8vcpu-ubuntu-2404
     timeout-minutes: 10
     steps:
@@ -313,11 +302,7 @@ jobs:
   test_web:
     name: Release web tests ${{ matrix.shard }}
     needs: [preflight]
-    if: >-
-      github.repository != 'Vincent-HD/zcode' &&
-      (
-        !failure() && !cancelled() && needs.preflight.result == 'success'
-      )
+    if: ${{ !failure() && !cancelled() && needs.preflight.result == 'success' }}
     runs-on: blacksmith-8vcpu-ubuntu-2404
     timeout-minutes: 10
     strategy:
@@ -376,11 +361,7 @@ jobs:
   test_server:
     name: Release server tests ${{ matrix.shard }}
     needs: [preflight]
-    if: >-
-      github.repository != 'Vincent-HD/zcode' &&
-      (
-        !failure() && !cancelled() && needs.preflight.result == 'success'
-      )
+    if: ${{ !failure() && !cancelled() && needs.preflight.result == 'success' }}
     runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 10
     strategy:
@@ -416,12 +397,9 @@ jobs:
     # Consumes only the release commit, not preflight's resolved version, so it
     # runs alongside preflight instead of after it. The condition mirrors preflight's.
     needs: [resolve_commit]
-    if: >-
-      github.repository != 'Vincent-HD/zcode' &&
-      (
-        needs.resolve_commit.result == 'success' &&
-        (github.event_name != 'schedule' || needs.resolve_commit.outputs.has_changes == 'true')
-      )
+    if: |
+      needs.resolve_commit.result == 'success' &&
+      (github.event_name != 'schedule' || needs.resolve_commit.outputs.has_changes == 'true')
     runs-on: blacksmith-8vcpu-ubuntu-2404
     timeout-minutes: 5
     # Previews build any branch, but production admits only main and v* tags.
@@ -543,11 +521,7 @@ jobs:
     # Same gating as relay_public_config: only the release commit is needed, so
     # this runs alongside preflight. See the condition comment there.
     needs: [preflight, relay_public_config]
-    if: >-
-      github.repository != 'Vincent-HD/zcode' &&
-      (
-        !cancelled() && needs.preflight.result == 'success' && needs.relay_public_config.result == 'success'
-      )
+    if: ${{ !cancelled() && needs.preflight.result == 'success' && needs.relay_public_config.result == 'success' }}
     runs-on: blacksmith-32vcpu-ubuntu-2404
     timeout-minutes: 30
     outputs:
@@ -666,11 +640,7 @@ jobs:
   desktop_mac_arm64:
     name: Desktop macOS arm64
     needs: [preflight, relay_public_config, build_bundle]
-    if: >-
-      github.repository != 'Vincent-HD/zcode' &&
-      (
-        !cancelled() && needs.preflight.result == 'success' && needs.relay_public_config.result == 'success' && needs.build_bundle.result == 'success'
-      )
+    if: ${{ !cancelled() && needs.preflight.result == 'success' && needs.relay_public_config.result == 'success' && needs.build_bundle.result == 'success' }}
     uses: ./.github/workflows/release-desktop.yml
     secrets: inherit
     with:
@@ -696,11 +666,7 @@ jobs:
   desktop_mac_x64:
     name: Desktop macOS x64
     needs: [preflight, relay_public_config, build_bundle]
-    if: >-
-      github.repository != 'Vincent-HD/zcode' &&
-      (
-        !cancelled() && needs.preflight.result == 'success' && needs.relay_public_config.result == 'success' && needs.build_bundle.result == 'success'
-      )
+    if: ${{ !cancelled() && needs.preflight.result == 'success' && needs.relay_public_config.result == 'success' && needs.build_bundle.result == 'success' }}
     uses: ./.github/workflows/release-desktop.yml
     secrets: inherit
     with:
@@ -726,11 +692,7 @@ jobs:
   desktop_linux_x64:
     name: Desktop Linux x64
     needs: [preflight, relay_public_config, build_bundle]
-    if: >-
-      github.repository != 'Vincent-HD/zcode' &&
-      (
-        !cancelled() && needs.preflight.result == 'success' && needs.relay_public_config.result == 'success' && needs.build_bundle.result == 'success'
-      )
+    if: ${{ !cancelled() && needs.preflight.result == 'success' && needs.relay_public_config.result == 'success' && needs.build_bundle.result == 'success' }}
     uses: ./.github/workflows/release-desktop.yml
     secrets: inherit
     with:
@@ -756,11 +718,7 @@ jobs:
   desktop_linux_arm64:
     name: Desktop Linux arm64
     needs: [preflight, relay_public_config, build_bundle]
-    if: >-
-      github.repository != 'Vincent-HD/zcode' &&
-      (
-        !cancelled() && needs.preflight.result == 'success' && needs.relay_public_config.result == 'success' && needs.build_bundle.result == 'success'
-      )
+    if: ${{ !cancelled() && needs.preflight.result == 'success' && needs.relay_public_config.result == 'success' && needs.build_bundle.result == 'success' }}
     uses: ./.github/workflows/release-desktop.yml
     secrets: inherit
     with:
@@ -788,11 +746,7 @@ jobs:
   desktop_win_x64:
     name: Desktop Windows x64
     needs: [preflight, relay_public_config, build_bundle]
-    if: >-
-      github.repository != 'Vincent-HD/zcode' &&
-      (
-        !cancelled() && needs.preflight.result == 'success' && needs.relay_public_config.result == 'success' && needs.build_bundle.result == 'success'
-      )
+    if: ${{ !cancelled() && needs.preflight.result == 'success' && needs.relay_public_config.result == 'success' && needs.build_bundle.result == 'success' }}
     uses: ./.github/workflows/release-desktop.yml
     secrets: inherit
     with:
@@ -816,11 +770,7 @@ jobs:
   desktop_win_arm64:
     name: Desktop Windows arm64
     needs: [preflight, relay_public_config, build_bundle]
-    if: >-
-      github.repository != 'Vincent-HD/zcode' &&
-      (
-        !cancelled() && needs.preflight.result == 'success' && needs.relay_public_config.result == 'success' && needs.build_bundle.result == 'success'
-      )
+    if: ${{ !cancelled() && needs.preflight.result == 'success' && needs.relay_public_config.result == 'success' && needs.build_bundle.result == 'success' }}
     uses: ./.github/workflows/release-desktop.yml
     secrets: inherit
     with:
@@ -858,11 +808,7 @@ jobs:
         desktop_win_x64,
         desktop_win_arm64,
       ]
-    if: >-
-      github.repository != 'Vincent-HD/zcode' &&
-      (
-        !failure() && !cancelled() && needs.preflight.result == 'success' && needs.relay_public_config.result == 'success' && needs.quality.result == 'success' && needs.test.result == 'success' && needs.test_web.result == 'success' && needs.test_server.result == 'success' && needs.desktop_mac_arm64.result == 'success' && needs.desktop_mac_x64.result == 'success' && needs.desktop_linux_x64.result == 'success' && needs.desktop_linux_arm64.result == 'success' && needs.desktop_win_x64.result == 'success' && needs.desktop_win_arm64.result == 'success'
-      )
+    if: ${{ !failure() && !cancelled() && needs.preflight.result == 'success' && needs.relay_public_config.result == 'success' && needs.quality.result == 'success' && needs.test.result == 'success' && needs.test_web.result == 'success' && needs.test_server.result == 'success' && needs.desktop_mac_arm64.result == 'success' && needs.desktop_mac_x64.result == 'success' && needs.desktop_linux_x64.result == 'success' && needs.desktop_linux_arm64.result == 'success' && needs.desktop_win_x64.result == 'success' && needs.desktop_win_arm64.result == 'success' }}
     runs-on: blacksmith-8vcpu-ubuntu-2404
     timeout-minutes: 30
     permissions:
@@ -1219,11 +1165,7 @@ jobs:
   publish_aur:
     name: Publish AUR package
     needs: [preflight, release]
-    if: >-
-      github.repository != 'Vincent-HD/zcode' &&
-      (
-        !failure() && !cancelled() && needs.preflight.result == 'success' && needs.release.result == 'success' && needs.preflight.outputs.release_channel != 'preview'
-      )
+    if: ${{ !failure() && !cancelled() && needs.preflight.result == 'success' && needs.release.result == 'success' && needs.preflight.outputs.release_channel != 'preview' }}
     uses: ./.github/workflows/publish-aur.yml
     with:
       release_tag: ${{ needs.preflight.outputs.tag }}
@@ -1239,11 +1181,7 @@ jobs:
   build_web:
     name: Build hosted web app
     needs: [preflight, relay_public_config]
-    if: >-
-      github.repository != 'Vincent-HD/zcode' &&
-      (
-        !cancelled() && needs.preflight.result == 'success' && needs.relay_public_config.result == 'success' && needs.preflight.outputs.release_channel != 'preview'
-      )
+    if: ${{ !cancelled() && needs.preflight.result == 'success' && needs.relay_public_config.result == 'success' && needs.preflight.outputs.release_channel != 'preview' }}
     runs-on: blacksmith-8vcpu-ubuntu-2404
     timeout-minutes: 10
     outputs:
@@ -1344,11 +1282,7 @@ jobs:
   deploy_web:
     name: Deploy hosted web app
     needs: [preflight, build_web, release, publish_cli]
-    if: >-
-      github.repository != 'Vincent-HD/zcode' &&
-      (
-        !failure() && !cancelled() && needs.preflight.result == 'success' && needs.build_web.result == 'success' && needs.release.result == 'success' && needs.publish_cli.result == 'success' && needs.preflight.outputs.release_channel != 'preview'
-      )
+    if: ${{ !failure() && !cancelled() && needs.preflight.result == 'success' && needs.build_web.result == 'success' && needs.release.result == 'success' && needs.publish_cli.result == 'success' && needs.preflight.outputs.release_channel != 'preview' }}
     runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 10
     env:
@@ -1423,11 +1357,7 @@ jobs:
   build_marketing:
     name: Build marketing site
     needs: [preflight]
-    if: >-
-      github.repository != 'Vincent-HD/zcode' &&
-      (
-        !cancelled() && needs.preflight.result == 'success' && needs.preflight.outputs.release_channel == 'nightly'
-      )
+    if: ${{ !cancelled() && needs.preflight.result == 'success' && needs.preflight.outputs.release_channel == 'nightly' }}
     runs-on: blacksmith-8vcpu-ubuntu-2404
     timeout-minutes: 10
     outputs:
@@ -1494,11 +1424,7 @@ jobs:
   deploy_marketing:
     name: Deploy marketing site
     needs: [preflight, build_marketing, release]
-    if: >-
-      github.repository != 'Vincent-HD/zcode' &&
-      (
-        !failure() && !cancelled() && needs.preflight.result == 'success' && needs.build_marketing.result == 'success' && needs.release.result == 'success' && needs.preflight.outputs.release_channel == 'nightly'
-      )
+    if: ${{ !failure() && !cancelled() && needs.preflight.result == 'success' && needs.build_marketing.result == 'success' && needs.release.result == 'success' && needs.preflight.outputs.release_channel == 'nightly' }}
     runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 10
     env:
@@ -1540,11 +1466,7 @@ jobs:
 
   finalize:
     name: Finalize release
-    if: >-
-      github.repository != 'Vincent-HD/zcode' &&
-      (
-        !failure() && !cancelled() && needs.preflight.result == 'success' && needs.release.result == 'success' && needs.preflight.outputs.release_channel == 'stable'
-      )
+    if: ${{ !failure() && !cancelled() && needs.preflight.result == 'success' && needs.release.result == 'success' && needs.preflight.outputs.release_channel == 'stable' }}
     needs: [preflight, release]
     runs-on: blacksmith-8vcpu-ubuntu-2404
     timeout-minutes: 10
@@ -1629,17 +1551,14 @@ jobs:
 
   announce_discord:
     name: Announce release on Discord
-    if: >-
-      github.repository != 'Vincent-HD/zcode' &&
-      (
-        always() && !cancelled() &&
-        needs.preflight.result == 'success' &&
-        needs.preflight.outputs.release_channel != 'preview' &&
-        needs.relay_public_config.result == 'success' &&
-        needs.release.result == 'success' &&
-        needs.deploy_web.result == 'success' &&
-        (needs.finalize.result == 'success' || needs.finalize.result == 'skipped')
-      )
+    if: |
+      always() && !cancelled() &&
+      needs.preflight.result == 'success' &&
+      needs.preflight.outputs.release_channel != 'preview' &&
+      needs.relay_public_config.result == 'success' &&
+      needs.release.result == 'success' &&
+      needs.deploy_web.result == 'success' &&
+      (needs.finalize.result == 'success' || needs.finalize.result == 'skipped')
     needs: [preflight, relay_public_config, release, deploy_web, finalize]
     runs-on: blacksmith-8vcpu-ubuntu-2404
     timeout-minutes: 10

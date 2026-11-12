@@ -4,12 +4,13 @@ import {
   type AtomCommandResult,
 } from "@t3tools/client-runtime/state/runtime";
 import { AuthOrchestrationReadScope } from "@t3tools/contracts";
-import type { EnvironmentId, JjPanelReady, ProjectId } from "@t3tools/contracts";
+import type { EnvironmentId, ProjectId } from "@t3tools/contracts";
 import { useServerConfigs } from "~/state/entities";
 import { jjEnvironment } from "~/state/jj";
 import { useEnvironmentScope } from "~/state/session";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { JjForgeSection, type JjForgeSectionProps } from "./JjForgeSection";
+import type { JjForgePanelView } from "./jj-forge-state";
 
 const requireSuccess = <A, E>(result: AtomCommandResult<A, E>): A => {
   if (result._tag === "Failure") throw squashAtomCommandFailure(result);
@@ -17,7 +18,8 @@ const requireSuccess = <A, E>(result: AtomCommandResult<A, E>): A => {
 };
 
 export const JjForgePanel = (props: {
-  panel: JjPanelReady;
+  panel: JjForgePanelView;
+  focusRequest: JjForgeSectionProps["focusRequest"];
   environmentId: EnvironmentId;
   projectId: ProjectId;
   disabled: boolean;
@@ -36,6 +38,7 @@ export const JjForgePanel = (props: {
   return (
     <JjForgeSection
       panel={props.panel}
+      focusRequest={props.focusRequest ?? null}
       environmentId={props.environmentId}
       projectId={props.projectId}
       disabled={props.disabled}

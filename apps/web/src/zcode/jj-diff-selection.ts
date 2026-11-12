@@ -12,6 +12,8 @@ export interface JjDiffContext {
 export type JjDiffPanelSelection = {
   kind: "jj";
   revisionCommitId: string;
+  /** Compares from this revision instead of from the revision's parents. */
+  fromCommitId?: string;
   filePath: string | null;
   revealRequestId: number;
   context?: JjDiffContext;
@@ -22,6 +24,7 @@ export const selectJjRevision = (
   revisionCommitId: string,
   filePath?: string,
   context?: JjDiffContext,
+  fromCommitId?: string,
 ) =>
   useDiffPanelStore.setState((state) => {
     const threadKey = scopedThreadKey(ref);
@@ -32,6 +35,7 @@ export const selectJjRevision = (
         [threadKey]: {
           kind: "jj",
           revisionCommitId,
+          ...(fromCommitId ? { fromCommitId } : {}),
           filePath: filePath?.trim() || null,
           revealRequestId: previous?.kind === "jj" ? previous.revealRequestId + 1 : 1,
           ...(context ? { context } : {}),

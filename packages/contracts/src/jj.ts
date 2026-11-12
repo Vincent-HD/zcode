@@ -13,45 +13,92 @@ export const JjChangedFile = Schema.Struct({
   path: Schema.String,
   status: Schema.Literals(["added", "modified", "removed", "renamed", "copied"]),
 });
+export type JjChangedFile = typeof JjChangedFile.Type;
 export const JjSignature = Schema.Struct({
   name: Schema.String,
   email: Schema.String,
   timestamp: Schema.String,
 });
 export type JjSignature = typeof JjSignature.Type;
-export const JjRevision = Schema.Struct({
+
+const flag = Schema.optionalKey(Schema.Boolean);
+const names = Schema.optionalKey(Schema.Array(Schema.String));
+export const JjLogEdge = Schema.Struct({ commitId: JjCommitId, elided: flag });
+export type JjLogEdge = typeof JjLogEdge.Type;
+/** One graph row. False flags and empty lists are omitted to keep remote payloads small. */
+export const JjLogRow = Schema.Struct({
   commitId: JjCommitId,
   changeId: JjChangeId,
   parentIds: Schema.Array(JjCommitId),
-  description: Schema.String,
-  immutable: Schema.Boolean,
-  conflict: Schema.Boolean,
-  empty: Schema.Boolean,
-  current: Schema.Boolean,
-  files: Schema.Array(JjChangedFile),
-  author: Schema.optionalKey(JjSignature),
-  committer: Schema.optionalKey(JjSignature),
-  bookmarks: Schema.optionalKey(Schema.Array(Schema.String)),
-  remoteBookmarks: Schema.optionalKey(Schema.Array(Schema.String)),
-  tags: Schema.optionalKey(Schema.Array(Schema.String)),
-  conflictPaths: Schema.optionalKey(Schema.Array(Schema.String)),
+  /** Present only when a parent is outside the revset: graph edges to the nearest visible ancestors. */
+  edges: Schema.optionalKey(Schema.Array(JjLogEdge)),
+  /** Some ancestry leaves the revset without reaching a visible ancestor. */
+  edgesTruncated: flag,
+  summary: Schema.String,
+  author: JjSignature,
+  changePrefixLength: Schema.Number,
+  commitPrefixLength: Schema.Number,
+  /** Set only for divergent changes, rendered as `change/offset`. */
+  changeOffset: Schema.optionalKey(Schema.Number),
+  current: flag,
+  immutable: flag,
+  conflict: flag,
+  empty: flag,
+  divergent: flag,
+  hidden: flag,
+  root: flag,
+  bookmarks: names,
+  remoteBookmarks: names,
+  tags: names,
+  workingCopies: names,
 });
-export type JjRevision = typeof JjRevision.Type;
+export type JjLogRow = typeof JjLogRow.Type;
+export const JjRevisionDetails = Schema.Struct({
+  commitId: JjCommitId,
+  changeId: JjChangeId,
+  description: Schema.String,
+  author: JjSignature,
+  committer: JjSignature,
+  files: Schema.Array(JjChangedFile),
+  filesTruncated: Schema.Boolean,
+  conflictPaths: Schema.Array(Schema.String),
+});
+export type JjRevisionDetails = typeof JjRevisionDetails.Type;
+// Control characters cannot be quoted safely into jj template string literals.
+export const JjRevset = Schema.String.check(
+  Schema.isMinLength(1),
+  Schema.isMaxLength(1000),
+  Schema.isPattern(/^[^\u0000-\u001f\u007f]+$/),
+);
+export const JjLogLimit = Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 2000 }));
+export const JjLogView = Schema.Struct({
+  revset: Schema.optionalKey(JjRevset),
+  limit: Schema.optionalKey(JjLogLimit),
+});
+export type JjLogView = typeof JjLogView.Type;
 export const JjPanelReady = Schema.Struct({
   status: Schema.Literal("ready"),
   cwd: Schema.String,
   workspaceIdentity: JjWorkspaceIdentity,
   operationId: JjOperationId,
+  operationDescription: Schema.String,
   workingCopyCommitId: JjCommitId,
-  revisions: Schema.Array(JjRevision),
-  filesTruncated: Schema.Boolean,
-  visibleRevisions: Schema.optionalKey(Schema.Array(JjRevision)),
-  visibleRevisionsTruncated: Schema.optionalKey(Schema.Boolean),
-  remotes: Schema.optionalKey(Schema.Array(Schema.String)),
+  /** The effective revset: the requested one, or the workspace's `revsets.log`. */
+  revset: Schema.String,
+  /** Rows start at this log index: 0 replaces the client's rows, otherwise they append. */
+  offset: Schema.Number,
+  rows: Schema.Array(JjLogRow),
+  hasMore: Schema.Boolean,
+  remotes: Schema.Array(Schema.String),
 });
 export type JjPanelReady = typeof JjPanelReady.Type;
 export const JjPanelSnapshot = Schema.Union([
   JjPanelReady,
+  Schema.Struct({
+    status: Schema.Literal("unchanged"),
+    cwd: Schema.String,
+    operationId: JjOperationId,
+  }),
   Schema.Struct({
     status: Schema.Literal("unavailable"),
     cwd: Schema.String,
@@ -59,13 +106,23 @@ export const JjPanelSnapshot = Schema.Union([
   }),
 ]);
 export type JjPanelSnapshot = typeof JjPanelSnapshot.Type;
-export const JjGetPanelInput = Schema.Struct({ cwd: Schema.String });
+export const JjGetPanelInput = Schema.Struct({
+  cwd: Schema.String,
+  ...JjLogView.fields,
+  /** With the client's row count, the server skips the log read when the operation has not moved. */
+  knownOperationId: Schema.optionalKey(JjOperationId),
+  loadedCount: Schema.optionalKey(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
+});
 export type JjGetPanelInput = typeof JjGetPanelInput.Type;
-const mutationFields = {
+export const JjGetRevisionInput = Schema.Struct({ cwd: Schema.String, commitId: JjCommitId });
+export type JjGetRevisionInput = typeof JjGetRevisionInput.Type;
+const contextFields = {
   cwd: Schema.String,
   workspaceIdentity: JjWorkspaceIdentity,
   expectedOperationId: JjOperationId,
 };
+// The view shapes the panel page returned with the mutation result.
+const mutationFields = { ...contextFields, view: Schema.optionalKey(JjLogView) };
 export const JjDescribeInput = Schema.Struct({
   ...mutationFields,
   revisionCommitId: JjCommitId,
@@ -161,8 +218,10 @@ export type JjRunAction = typeof JjRunAction.Type;
 export const JjRunActionInput = Schema.Struct({ ...mutationFields, action: JjRunAction });
 export type JjRunActionInput = typeof JjRunActionInput.Type;
 export const JjGetDiffInput = Schema.Struct({
-  ...mutationFields,
+  ...contextFields,
   revisionCommitId: JjCommitId,
+  /** Diffs from this revision to `revisionCommitId` instead of from its parents. */
+  fromCommitId: Schema.optionalKey(JjCommitId),
   filePath: Schema.optionalKey(JjFilePath),
 });
 export type JjGetDiffInput = typeof JjGetDiffInput.Type;
@@ -216,6 +275,7 @@ export class JjPanelError extends Schema.TaggedError<JjPanelError>()("JjPanelErr
     "workspace-mismatch",
     "invalid-target",
     "invalid-path",
+    "invalid-revset",
     "immutable",
     "conflicted",
     "invalid-receipt",
@@ -223,8 +283,10 @@ export class JjPanelError extends Schema.TaggedError<JjPanelError>()("JjPanelErr
     "command-failed",
     "invalid-output",
   ]),
+  /** jj's own error line, when one explains the failure. */
+  detail: Schema.optionalKey(Schema.String),
 }) {
   override get message(): string {
-    return `Jujutsu panel: ${this.reason}.`;
+    return this.detail ? `Jujutsu: ${this.detail}` : `Jujutsu panel: ${this.reason}.`;
   }
 }

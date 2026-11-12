@@ -80,8 +80,8 @@ const fixture = (
     yield* cli(["bookmark", "set", "second", "-r", "@"]);
     const snapshot = yield* jj.getPanel({ cwd });
     if (snapshot.status !== "ready") return yield* Effect.die("Expected JJ workspace");
-    const first = snapshot.revisions.find((revision) => revision.description.startsWith("first"));
-    const second = snapshot.revisions.find((revision) => revision.description.startsWith("second"));
+    const first = snapshot.rows.find((row) => row.summary === "first");
+    const second = snapshot.rows.find((row) => row.summary === "second");
     if (!first || !second) return yield* Effect.die("Expected revision chain");
     const request: JjForgePreviewInput = {
       cwd,

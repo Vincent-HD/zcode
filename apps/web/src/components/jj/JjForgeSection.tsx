@@ -1,4 +1,4 @@
-import type { EnvironmentId, ProjectId, JjPanelReady, PullRequestRef } from "@t3tools/contracts";
+import type { EnvironmentId, ProjectId, PullRequestRef } from "@t3tools/contracts";
 import {
   JjForgePreviewInput,
   type JjForgePlan,
@@ -20,13 +20,15 @@ import {
   DialogFooter,
 } from "~/components/ui/dialog";
 import { PULL_REQUEST_STATE_PRESENTATION } from "~/components/pullRequest/pullRequestIcons";
-import { jjForgeFailureMessage, selectJjForgeChain } from "./jj-forge-state";
+import { jjForgeFailureMessage, selectJjForgeChain, type JjForgePanelView } from "./jj-forge-state";
 
 type ScopedInput<T> = { environmentId: EnvironmentId; input: T };
 const decodePreviewInput = Schema.decodeSync(JjForgePreviewInput);
 
 export interface JjForgeSectionProps {
-  panel: JjPanelReady;
+  panel: JjForgePanelView;
+  /** Opens the section on a revision chosen elsewhere, such as the graph context menu. */
+  focusRequest?: { readonly commitId: string; readonly id: number } | null;
   environmentId: EnvironmentId;
   projectId: ProjectId;
   canRead: boolean;
@@ -78,10 +80,14 @@ export const JjForgeSection = (props: JjForgeSectionProps) => {
       : null;
   const [pending, setPending] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
-  const revisions = [...props.panel.revisions, ...(props.panel.visibleRevisions ?? [])].filter(
-    (revision, index, all) =>
-      all.findIndex((candidate) => candidate.commitId === revision.commitId) === index,
-  );
+  const [handledFocus, setHandledFocus] = useState<number | null>(null);
+  if (props.focusRequest && props.focusRequest.id !== handledFocus) {
+    setHandledFocus(props.focusRequest.id);
+    setTargetCommitId(props.focusRequest.commitId);
+    setMode("single");
+    setExpanded(true);
+  }
+  const revisions = props.panel.rows;
   const effectiveTargetCommitId = revisions.some(
     (revision) => revision.commitId === targetCommitId && !revision.immutable,
   )
@@ -289,8 +295,7 @@ export const JjForgeSection = (props: JjForgeSectionProps) => {
                 .filter((revision) => !revision.immutable)
                 .map((revision) => (
                   <option key={revision.commitId} value={revision.commitId}>
-                    {revision.changeId.slice(0, 8)} ·{" "}
-                    {revision.description.split("\n")[0] || "(no description)"}
+                    {revision.changeId.slice(0, 8)} · {revision.summary || "(no description)"}
                   </option>
                 ))}
             </select>

@@ -95,10 +95,16 @@ export const useJjDiff = (input: {
           selection
         )
           return;
-        selectJjRevision(threadRef, selection.revisionCommitId, selection.filePath ?? undefined, {
-          workspaceIdentity: result.value.workspaceIdentity,
-          expectedOperationId: result.value.operationId,
-        });
+        selectJjRevision(
+          threadRef,
+          selection.revisionCommitId,
+          selection.filePath ?? undefined,
+          {
+            workspaceIdentity: result.value.workspaceIdentity,
+            expectedOperationId: result.value.operationId,
+          },
+          selection.fromCommitId,
+        );
         return;
       }
       const result = await getJjDiff({
@@ -107,6 +113,7 @@ export const useJjDiff = (input: {
           cwd: activeCwd,
           ...selection.context,
           revisionCommitId: selection.revisionCommitId,
+          ...(selection.fromCommitId ? { fromCommitId: selection.fromCommitId } : {}),
           ...(selection.filePath ? { filePath: selection.filePath } : {}),
         },
       });
@@ -146,14 +153,16 @@ export const useJjDiff = (input: {
   ]);
   if (!selection) return null;
   const current = diffState?.scope === requestScope ? diffState : null;
-  const label = `JJ ${selection.revisionCommitId.slice(0, 12)}`;
+  const label = selection.fromCommitId
+    ? `JJ ${selection.fromCommitId.slice(0, 8)} → ${selection.revisionCommitId.slice(0, 8)}`
+    : `JJ ${selection.revisionCommitId.slice(0, 12)}`;
   return {
     label,
     scopeValue: "jj",
     loadingLabel: "Loading Jujutsu diff...",
     filePath: selection.filePath,
     revealRequestId: selection.revealRequestId,
-    sectionId: `jj:${JSON.stringify([activeCwd, selection.context, selection.revisionCommitId, selection.filePath])}`,
+    sectionId: `jj:${JSON.stringify([activeCwd, selection.context, selection.fromCommitId, selection.revisionCommitId, selection.filePath])}`,
     patch: current?.data?.diff,
     truncated: current?.data?.truncated === true,
     isPending: !current || current.pending,

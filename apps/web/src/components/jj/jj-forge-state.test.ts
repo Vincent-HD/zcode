@@ -1,61 +1,48 @@
 import { describe, expect, it } from "@effect/vitest";
-import * as Schema from "effect/Schema";
-import { JjPanelReady } from "@t3tools/contracts";
+import type { JjLogRow } from "@t3tools/contracts";
 import { jjForgeFailureMessage, selectJjForgeChain } from "./jj-forge-state";
 
 const base = "a".repeat(40);
 const first = "b".repeat(40);
 const top = "c".repeat(40);
-const panel = Schema.decodeSync(JjPanelReady)({
-  status: "ready",
-  cwd: "/repo",
-  workspaceIdentity: {
-    workspaceRoot: "/repo",
-    repositoryPath: "/repo/.jj/repo",
-    workspaceId: "workspace",
-  },
-  operationId: "d".repeat(128),
-  workingCopyCommitId: top,
-  filesTruncated: false,
-  revisions: [
-    {
-      commitId: top,
-      parentIds: [first],
-      changeId: "k".repeat(32),
-      description: "top",
-      bookmarks: ["top", "alternate"],
-      immutable: false,
-      conflict: false,
-      empty: false,
-      current: true,
-      files: [],
-    },
-    {
-      commitId: first,
-      parentIds: [base],
-      changeId: "l".repeat(32),
-      description: "first",
-      bookmarks: ["first"],
-      immutable: false,
-      conflict: false,
-      empty: false,
-      current: false,
-      files: [],
-    },
-    {
-      commitId: base,
-      parentIds: ["0".repeat(40)],
-      changeId: "m".repeat(32),
-      description: "base",
-      bookmarks: ["main"],
-      immutable: true,
-      conflict: false,
-      empty: false,
-      current: false,
-      files: [],
-    },
-  ],
+const row = (input: {
+  commitId: string;
+  parentIds: ReadonlyArray<string>;
+  changeId: string;
+  summary: string;
+  bookmarks: ReadonlyArray<string>;
+  immutable?: boolean;
+}): JjLogRow => ({
+  ...input,
+  author: { name: "A", email: "a@example.invalid", timestamp: "2026-01-01T00:00:00Z" },
+  changePrefixLength: 1,
+  commitPrefixLength: 1,
 });
+const rows: ReadonlyArray<JjLogRow> = [
+  row({
+    commitId: top,
+    parentIds: [first],
+    changeId: "k".repeat(32),
+    summary: "top",
+    bookmarks: ["top", "alternate"],
+  }),
+  row({
+    commitId: first,
+    parentIds: [base],
+    changeId: "l".repeat(32),
+    summary: "first",
+    bookmarks: ["first"],
+  }),
+  row({
+    commitId: base,
+    parentIds: ["0".repeat(40)],
+    changeId: "m".repeat(32),
+    summary: "base",
+    bookmarks: ["main"],
+    immutable: true,
+  }),
+];
+const panel = { rows };
 const input = {
   panel,
   targetCommitId: top,
@@ -79,30 +66,16 @@ describe("JJ forge selection", () => {
     ).toEqual({ selections: [{ commitId: top, bookmark: "alternate" }], issue: null });
   });
   it("does not silently publish a truncated chain", () => {
-    expect(
-      selectJjForgeChain({ ...input, panel: { ...panel, revisions: panel.revisions.slice(0, 2) } })
-        .issue,
-    ).toContain("outside the loaded revisions");
-  });
-  it("uses additional visible revisions for a fully loaded chain", () => {
-    expect(
-      selectJjForgeChain({
-        ...input,
-        panel: {
-          ...panel,
-          revisions: panel.revisions.slice(0, 1),
-          visibleRevisions: panel.revisions.slice(1),
-        },
-      }).issue,
-    ).toBeNull();
+    expect(selectJjForgeChain({ ...input, panel: { rows: rows.slice(0, 2) } }).issue).toContain(
+      "outside the loaded revisions",
+    );
   });
   it("rejects merge ancestry and missing bookmark", () => {
     expect(
       selectJjForgeChain({
         ...input,
         panel: {
-          ...panel,
-          revisions: panel.revisions.map((revision) =>
+          rows: rows.map((revision) =>
             revision.commitId === first ? { ...revision, parentIds: [base, top] } : revision,
           ),
         },
@@ -112,8 +85,7 @@ describe("JJ forge selection", () => {
       selectJjForgeChain({
         ...input,
         panel: {
-          ...panel,
-          revisions: panel.revisions.map((revision) =>
+          rows: rows.map((revision) =>
             revision.commitId === first ? { ...revision, bookmarks: [] } : revision,
           ),
         },

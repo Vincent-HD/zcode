@@ -1,8 +1,16 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { describe, expect, it } from "@effect/vitest";
 import {
+  type JjDescribeInput,
+  type JjGetPanelInput,
+  type JjMutationResult,
+  type JjPanelError,
   type JjPanelReady,
+  type JjRevertOperationInput,
+  type JjRevisionDetails,
   type JjRunAction,
+  type JjRunActionInput,
+  type JjSquashInput,
   WS_METHODS,
   WsRpcGroup,
   AuthOrchestrationReadScope,
@@ -12,21 +20,114 @@ import {
 } from "@t3tools/contracts";
 import * as RpcTest from "effect/rpc/RpcTest";
 import * as RpcAuthorization from "../auth/RpcAuthorization.ts";
+import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as VcsProcess from "../vcs/VcsProcess.ts";
 import * as JjPanelService from "./JjPanelService.ts";
 
+class ProcessLog extends Context.Service<
+  ProcessLog,
+  { readonly jj: Array<ReadonlyArray<string>> }
+>()("t3/jj/JjPanelService.test/ProcessLog") {}
+// Records the service's own jj invocations; fixture setup commands are not counted.
+const countingProcess = Layer.effect(
+  VcsProcess.VcsProcess,
+  Effect.gen(function* () {
+    const inner = yield* VcsProcess.VcsProcess;
+    const log = yield* ProcessLog;
+    return VcsProcess.VcsProcess.of({
+      run: (input) => {
+        if (input.command === "jj" && !input.operation.includes(".test")) log.jj.push(input.args);
+        return inner.run(input);
+      },
+    });
+  }),
+).pipe(Layer.provide(VcsProcess.layer));
 const live = JjPanelService.layer.pipe(
-  Layer.provideMerge(VcsProcess.layer),
+  Layer.provideMerge(countingProcess),
+  Layer.provideMerge(Layer.sync(ProcessLog, () => ({ jj: [] }))),
   Layer.provideMerge(NodeServices.layer),
 );
+
+/** The pre-graph panel shape: the working-copy ancestry plus every other row, with details. */
+interface ViewRevision {
+  readonly commitId: string;
+  readonly changeId: string;
+  readonly parentIds: ReadonlyArray<string>;
+  readonly description: string;
+  readonly files: JjRevisionDetails["files"];
+  readonly conflictPaths: ReadonlyArray<string>;
+  readonly author: JjRevisionDetails["author"];
+  readonly immutable: boolean;
+  readonly conflict: boolean;
+  readonly empty: boolean;
+  readonly current: boolean;
+  readonly bookmarks: ReadonlyArray<string>;
+  readonly remoteBookmarks: ReadonlyArray<string>;
+}
+type View = JjPanelReady & {
+  readonly revisions: ReadonlyArray<ViewRevision>;
+  readonly visibleRevisions: ReadonlyArray<ViewRevision>;
+};
+
 const fixture = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const process = yield* VcsProcess.VcsProcess;
-  const service = yield* JjPanelService.JjPanelService;
+  const raw = yield* JjPanelService.JjPanelService;
+  const log = yield* ProcessLog;
   const cwd = yield* fs.makeTempDirectoryScoped({ prefix: "t3-jj-panel-test-" });
+  const view = Effect.fn("JjPanelService.test.view")(function* (panel: JjPanelReady) {
+    const detailed = yield* Effect.forEach(panel.rows, (row) =>
+      raw.getRevision({ cwd: panel.cwd, commitId: row.commitId }).pipe(
+        Effect.map((details): ViewRevision => ({
+          commitId: row.commitId,
+          changeId: row.changeId,
+          parentIds: row.parentIds,
+          description: details.description,
+          files: details.files,
+          conflictPaths: details.conflictPaths,
+          author: details.author,
+          immutable: row.immutable === true,
+          conflict: row.conflict === true,
+          empty: row.empty === true,
+          current: row.current === true,
+          bookmarks: row.bookmarks ?? [],
+          remoteBookmarks: row.remoteBookmarks ?? [],
+        })),
+      ),
+    );
+    const byId = new Map(detailed.map((revision) => [revision.commitId, revision]));
+    const ancestry = new Set<string>();
+    const pending = [panel.workingCopyCommitId];
+    while (pending.length) {
+      const id = pending.shift();
+      const revision = id === undefined ? undefined : byId.get(id);
+      if (!revision || ancestry.has(revision.commitId)) continue;
+      ancestry.add(revision.commitId);
+      pending.push(...revision.parentIds);
+    }
+    const revisions = detailed.filter((revision) => ancestry.has(revision.commitId)).slice(0, 11);
+    return {
+      ...panel,
+      revisions,
+      visibleRevisions: detailed.filter((revision) => !revisions.includes(revision)),
+    } satisfies View;
+  });
+  const viewResult = (result: Effect.Effect<JjMutationResult, JjPanelError>) =>
+    result.pipe(
+      Effect.flatMap((value) =>
+        view(value.panel).pipe(Effect.map((panel) => ({ ...value, panel }))),
+      ),
+    );
+  const service = {
+    ...raw,
+    describe: (input: JjDescribeInput) => viewResult(raw.describe(input)),
+    squash: (input: JjSquashInput) => viewResult(raw.squash(input)),
+    revertOperation: (input: JjRevertOperationInput) => viewResult(raw.revertOperation(input)),
+    runAction: (input: JjRunActionInput) => viewResult(raw.runAction(input)),
+  };
   const cli = (args: ReadonlyArray<string>) =>
     process.run({
       operation: "JjPanelService.test",
@@ -44,21 +145,22 @@ const fixture = Effect.gen(function* () {
     });
   yield* cli(["git", "init"]);
   yield* cli(["config", "set", "--repo", "ui.editor", '"false"']);
-  const panel = () =>
-    service.getPanel({ cwd }).pipe(
+  const ready = (input: JjGetPanelInput = { cwd }) =>
+    raw.getPanel(input).pipe(
       Effect.filterOrElse(
         (value): value is JjPanelReady => value.status === "ready",
         () => Effect.die("Expected jj workspace"),
       ),
     );
-  const expected = (value: JjPanelReady) => ({
+  const panel = () => ready().pipe(Effect.flatMap(view));
+  const expected = (value: Pick<JjPanelReady, "workspaceIdentity" | "operationId">) => ({
     cwd,
     workspaceIdentity: value.workspaceIdentity,
     expectedOperationId: value.operationId,
   });
   const action = (action: JjRunAction) =>
     panel().pipe(Effect.flatMap((before) => service.runAction({ ...expected(before), action })));
-  return { fs, cwd, cli, service, panel, expected, action };
+  return { fs, cwd, cli, raw, service, log, ready, view, panel, expected, action };
 });
 
 describe("JjPanelService real jj repositories", () => {
@@ -127,16 +229,15 @@ describe("JjPanelService real jj repositories", () => {
     }).pipe(Effect.provide(live)),
   );
   it.live(
-    "reads nested cwd, structured filenames and the working copy and ten ancestors with parent edges",
+    "reads nested cwd, structured filenames and the working copy with its ancestors as graph rows",
     () =>
       Effect.gen(function* () {
         const f = yield* fixture;
         for (let index = 0; index < 12; index++) yield* f.cli(["new", "-m", `ancestor ${index}`]);
         yield* f.fs.writeFileString(`${f.cwd}/odd\n"filename.txt`, "hello");
         yield* f.fs.makeDirectory(`${f.cwd}/nested`);
-        const panel = yield* f.service.getPanel({ cwd: `${f.cwd}/nested` });
-        expect(panel.status).toBe("ready");
-        if (panel.status !== "ready") return;
+        const panel = yield* f.ready({ cwd: `${f.cwd}/nested` }).pipe(Effect.flatMap(f.view));
+        expect(panel.rows).toHaveLength(14);
         expect(panel.revisions).toHaveLength(11);
         expect(panel.workspaceIdentity.workspaceRoot).toBe(f.cwd);
         expect(panel.revisions[0]?.files).toContainEqual({
@@ -146,13 +247,11 @@ describe("JjPanelService real jj repositories", () => {
         expect(panel.revisions[0]?.current).toBe(true);
         expect(panel.revisions.filter((revision) => !revision.current)).toHaveLength(10);
         expect(panel.revisions[0]?.parentIds[0]).toBe(panel.revisions[1]?.commitId);
-        expect(panel.visibleRevisions?.length).toBeGreaterThan(0);
-        expect(
-          panel.visibleRevisions?.every(
-            (revision) =>
-              !panel.revisions.some((ancestor) => ancestor.commitId === revision.commitId),
-          ),
-        ).toBe(true);
+        expect(panel.rows[0]).toMatchObject({
+          current: true,
+          changePrefixLength: expect.any(Number),
+        });
+        expect(panel.rows.at(-1)).toMatchObject({ root: true, immutable: true, parentIds: [] });
         expect(panel.operationId).toHaveLength(128);
       }).pipe(Effect.provide(live)),
   );
@@ -399,7 +498,7 @@ describe("JjPanelService real jj repositories", () => {
             > => tag !== WS_METHODS.jjDescribe,
           ),
         );
-        const handler = group.toLayerHandler(WS_METHODS.jjDescribe, f.service.describe);
+        const handler = group.toLayerHandler(WS_METHODS.jjDescribe, f.raw.describe);
         const readClient = yield* RpcTest.makeClient(group).pipe(
           Effect.provide(
             Layer.mergeAll(handler, RpcAuthorization.layer([AuthOrchestrationReadScope])),
@@ -419,9 +518,14 @@ describe("JjPanelService real jj repositories", () => {
             Layer.mergeAll(handler, RpcAuthorization.layer([AuthSourceControlWriteScope])),
           ),
         );
+        const described = yield* writeClient[WS_METHODS.jjDescribe](input);
         expect(
-          (yield* writeClient[WS_METHODS.jjDescribe](input)).panel.revisions[0]?.description,
+          (yield* f.raw.getRevision({ cwd: f.cwd, commitId: described.panel.workingCopyCommitId }))
+            .description,
         ).toBe("authorized\n");
+        expect(RpcAuthorization.requiredScopeForRpcMethod(WS_METHODS.jjGetRevision)).toBe(
+          AuthOrchestrationReadScope,
+        );
         expect(RpcAuthorization.requiredScopeForRpcMethod(WS_METHODS.jjGetPanel)).toBe(
           AuthOrchestrationReadScope,
         );
@@ -862,11 +966,6 @@ describe("expanded JjPanelService actions", () => {
       ).toBe("invalid-path");
       yield* f.cli(["config", "set", "--repo", "snapshot.max-new-file-size", "2000000"]);
       yield* f.fs.writeFileString(`${f.cwd}/large`, "x".repeat(1_100_000));
-      expect(
-        (yield* f.service
-          .getDiff({ ...f.expected(panel), revisionCommitId: original })
-          .pipe(Effect.flip)).reason,
-      ).toBe("stale-state");
       const largePanel = yield* f.panel();
       const large = yield* f.service.getDiff({
         ...f.expected(largePanel),
@@ -878,16 +977,27 @@ describe("expanded JjPanelService actions", () => {
     }).pipe(Effect.provide(live)),
   );
 
-  it.live("bounds additional mutable choices while preserving the current/ancestor list", () =>
+  it.live("reads a diff pinned to its operation after the workspace moves on", () =>
     Effect.gen(function* () {
       const f = yield* fixture;
-      for (let index = 0; index < 67; index++)
-        yield* f.cli(["new", "root()", "--no-edit", "-m", `sibling ${index}`]);
-      const panel = yield* f.panel();
-      expect(panel.revisions).toHaveLength(2);
-      expect(panel.visibleRevisions).toHaveLength(64);
-      expect(panel.visibleRevisionsTruncated).toBe(true);
-      expect(panel.visibleRevisions?.every((revision) => !revision.immutable)).toBe(true);
+      yield* f.fs.writeFileString(`${f.cwd}/file`, "pinned\n");
+      const panel = yield* f.ready();
+      yield* f.cli(["describe", "-m", "moved"]);
+      yield* f.fs.writeFileString(`${f.cwd}/file`, "moved\n");
+      const diff = yield* f.raw.getDiff({
+        ...f.expected(panel),
+        revisionCommitId: panel.workingCopyCommitId,
+      });
+      expect(diff.diff).toContain("+pinned");
+      expect(diff.operationId).toBe(panel.operationId);
+      const moved = yield* f.ready();
+      const compared = yield* f.raw.getDiff({
+        ...f.expected(moved),
+        revisionCommitId: moved.workingCopyCommitId,
+        fromCommitId: panel.workingCopyCommitId,
+      });
+      expect(compared.diff).toContain("-pinned");
+      expect(compared.diff).toContain("+moved");
     }).pipe(Effect.provide(live)),
   );
 });
@@ -911,7 +1021,7 @@ describe("expanded JJ RPC permissions", () => {
           ),
         );
         const handlers = Layer.mergeAll(
-          group.toLayerHandler(WS_METHODS.jjRunAction, f.service.runAction),
+          group.toLayerHandler(WS_METHODS.jjRunAction, f.raw.runAction),
           group.toLayerHandler(WS_METHODS.jjGetDiff, f.service.getDiff),
         );
         const reader = yield* RpcTest.makeClient(group).pipe(
@@ -955,7 +1065,11 @@ describe("expanded JJ RPC permissions", () => {
           ...f.expected(before),
           action: { type: "commit", description: "authorized" },
         });
-        expect(committed.panel.revisions[1]?.description).toBe("authorized\n");
+        const committedParent = committed.panel.rows.find((row) => row.summary === "authorized");
+        expect(committed.panel.rows[0]).toMatchObject({
+          current: true,
+          parentIds: [committedParent?.commitId],
+        });
       }).pipe(Effect.provide(live)),
   );
 });
@@ -1015,4 +1129,288 @@ describe("expanded JJ immutable guards", () => {
         expect(created.panel.revisions[0]?.parentIds).toEqual([immutable.commitId]);
       }).pipe(Effect.provide(live)),
   );
+});
+
+const subcommands = new Set(["op", "log", "config", "git", "diff", "workspace", "describe"]);
+const commandsOf = (calls: ReadonlyArray<ReadonlyArray<string>>) =>
+  calls.map((args) => args.find((arg) => subcommands.has(arg)) ?? args.join(" ")).toSorted();
+
+describe("JjPanelService graph log", () => {
+  it.live(
+    "reads the log in one pinned call and answers unchanged refreshes with one snapshot",
+    () =>
+      Effect.gen(function* () {
+        const f = yield* fixture;
+        yield* f.cli(["describe", "-m", "base"]);
+        yield* f.cli(["new", "-m", "top"]);
+        f.log.jj.length = 0;
+        const cold = yield* f.ready();
+        expect(commandsOf(f.log.jj)).toEqual(["config", "git", "log", "op"]);
+        expect(cold.revset).toBe("builtin_log()");
+        expect(cold.rows.map((row) => row.summary)).toEqual(["top", "base", ""]);
+        expect(cold.rows[0]).toMatchObject({ current: true, empty: true });
+        expect(cold.rows[0]?.immutable).toBeUndefined();
+
+        f.log.jj.length = 0;
+        const unchanged = yield* f.raw.getPanel({
+          cwd: f.cwd,
+          knownOperationId: cold.operationId,
+          loadedCount: cold.rows.length,
+        });
+        expect(unchanged).toEqual({
+          status: "unchanged",
+          cwd: f.cwd,
+          operationId: cold.operationId,
+        });
+        expect(commandsOf(f.log.jj)).toEqual(["op"]);
+
+        yield* f.fs.writeFileString(`${f.cwd}/file`, "edited\n");
+        f.log.jj.length = 0;
+        const edited = yield* f.raw.getPanel({
+          cwd: f.cwd,
+          knownOperationId: cold.operationId,
+          loadedCount: cold.rows.length,
+        });
+        expect(edited).toMatchObject({ status: "ready", offset: 0 });
+        expect(commandsOf(f.log.jj)).toEqual(["git", "log", "op"]);
+
+        yield* f.fs.writeFileString(`${f.cwd}/file`, "concurrent\n");
+        f.log.jj.length = 0;
+        const pair = yield* Effect.all(
+          [f.ready({ cwd: f.cwd, revset: "all()" }), f.ready({ cwd: f.cwd, revset: "all()" })],
+          {
+            concurrency: "unbounded",
+          },
+        );
+        expect(pair[0].operationId).toBe(pair[1].operationId);
+        expect(commandsOf(f.log.jj).filter((command) => command !== "git")).toEqual(["log", "op"]);
+      }).pipe(Effect.provide(live)),
+  );
+
+  it.live("keeps jj invocations flat on a 300-revision history", () =>
+    Effect.gen(function* () {
+      const f = yield* fixture;
+      const process = yield* VcsProcess.VcsProcess;
+      const cwd = yield* f.fs.makeTempDirectoryScoped({ prefix: "t3-jj-panel-large-" });
+      const git = (args: ReadonlyArray<string>, stdin?: string) =>
+        process.run({
+          operation: "JjPanelService.test.git",
+          command: "git",
+          cwd,
+          args,
+          ...(stdin === undefined ? {} : { stdin }),
+        });
+      yield* git(["init", "--quiet"]);
+      // fast-import builds the history in one process; one jj command per commit would take minutes.
+      const commits = Array.from({ length: 300 }, (_, index) => {
+        const message = `commit ${index}`;
+        return [
+          `commit refs/heads/${index % 50 === 49 ? `branch-${index}` : "main"}`,
+          `mark :${index + 1}`,
+          `committer Bench <bench@example.invalid> ${1_700_000_000 + index} +0000`,
+          `data ${message.length}`,
+          message,
+          ...(index > 0 ? [`from :${index % 50 === 0 && index > 0 ? index - 1 : index}`] : []),
+          `M 644 inline file-${index % 7}.txt`,
+          `data ${String(index).length}`,
+          String(index),
+          "",
+        ].join("\n");
+      });
+      yield* git(["fast-import", "--quiet"], `${commits.join("\n")}\n`);
+      yield* git(["checkout", "--quiet", "main"]);
+      yield* process.run({
+        operation: "JjPanelService.test",
+        command: "jj",
+        cwd,
+        args: ["git", "init", "--colocate", "--quiet"],
+      });
+      const view = { cwd, revset: "all()" };
+      f.log.jj.length = 0;
+      const first = yield* f.ready(view);
+      expect(first.rows).toHaveLength(100);
+      expect(first.hasMore).toBe(true);
+      expect(commandsOf(f.log.jj)).toEqual(["git", "log", "op"]);
+      f.log.jj.length = 0;
+      const more = yield* f.ready({
+        ...view,
+        limit: 200,
+        knownOperationId: first.operationId,
+        loadedCount: 100,
+      });
+      expect(more).toMatchObject({ offset: 100, hasMore: true });
+      expect(more.rows).toHaveLength(100);
+      expect(commandsOf(f.log.jj)).toEqual(["log", "op"]);
+      f.log.jj.length = 0;
+      expect(
+        (yield* f.raw.getPanel({
+          ...view,
+          limit: 200,
+          knownOperationId: first.operationId,
+          loadedCount: 200,
+        })).status,
+      ).toBe("unchanged");
+      expect(commandsOf(f.log.jj)).toEqual(["op"]);
+    }).pipe(Effect.provide(live)),
+  );
+
+  it.live("pages through the log by appending from the loaded count", () =>
+    Effect.gen(function* () {
+      const f = yield* fixture;
+      for (let index = 0; index < 6; index++) yield* f.cli(["new", "-m", `step ${index}`]);
+      const view = { cwd: f.cwd, revset: "all()" };
+      const first = yield* f.ready({ ...view, limit: 3 });
+      expect(first).toMatchObject({ offset: 0, hasMore: true });
+      expect(first.rows).toHaveLength(3);
+      const second = yield* f.ready({
+        ...view,
+        limit: 6,
+        knownOperationId: first.operationId,
+        loadedCount: 3,
+      });
+      expect(second).toMatchObject({ offset: 3, hasMore: true });
+      expect(second.rows.map((row) => row.summary)).toEqual(["step 2", "step 1", "step 0"]);
+      const last = yield* f.ready({
+        ...view,
+        limit: 20,
+        knownOperationId: first.operationId,
+        loadedCount: 6,
+      });
+      expect(last).toMatchObject({ offset: 6, hasMore: false });
+      expect(last.rows.at(-1)?.root).toBe(true);
+      expect(
+        (yield* f.raw.getPanel({
+          ...view,
+          limit: 20,
+          knownOperationId: first.operationId,
+          loadedCount: 8,
+        })).status,
+      ).toBe("unchanged");
+    }).pipe(Effect.provide(live)),
+  );
+
+  it.live("routes edges through hidden ancestry to the nearest listed revision", () =>
+    Effect.gen(function* () {
+      const f = yield* fixture;
+      yield* f.cli(["describe", "-m", "a"]);
+      yield* f.cli(["new", "-m", "b"]);
+      yield* f.cli(["new", "-m", "c"]);
+      const elided = yield* f.ready({ cwd: f.cwd, revset: "@ | root()" });
+      expect(elided.rows.map((row) => row.summary)).toEqual(["c", ""]);
+      expect(elided.rows[0]?.edges).toEqual([{ commitId: "0".repeat(40), elided: true }]);
+      expect(elided.rows[0]?.edgesTruncated).toBeUndefined();
+      const truncated = yield* f.ready({ cwd: f.cwd, revset: "@" });
+      expect(truncated.rows[0]).toMatchObject({ edges: [], edgesTruncated: true });
+      const direct = yield* f.ready({ cwd: f.cwd, revset: "all()" });
+      expect(direct.rows.every((row) => row.edges === undefined)).toBe(true);
+    }).pipe(Effect.provide(live)),
+  );
+
+  it.live("reports invalid revsets with jj's own explanation", () =>
+    Effect.gen(function* () {
+      const f = yield* fixture;
+      const failure = yield* f.raw.getPanel({ cwd: f.cwd, revset: "nope(" }).pipe(Effect.flip);
+      expect(failure.reason).toBe("invalid-revset");
+      expect(failure.detail).toMatch(/revset/i);
+      expect(
+        (yield* f.raw.getPanel({ cwd: f.cwd, revset: "all()\n" }).pipe(Effect.flip)).reason,
+      ).toBe("invalid-revset");
+    }).pipe(Effect.provide(live)),
+  );
+
+  it.live("marks divergent changes with their offsets and caches commit details", () =>
+    Effect.gen(function* () {
+      const f = yield* fixture;
+      yield* f.fs.writeFileString(`${f.cwd}/file`, "content\n");
+      yield* f.cli(["describe", "-m", "base"]);
+      const operation = (yield* f.ready()).operationId;
+      yield* f.cli(["describe", "-m", "one"]);
+      yield* f.cli(["--at-operation", operation, "describe", "-m", "two"]);
+      const panel = yield* f.ready();
+      const divergent = panel.rows.filter((row) => row.divergent);
+      expect(divergent.map((row) => row.changeOffset).toSorted()).toEqual([0, 1]);
+      expect(new Set(divergent.map((row) => row.changeId)).size).toBe(1);
+      const commitId = divergent[0]?.commitId ?? "";
+      f.log.jj.length = 0;
+      const details = yield* f.raw.getRevision({ cwd: f.cwd, commitId });
+      expect(details.files).toEqual([{ path: "file", status: "added" }]);
+      yield* f.raw.getRevision({ cwd: f.cwd, commitId });
+      expect(f.log.jj).toHaveLength(1);
+    }).pipe(Effect.provide(live)),
+  );
+});
+
+describe("JjPanelService row mapping", () => {
+  const commitId = "a".repeat(40);
+  const parent = "b".repeat(40);
+  const other = "c".repeat(40);
+  const output = (
+    overrides: Partial<{ flags: string; inRevset: ReadonlyArray<boolean>; offset: number | null }>,
+  ) =>
+    [
+      commitId,
+      "k".repeat(32),
+      [parent, other],
+      overrides.inRevset ?? [true, true],
+      "summary",
+      { name: "A", email: "a@example.invalid", timestamp: "2026-01-01T00:00:00Z" },
+      2,
+      3,
+      overrides.offset ?? null,
+      overrides.flags ?? "",
+      [
+        ["main", null],
+        ["main", "origin"],
+      ],
+      ["v1", "v1"],
+      [],
+    ] as const;
+
+  it("omits false flags, splits remote bookmarks and dedupes tags", () => {
+    expect(JjPanelService.toLogRow(output({ flags: "ci" }), undefined)).toEqual({
+      commitId,
+      changeId: "k".repeat(32),
+      parentIds: [parent, other],
+      summary: "summary",
+      author: { name: "A", email: "a@example.invalid", timestamp: "2026-01-01T00:00:00Z" },
+      changePrefixLength: 2,
+      commitPrefixLength: 3,
+      current: true,
+      immutable: true,
+      bookmarks: ["main"],
+      remoteBookmarks: ["main@origin"],
+      tags: ["v1"],
+    });
+  });
+
+  it("keeps the change offset only for divergent rows", () => {
+    expect(JjPanelService.toLogRow(output({ offset: 1 }), undefined).changeOffset).toBeUndefined();
+    expect(JjPanelService.toLogRow(output({ flags: "d", offset: 1 }), undefined)).toMatchObject({
+      divergent: true,
+      changeOffset: 1,
+    });
+  });
+
+  it.each([
+    {
+      nearest: [parent, "d".repeat(40)],
+      edges: [{ commitId: parent }, { commitId: "d".repeat(40), elided: true }],
+      truncated: undefined,
+    },
+    { nearest: [], edges: [], truncated: true },
+    { nearest: "truncated" as const, edges: [{ commitId: parent }], truncated: true },
+  ])("maps nearest ancestors $nearest to graph edges", ({ nearest, edges, truncated }) => {
+    const row = JjPanelService.toLogRow(output({ inRevset: [true, false] }), nearest);
+    expect(row.edges).toEqual(edges);
+    expect(row.edgesTruncated).toBe(truncated);
+  });
+
+  it("extracts jj's error and first cause", () => {
+    expect(
+      JjPanelService.jjErrorDetail(
+        "Warning: x\nError: Failed to parse revset: Syntax error\nCaused by:  --> 1:5\n",
+      ),
+    ).toBe("Failed to parse revset: Syntax error Caused by:  --> 1:5");
+    expect(JjPanelService.jjErrorDetail("plain failure")).toBeUndefined();
+  });
 });

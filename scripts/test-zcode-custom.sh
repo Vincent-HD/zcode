@@ -25,8 +25,11 @@ added_tests=(
   apps/web/src/components/chat/usage-pricing.test.ts
   apps/web/src/components/chat/useComposerSend.logic.test.ts
   apps/web/src/components/jj/JjPanel.permissions.browser.test.tsx
+  apps/web/src/components/jj/jj-actions.test.ts
   apps/web/src/components/jj/jj-description-draft-store.test.ts
   apps/web/src/components/jj/jj-forge-state.test.ts
+  apps/web/src/components/jj/jj-graph-layout.test.ts
+  apps/web/src/components/jj/jj-log-state.test.ts
   apps/web/src/components/jj/jj-panel-state.test.ts
   apps/web/src/temporaryConversationNavigation.test.ts
   apps/web/src/zcode/jj-diff-selection.test.ts

@@ -6,6 +6,7 @@ import {
   type JjForgeStatusInput,
   type JjGetDiffInput,
   type JjGetPanelInput,
+  type JjGetRevisionInput,
   type JjRevertOperationInput,
   type JjRunActionInput,
   type JjSquashInput,
@@ -34,6 +35,8 @@ export const makeZcodeWsHandlers = Effect.gen(function* () {
   return {
     [ZCODE_WS_METHODS.jjGetPanel]: (input: JjGetPanelInput) =>
       jjPanel((service) => service.getPanel(input)),
+    [ZCODE_WS_METHODS.jjGetRevision]: (input: JjGetRevisionInput) =>
+      jjPanel((service) => service.getRevision(input)),
     [ZCODE_WS_METHODS.jjRunAction]: (input: JjRunActionInput) =>
       jjPanel((service) => service.runAction(input)),
     [ZCODE_WS_METHODS.jjGetDiff]: (input: JjGetDiffInput) =>

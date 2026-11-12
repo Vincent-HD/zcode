@@ -1,7 +1,6 @@
 import {
   JjCommitId,
   type ChangeRequest,
-  type JjPanelReady,
   type JjWorkspaceIdentity,
   type PullRequestRef,
 } from "@t3tools/contracts";
@@ -66,14 +65,27 @@ const make = Effect.gen(function* () {
   const readWorkspace = Effect.fn("JjForgeService.readWorkspace")(function* (
     input: Pick<JjForgePreviewInput, "cwd" | "workspaceIdentity" | "expectedOperationId">,
   ) {
-    const panel = yield* jj
-      .getPanel({ cwd: input.cwd })
-      .pipe(Effect.mapError(() => error("command-failed")));
-    if (panel.status !== "ready") return yield* error("unavailable");
-    if (!sameWorkspace({ left: input.workspaceIdentity, right: panel.workspaceIdentity }))
+    const current = yield* jj
+      .currentOperation({ cwd: input.cwd })
+      .pipe(
+        Effect.mapError((cause) =>
+          cause.reason === "unavailable" ? error("unavailable") : error("command-failed"),
+        ),
+      );
+    if (!sameWorkspace({ left: input.workspaceIdentity, right: current.workspaceIdentity }))
       return yield* error("workspace-mismatch");
-    if (panel.operationId !== input.expectedOperationId) return yield* error("stale-state");
-    return panel;
+    if (current.operationId !== input.expectedOperationId) return yield* error("stale-state");
+    return current;
+  });
+  const readRevisions = Effect.fn("JjForgeService.readRevisions")(function* (input: {
+    cwd: string;
+    operationId: string;
+    commitIds: ReadonlyArray<string>;
+  }) {
+    const revisions = yield* jj
+      .lookupRevisions(input)
+      .pipe(Effect.mapError(() => error("invalid-selection")));
+    return revisions.filter((revision) => !revision.hidden);
   });
   const cli = Effect.fn("JjForgeService.readCli")(function* (input: {
     cwd: string;
@@ -153,7 +165,7 @@ const make = Effect.gen(function* () {
     };
   });
   const localTarget = Effect.fn("JjForgeService.localTarget")(function* (input: {
-    panel: JjPanelReady;
+    panel: { cwd: string; operationId: string };
     bookmark: string;
   }) {
     const output = yield* cli({
@@ -213,8 +225,14 @@ const make = Effect.gen(function* () {
   const prepare = Effect.fn("JjForgeService.prepare")(function* (input: JjForgePreviewInput) {
     const panel = yield* readWorkspace(input);
     const resolved = yield* destination(input);
+    const revisions = yield* readRevisions({
+      cwd: input.cwd,
+      operationId: panel.operationId,
+      commitIds: input.selections.map((selection) => selection.commitId),
+    });
     const layers = yield* Effect.try({
-      try: () => buildJjForgeLayers({ request: input, panel, provider: resolved.provider.kind }),
+      try: () =>
+        buildJjForgeLayers({ request: input, revisions, provider: resolved.provider.kind }),
       catch: (cause) => (isForgeError(cause) ? cause : error("invalid-selection")),
     });
     for (const layer of layers) {
@@ -362,7 +380,11 @@ const make = Effect.gen(function* () {
   const getStatus = Effect.fn("JjForgeService.getStatus")(function* (input: JjForgeStatusInput) {
     const panel = yield* readWorkspace(input);
     const resolved = yield* destination(input);
-    const revisions = [...panel.revisions, ...(panel.visibleRevisions ?? [])];
+    const revisions = yield* readRevisions({
+      cwd: input.cwd,
+      operationId: panel.operationId,
+      commitIds: [...new Set(input.revisionCommitIds)],
+    });
     const selected = [...new Set(input.revisionCommitIds)].map((commitId) =>
       revisions.find((revision) => revision.commitId === commitId),
     );
@@ -373,7 +395,7 @@ const make = Effect.gen(function* () {
     let lookups = 0;
     for (const revision of selected) {
       if (!revision) continue;
-      for (const bookmark of new Set(revision.bookmarks ?? [])) {
+      for (const bookmark of new Set(revision.bookmarks)) {
         if (lookups >= 32) {
           truncated = true;
           break;

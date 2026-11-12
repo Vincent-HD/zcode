@@ -1,13 +1,27 @@
-import type { JjPanelReady } from "@t3tools/contracts";
-import type { JjForgeSelection, JjForgePreviewInput } from "@t3tools/contracts";
+import type {
+  JjForgePreviewInput,
+  JjForgeSelection,
+  JjLogRow,
+  JjWorkspaceIdentity,
+} from "@t3tools/contracts";
+
+/** The slice of the panel the publication section reads. */
+export interface JjForgePanelView {
+  readonly cwd: string;
+  readonly workspaceIdentity: JjWorkspaceIdentity;
+  readonly operationId: string;
+  readonly workingCopyCommitId: string;
+  readonly rows: ReadonlyArray<JjLogRow>;
+  readonly remotes: ReadonlyArray<string>;
+}
 
 export const selectJjForgeChain = (input: {
-  panel: JjPanelReady;
+  panel: Pick<JjForgePanelView, "rows">;
   targetCommitId: string;
   mode: JjForgePreviewInput["mode"];
   bookmarks: Readonly<Record<string, string>>;
 }): { selections: ReadonlyArray<JjForgeSelection>; issue: string | null } => {
-  const revisions = [...input.panel.revisions, ...(input.panel.visibleRevisions ?? [])];
+  const revisions = input.panel.rows;
   let current = revisions.find((revision) => revision.commitId === input.targetCommitId);
   const selected: JjForgeSelection[] = [];
   const visited = new Set<string>();

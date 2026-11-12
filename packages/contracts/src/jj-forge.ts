@@ -2,7 +2,7 @@ import * as Schema from "effect/Schema";
 import { ProjectId } from "./baseSchemas.ts";
 import { ChangeRequest, SourceControlProviderKind } from "./sourceControl.ts";
 import { PullRequestRef, PullRequestSummary } from "./pullRequest.ts";
-import { JjCommitId, JjOperationId, JjWorkspaceIdentity, type JjPanelReady } from "./jj.ts";
+import { JjCommitId, JjOperationId, JjWorkspaceIdentity } from "./jj.ts";
 
 export const JjForgeBookmark = Schema.String.check(
   Schema.isPattern(
@@ -115,10 +115,20 @@ export class JjForgeError extends Schema.TaggedError<JjForgeError>()("JjForgeErr
   }
 }
 
+/** The revision facts publication validates, read by the server at the expected operation. */
+export interface JjForgeRevision {
+  readonly commitId: string;
+  readonly parentIds: ReadonlyArray<string>;
+  readonly description: string;
+  readonly immutable: boolean;
+  readonly conflict: boolean;
+  readonly bookmarks: ReadonlyArray<string>;
+}
+
 /** Build only the requested chain; never infer bookmarks or a base from the current branch. */
 export const buildJjForgeLayers = (input: {
   request: JjForgePreviewInput;
-  panel: JjPanelReady;
+  revisions: ReadonlyArray<JjForgeRevision>;
   provider: SourceControlProviderKind;
 }): ReadonlyArray<JjForgeLayer> => {
   const fail = (reason: JjForgeError["reason"]): never => {
@@ -140,13 +150,12 @@ export const buildJjForgeLayers = (input: {
     fail("duplicate-bookmark");
   if (new Set(selections.map((selection) => selection.commitId)).size !== selections.length)
     fail("invalid-selection");
-  const revisions = [...input.panel.revisions, ...(input.panel.visibleRevisions ?? [])];
   return selections.map((selection, index) => {
-    const revision = revisions.find((candidate) => candidate.commitId === selection.commitId);
+    const revision = input.revisions.find((candidate) => candidate.commitId === selection.commitId);
     if (!revision) return fail("invalid-selection");
     if (revision.immutable || /^0+$/.test(revision.commitId)) fail("immutable");
     if (revision.conflict) fail("conflicted");
-    if (!revision.bookmarks?.includes(selection.bookmark)) fail("missing-bookmark");
+    if (!revision.bookmarks.includes(selection.bookmark)) fail("missing-bookmark");
     if (
       input.request.mode === "linear-stack" &&
       (revision.parentIds.length !== 1 ||

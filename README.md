@@ -17,13 +17,18 @@ upstream entry points to re-check after a rebase are in [`ZCODE.md`](./ZCODE.md)
   different fields, and missing values stay unavailable. Cost estimates are separate from
   subscription charges. Time to first token and breakdowns of system prompt, tools, and messages
   are unavailable unless a provider supplies them.
-- **Jujutsu panel:** Open the **Jujutsu** tab from the chat's right-panel menu to inspect the
-  current working copy and up to ten preceding revisions, view changed files in T3 Code's
-  existing diff panel, and manage revisions, bookmarks, and confirmed publication through the
-  existing forge integrations. It requires `jj` installed in the thread's environment and an
-  existing jj workspace; it never initializes a repository. Available actions depend on
-  environment capabilities and permissions, conflicts are informational, and Squash Onto requires
-  jj's experimental `--onto` option.
+- **Jujutsu panel:** Open the **Jujutsu** tab from the chat's right-panel menu for a revision
+  graph of the workspace's `revsets.log` (or a revset typed in the panel), loaded 100 revisions
+  at a time. Click a revision for its details and changed files, which open in T3 Code's diff
+  panel; Ctrl/Cmd+click selects several, Escape clears. Right-click (or Shift+F10) for jj-view's
+  actions: new child/before/after, edit, describe, duplicate, abandon, absorb, squash into parent
+  or ancestor, rebase onto the selection, merge, bookmarks, push and PR/MR publication through
+  the existing forge integrations. Drag a revision onto another to rebase its branch; hold R to
+  rebase only the revision, S to squash into, Shift+S to squash onto, D to duplicate or M to
+  merge. Drag a bookmark to move it. The header undoes and redoes jj operations. It requires
+  `jj` in the thread's environment and an existing jj workspace; it never initializes a
+  repository. Destructive actions ask first, available actions depend on environment
+  capabilities and permissions, and Squash Onto requires jj's experimental `--onto` option.
 - **Temporary conversations:** Mark a draft or conversation temporary from the header. Leaving it
   does not discard it. The header trash button confirms, then removes it from history through the
   normal deletion flow and preserves the workspace and worktree. The temporary marker is local to

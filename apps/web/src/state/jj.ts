@@ -27,6 +27,10 @@ export const jjEnvironment = {
     label: "environment-data:jj:get-panel",
     tag: WS_METHODS.jjGetPanel,
   }),
+  getRevision: createEnvironmentRpcCommand(connectionAtomRuntime, {
+    label: "environment-data:jj:get-revision",
+    tag: WS_METHODS.jjGetRevision,
+  }),
   describe: createEnvironmentRpcCommand(connectionAtomRuntime, {
     label: "environment-data:jj:describe",
     tag: WS_METHODS.jjDescribe,

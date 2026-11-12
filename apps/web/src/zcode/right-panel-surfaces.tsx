@@ -3,7 +3,8 @@ import { GitBranch } from "lucide-react";
 import { lazy, Suspense } from "react";
 
 import { useRightPanelStore } from "../rightPanelStore";
-import { selectJjRevision, type JjDiffContext } from "./jj-diff-selection";
+import type { JjOpenDiffInput } from "../components/jj/JjPanel";
+import { selectJjRevision } from "./jj-diff-selection";
 import type { ZcodeRightPanelKind, ZcodeRightPanelSurface } from "./right-panel-kinds";
 
 const JjPanel = lazy(() => import("../components/jj/JjPanel"));
@@ -44,14 +45,15 @@ export const zcodeSurfaceLaunchers = (context: ZcodeRightPanelContext) => {
   ];
 };
 
-const openJjDiff = (
-  context: ZcodeRightPanelContext,
-  revisionCommitId: string,
-  filePath: string,
-  diffContext?: JjDiffContext,
-) => {
+const openJjDiff = (context: ZcodeRightPanelContext, input: JjOpenDiffInput) => {
   if (!context.isServerThread || !context.threadRef) return;
-  selectJjRevision(context.threadRef, revisionCommitId, filePath, diffContext);
+  selectJjRevision(
+    context.threadRef,
+    input.commitId,
+    input.filePath,
+    input.context,
+    input.fromCommitId,
+  );
   useRightPanelStore.getState().open(context.threadRef, "diff");
 };
 
@@ -70,9 +72,7 @@ export const ZcodeRightPanelSurfaceContent = (props: {
       environmentId={props.environmentId}
       cwd={props.zcode.cwd}
       visible={props.visible && props.activeSurfaceId === props.surface.id}
-      onOpenDiff={(revisionCommitId, filePath, diffContext) =>
-        openJjDiff(props.zcode, revisionCommitId, filePath, diffContext)
-      }
+      onOpenDiff={(input) => openJjDiff(props.zcode, input)}
       projectId={props.zcode.projectId ?? undefined}
       onOpenPullRequest={({ environmentId, reference }) => {
         if (environmentId !== props.environmentId) return;

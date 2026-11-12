@@ -1,11 +1,14 @@
 import { describe, expect, it } from "@effect/vitest";
 import * as Schema from "effect/Schema";
 import { ProjectId } from "./baseSchemas.ts";
-import { JjPanelReady } from "./jj.ts";
 import { SourceControlProviderKind } from "./sourceControl.ts";
-import { JjForgeBookmark, JjForgePreviewInput, buildJjForgeLayers } from "./jj-forge.ts";
+import {
+  JjForgeBookmark,
+  JjForgePreviewInput,
+  buildJjForgeLayers,
+  type JjForgeRevision,
+} from "./jj-forge.ts";
 
-const decodePanel = Schema.decodeUnknownSync(JjPanelReady);
 const decodeRequest = Schema.decodeUnknownSync(JjForgePreviewInput);
 const decodeBookmark = Schema.decodeUnknownSync(JjForgeBookmark);
 
@@ -13,60 +16,41 @@ const root = "0".repeat(40);
 const first = "a".repeat(40);
 const second = "b".repeat(40);
 const third = "c".repeat(40);
-const panel = decodePanel({
-  status: "ready",
-  cwd: "/repo",
-  workspaceIdentity: {
-    workspaceRoot: "/repo",
-    repositoryPath: "/repo/.jj/repo",
-    workspaceId: "workspace",
+const workspaceIdentity = {
+  workspaceRoot: "/repo",
+  repositoryPath: "/repo/.jj/repo",
+  workspaceId: "workspace",
+};
+const revisions: ReadonlyArray<JjForgeRevision> = [
+  {
+    commitId: third,
+    parentIds: [second],
+    description: "third\n\nThird body",
+    bookmarks: ["third", "other-third"],
+    immutable: false,
+    conflict: false,
   },
-  operationId: "d".repeat(128),
-  workingCopyCommitId: third,
-  filesTruncated: false,
-  revisions: [
-    {
-      commitId: third,
-      parentIds: [second],
-      changeId: "k".repeat(32),
-      description: "third\n\nThird body",
-      bookmarks: ["third", "other-third"],
-      immutable: false,
-      conflict: false,
-      empty: false,
-      current: true,
-      files: [],
-    },
-    {
-      commitId: second,
-      parentIds: [first],
-      changeId: "l".repeat(32),
-      description: "second",
-      bookmarks: ["second"],
-      immutable: false,
-      conflict: false,
-      empty: false,
-      current: false,
-      files: [],
-    },
-    {
-      commitId: first,
-      parentIds: [root],
-      changeId: "m".repeat(32),
-      description: "first",
-      bookmarks: ["first"],
-      immutable: false,
-      conflict: false,
-      empty: false,
-      current: false,
-      files: [],
-    },
-  ],
-});
+  {
+    commitId: second,
+    parentIds: [first],
+    description: "second",
+    bookmarks: ["second"],
+    immutable: false,
+    conflict: false,
+  },
+  {
+    commitId: first,
+    parentIds: [root],
+    description: "first",
+    bookmarks: ["first"],
+    immutable: false,
+    conflict: false,
+  },
+];
 const request = decodeRequest({
-  cwd: panel.cwd,
-  workspaceIdentity: panel.workspaceIdentity,
-  expectedOperationId: panel.operationId,
+  cwd: "/repo",
+  workspaceIdentity,
+  expectedOperationId: "d".repeat(128),
   projectId: ProjectId.make("project"),
   remote: "origin",
   mode: "linear-stack",
@@ -82,7 +66,7 @@ describe("JJ forge publication contracts", () => {
   it.each([SourceControlProviderKind.make("github"), SourceControlProviderKind.make("gitlab")])(
     "pairs every %s head with the explicit base or previous head",
     (provider) => {
-      const layers = buildJjForgeLayers({ request, panel, provider });
+      const layers = buildJjForgeLayers({ request, revisions, provider });
       expect(layers.map((layer) => [layer.bookmark, layer.baseBookmark])).toEqual([
         ["first", "main"],
         ["second", "first"],
@@ -99,7 +83,7 @@ describe("JJ forge publication contracts", () => {
           mode: "single",
           selections: [{ commitId: third, bookmark: "third" }],
         },
-        panel,
+        revisions,
         provider: SourceControlProviderKind.make("github"),
       }).map((layer) => [layer.bookmark, layer.baseBookmark]),
     ).toEqual([["third", "main"]]);
@@ -109,7 +93,7 @@ describe("JJ forge publication contracts", () => {
       SourceControlProviderKind.make(provider),
     ),
   )("rejects unsupported %s publication", (provider) => {
-    expect(() => buildJjForgeLayers({ request, panel, provider })).toThrow("unsupported-forge");
+    expect(() => buildJjForgeLayers({ request, revisions, provider })).toThrow("unsupported-forge");
   });
   it("rejects reversed, skipped, duplicate and singleton stacks", () => {
     for (const selections of [
@@ -121,23 +105,20 @@ describe("JJ forge publication contracts", () => {
       expect(() =>
         buildJjForgeLayers({
           request: { ...request, selections },
-          panel,
+          revisions,
           provider: SourceControlProviderKind.make("github"),
         }),
       ).toThrow();
   });
   it("rejects a merge at the bottom as well as in a later layer", () => {
     for (const commitId of [first, second]) {
-      const merged = {
-        ...panel,
-        revisions: panel.revisions.map((revision) =>
-          revision.commitId === commitId ? { ...revision, parentIds: [root, third] } : revision,
-        ),
-      };
+      const merged = revisions.map((revision) =>
+        revision.commitId === commitId ? { ...revision, parentIds: [root, third] } : revision,
+      );
       expect(() =>
         buildJjForgeLayers({
           request,
-          panel: merged,
+          revisions: merged,
           provider: SourceControlProviderKind.make("github"),
         }),
       ).toThrow("nonlinear-stack");
@@ -147,7 +128,7 @@ describe("JJ forge publication contracts", () => {
     expect(() =>
       buildJjForgeLayers({
         request: { ...request, baseBookmark: "first" },
-        panel,
+        revisions,
         provider: SourceControlProviderKind.make("github"),
       }),
     ).toThrow("duplicate-bookmark");
@@ -157,7 +138,7 @@ describe("JJ forge publication contracts", () => {
           ...request,
           selections: request.selections.map((selection) => ({ ...selection, bookmark: "first" })),
         },
-        panel,
+        revisions,
         provider: SourceControlProviderKind.make("github"),
       }),
     ).toThrow("duplicate-bookmark");
@@ -168,16 +149,13 @@ describe("JJ forge publication contracts", () => {
     { field: "description", value: "\n ", reason: "missing-description" },
     { field: "bookmarks", value: [], reason: "missing-bookmark" },
   ])("rejects $reason before publication", ({ field, value, reason }) => {
-    const changed = decodePanel({
-      ...panel,
-      revisions: panel.revisions.map((revision) =>
-        revision.commitId === first ? { ...revision, [field]: value } : revision,
-      ),
-    });
+    const changed = revisions.map((revision) =>
+      revision.commitId === first ? { ...revision, [field]: value } : revision,
+    );
     expect(() =>
       buildJjForgeLayers({
         request,
-        panel: changed,
+        revisions: changed,
         provider: SourceControlProviderKind.make("github"),
       }),
     ).toThrow(reason);

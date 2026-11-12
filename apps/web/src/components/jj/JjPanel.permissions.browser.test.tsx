@@ -8,6 +8,7 @@ const state = vi.hoisted(() => ({
   configReady: false,
   supportsPanel: true,
   getPanel: vi.fn<(...args: ReadonlyArray<unknown>) => Promise<unknown>>(),
+  getRevision: vi.fn<(...args: ReadonlyArray<unknown>) => Promise<unknown>>(),
 }));
 
 vi.mock(import("@effect/atom-react"), async (original) => ({
@@ -37,7 +38,8 @@ vi.mock(import("~/state/session"), async (original) => ({
 }));
 vi.mock(import("~/state/use-atom-command"), async (original) => ({
   ...(await original()),
-  useAtomCommand: (() => state.getPanel) as never,
+  useAtomCommand: ((command: { label: string }) =>
+    command.label.endsWith("get-revision") ? state.getRevision : state.getPanel) as never,
 }));
 vi.mock(import("~/hooks/useTheme"), () => ({
   useTheme: (() => ({ resolvedTheme: "light" })) as never,
@@ -48,6 +50,7 @@ vi.mock(import("./jj-action-dialog"), async (original) => ({
 }));
 vi.mock(import("./jj-forge-panel"), () => ({ JjForgePanel: () => null }));
 
+import { page, userEvent } from "vite-plus/test/browser";
 import { act, render } from "../../../test/render";
 import JjPanel from "./JjPanel";
 
@@ -59,9 +62,12 @@ function setup() {
   state.configReady = false;
   state.supportsPanel = true;
   state.getPanel.mockReset();
+  state.getRevision.mockReset();
 }
 
-function panel(description: string): JjPanelSnapshot {
+const author = { name: "Test", email: "test@example.invalid", timestamp: "2026-01-01T00:00:00Z" };
+
+function panel(description: string, extraRows: ReadonlyArray<string> = []): JjPanelSnapshot {
   return decodePanel({
     status: "ready",
     cwd: "/repo",
@@ -71,20 +77,32 @@ function panel(description: string): JjPanelSnapshot {
       workspaceId: "workspace",
     },
     operationId: "d".repeat(128),
+    operationDescription: "snapshot working copy",
     workingCopyCommitId: "a".repeat(40),
-    filesTruncated: false,
-    revisions: [
+    revset: "builtin_log()",
+    offset: 0,
+    hasMore: false,
+    remotes: [],
+    rows: [
       {
         commitId: "a".repeat(40),
         parentIds: ["0".repeat(40)],
         changeId: "k".repeat(32),
-        description,
-        immutable: false,
-        conflict: false,
-        empty: false,
+        summary: description,
+        author,
+        changePrefixLength: 1,
+        commitPrefixLength: 1,
         current: true,
-        files: [],
       },
+      ...extraRows.map((summary, index) => ({
+        commitId: String(index + 1).repeat(40),
+        parentIds: ["0".repeat(40)],
+        changeId: "lmnopqrs"[index]!.repeat(32),
+        summary,
+        author,
+        changePrefixLength: 1,
+        commitPrefixLength: 1,
+      })),
     ],
   });
 }
@@ -143,4 +161,36 @@ describe("JjPanel permission and capability refresh", () => {
       await vi.waitFor(() => expect(screen.container.textContent).toContain("fresh response"));
     },
   );
+
+  it("selects with click, extends with Ctrl+click and clears with Escape", async () => {
+    setup();
+    state.configReady = true;
+    state.getPanel.mockResolvedValue(AsyncResult.success(panel("working copy", ["sibling"])));
+    state.getRevision.mockResolvedValue(
+      AsyncResult.success({
+        commitId: "a".repeat(40),
+        changeId: "k".repeat(32),
+        description: "working copy\n\nbody",
+        author,
+        committer: author,
+        files: [{ path: "src/file.ts", status: "modified" }],
+        filesTruncated: false,
+        conflictPaths: [],
+      }),
+    );
+    await using _screen = await render(
+      <JjPanel environmentId={environmentId} cwd="/repo" visible />,
+    );
+    const first = page.getByRole("option", { name: /working copy/ });
+    await userEvent.click(first);
+    await expect.element(first).toHaveAttribute("aria-selected", "true");
+    await expect.element(page.getByText("src/file.ts")).toBeVisible();
+    await userEvent.click(page.getByRole("option", { name: /sibling/ }), {
+      modifiers: ["Control"],
+    });
+    await expect.element(page.getByText("2 selected")).toBeVisible();
+    await userEvent.keyboard("{Escape}");
+    await expect.element(page.getByText("2 selected")).not.toBeInTheDocument();
+    await expect.element(first).toHaveAttribute("aria-selected", "false");
+  });
 });

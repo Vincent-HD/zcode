@@ -1,437 +1,328 @@
-import type { EnvironmentId, JjPanelReady, JjRevision, JjRunActionInput } from "@t3tools/contracts";
-import { useState } from "react";
+import {
+  JjBookmarkName,
+  type EnvironmentId,
+  type JjLogRow,
+  type JjRunAction,
+} from "@t3tools/contracts";
+import * as Schema from "effect/Schema";
+import { useEffect, useState } from "react";
+import {
+  AlertDialog,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogPopup,
+  AlertDialogTitle,
+} from "~/components/ui/alert-dialog";
 import { Button } from "~/components/ui/button";
 import { Checkbox } from "~/components/ui/checkbox";
 import { Input } from "~/components/ui/input";
 import { Textarea } from "~/components/ui/textarea";
-import {
-  AlertDialog,
-  AlertDialogPopup,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogDescription,
-  AlertDialogFooter,
-} from "~/components/ui/alert-dialog";
-import {
-  buildJjPanelAction,
-  jjActionLabels,
-  selectableJjTargets,
-  jjSquashTargets,
-  type JjActionFields,
-  type JjPanelActionKind,
-} from "./jj-panel-state";
+import { jjEnvironment } from "~/state/jj";
+import { useAtomCommand } from "~/state/use-atom-command";
+import { jjSquashTargets, type JjDialogRequest } from "./jj-actions";
 
-export interface JjActionPreview {
-  readonly environmentId: EnvironmentId;
-  readonly cwd: string;
-  readonly panel: JjPanelReady;
-  readonly kind: JjPanelActionKind;
-  readonly source: JjRevision;
-  readonly selectedCommitIds: string[];
-  readonly paths: string[];
-  readonly squashScope?: "parent" | "ancestors";
-}
+const isBookmarkName = Schema.is(JjBookmarkName);
 
-const explanations: Record<JjPanelActionKind, string> = {
-  new: "Create an empty child of the chosen parents and make it the working copy.",
-  commit: "Save this message on the working copy and start a new empty child.",
-  edit: "Switch the working copy to this older revision. Subsequent edits change that revision.",
-  "insert-before": "Insert an empty revision before these revisions, rewriting their parentage.",
-  "insert-after": "Insert an empty revision after these revisions, rewriting their descendants.",
-  "squash-into":
-    "Move source changes into a mutable destination. An emptied source may be abandoned.",
-  "squash-onto":
-    "Move source changes into a new child of the destination. The destination stays unchanged.",
-  absorb:
-    "Distribute source changes to the mutable ancestors that last changed those lines. Unmatched changes stay in the source.",
-  "rebase-revision": "Move this revision onto the chosen parents and reconnect its descendants.",
-  "rebase-branch": "Move this revision and its branch onto the chosen parents.",
-  duplicate:
-    "Copy this revision. Choose destination parents, or leave them unchecked to keep its original parents.",
-  merge: "Create an empty working-copy revision with all selected parents.",
-  abandon: "Remove these revisions from history and rebase their descendants.",
-  restore: "Discard these changes in the source revision, restoring files from its merged parents.",
-  undo: "Undo the latest workspace operation, including operations performed outside this panel.",
-  redo: "Redo the most recently undone workspace operation.",
-  "bookmark-set": "Create a local bookmark or move an existing bookmark to this revision.",
-  "bookmark-delete":
-    "Delete this local bookmark. Publishing the deletion requires an explicit push.",
-  "bookmark-advance": "Advance this local bookmark to the selected descendant revision.",
-  push: "Publish only the named bookmarks to the chosen remote. Undo cannot reverse remote publication.",
+const revisionLabel = (row: JjLogRow) =>
+  `${row.changeId.slice(0, 8)} · ${row.summary || "(no description)"}`;
+
+const ancestorBookmarks = (input: { revision: JjLogRow; rows: ReadonlyArray<JjLogRow> }) => {
+  const byId = new Map(input.rows.map((row) => [row.commitId, row]));
+  const names: string[] = [];
+  const seen = new Set<string>();
+  const pending = [...input.revision.parentIds];
+  while (pending.length) {
+    const id = pending.shift();
+    const row = id ? byId.get(id) : undefined;
+    if (!row || seen.has(row.commitId)) continue;
+    seen.add(row.commitId);
+    names.push(...(row.bookmarks ?? []));
+    pending.push(...row.parentIds);
+  }
+  return [...new Set(names)];
 };
 
-export const jjTargetRevisions = (panel: JjPanelReady) => [
-  ...new Map(
-    [...panel.revisions, ...(panel.visibleRevisions ?? [])].map((revision) => [
-      revision.commitId,
-      revision,
-    ]),
-  ).values(),
-];
-
-const revisionLabel = (revision: JjRevision) =>
-  `${revision.changeId.slice(0, 8)} · ${revision.description.split("\n")[0] || "(no description)"}`;
+const CommitMessage = (props: {
+  environmentId: EnvironmentId;
+  cwd: string;
+  revision: JjLogRow;
+  disabled: boolean;
+  value: string | null;
+  onChange: (value: string) => void;
+}) => {
+  const getRevision = useAtomCommand(jjEnvironment.getRevision, {
+    reportFailure: false,
+    reportDefect: false,
+  });
+  const { environmentId, cwd, onChange } = props;
+  const commitId = props.revision.commitId;
+  const prefilled = props.value !== null;
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- prefills the message from the remote revision's full description once
+  useEffect(() => {
+    if (prefilled) return;
+    let cancelled = false;
+    void getRevision({ environmentId, input: { cwd, commitId } }).then((result) => {
+      if (!cancelled) onChange(result._tag === "Success" ? result.value.description : "");
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [getRevision, environmentId, cwd, commitId, prefilled, onChange]);
+  return (
+    <label className="block space-y-1 text-xs">
+      <span>Description for the working copy</span>
+      <Textarea
+        autoFocus
+        value={props.value ?? ""}
+        placeholder={props.value === null ? "Loading description…" : "Describe this change"}
+        disabled={props.disabled || props.value === null}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </label>
+  );
+};
 
 export const JjActionDialog = (props: {
-  preview: JjActionPreview;
-  visible: boolean;
-  blocked: boolean;
+  request: JjDialogRequest<JjLogRow>;
+  environmentId: EnvironmentId;
+  cwd: string;
+  rows: ReadonlyArray<JjLogRow>;
+  remotes: ReadonlyArray<string>;
   busy: boolean;
-  revertingPanelAction?: boolean;
-  stale: boolean;
-  dirtyWorkingCopy: boolean;
   error: string | null;
   onCancel: () => void;
-  onConfirm: (action: JjRunActionInput["action"]) => void;
+  onConfirm: (action: JjRunAction, title: string) => void;
 }) => {
-  const preview = props.preview;
-  const revisions = jjTargetRevisions(preview.panel);
-  const targets = preview.squashScope
-    ? jjSquashTargets({ source: preview.source, revisions, scope: preview.squashScope })
-    : selectableJjTargets({
-        kind: preview.kind,
-        sourceCommitId: preview.source.commitId,
-        revisions,
-      });
-  const pushableBookmarks = revisions.flatMap((revision) =>
-    (revision.bookmarks ?? []).map((name) => ({ name, changeId: revision.changeId })),
+  const { request } = props;
+  const [targetCommitId, setTargetCommitId] = useState<string | null>(null);
+  const [bookmarkName, setBookmarkName] = useState(() =>
+    request.kind === "bookmark" && request.mode === "set"
+      ? (request.revision.bookmarks?.[0] ?? "")
+      : request.kind === "bookmark"
+        ? (ancestorBookmarks({ revision: request.revision, rows: props.rows })[0] ?? "")
+        : "",
   );
-  const remotes = preview.panel.remotes ?? [];
-  const [fields, setFields] = useState<JjActionFields>(() => ({
-    targetCommitIds:
-      preview.kind === "new" || preview.kind === "merge"
-        ? preview.selectedCommitIds.length
-          ? preview.selectedCommitIds
-          : [preview.source.commitId]
-        : preview.squashScope === "parent" && targets.length === 1
-          ? [targets[0]!.commitId]
-          : [],
-    paths: preview.paths,
-    allFiles: preview.paths.length === 0,
-    description: preview.source.description,
-    replaceMessage: false,
-    bookmarkName: preview.source.bookmarks?.[0] ?? "",
-    bookmarkNames: [
-      ...new Set(
-        revisions
-          .filter(
-            (revision) =>
-              revision.commitId === preview.source.commitId ||
-              preview.selectedCommitIds.includes(revision.commitId),
-          )
-          .flatMap((revision) => revision.bookmarks ?? []),
-      ),
-    ],
-    remote: remotes.includes("origin") ? "origin" : (remotes[0] ?? ""),
-  }));
-  const update = (next: Partial<JjActionFields>) =>
-    setFields((current) => ({ ...current, ...next }));
-  const choosesTargets = [
-    "new",
-    "merge",
-    "squash-into",
-    "squash-onto",
-    "rebase-revision",
-    "rebase-branch",
-    "duplicate",
-  ].includes(preview.kind);
-  const choosesFiles = ["squash-into", "squash-onto", "absorb", "restore"].includes(preview.kind);
-  const squashing = preview.kind === "squash-into" || preview.kind === "squash-onto";
-  const bookmarkAction = preview.kind.startsWith("bookmark-");
-  const action = buildJjPanelAction({
-    kind: preview.kind,
-    sourceCommitId: preview.source.commitId,
-    selectedCommitIds: preview.selectedCommitIds,
-    fields,
-    revisions,
-    workingCopyCommitId: preview.panel.workingCopyCommitId,
-    filesTruncated: preview.panel.filesTruncated,
-  });
-  const selected = preview.selectedCommitIds.length
-    ? preview.selectedCommitIds
-    : [preview.source.commitId];
+  const [pushNames, setPushNames] = useState<ReadonlyArray<string>>(() =>
+    request.kind === "push" ? (request.revision.bookmarks ?? []) : [],
+  );
+  const [remote, setRemote] = useState(() =>
+    props.remotes.includes("origin") ? "origin" : (props.remotes[0] ?? ""),
+  );
+  const [message, setMessage] = useState<string | null>(null);
+
+  const plan = ((): {
+    title: string;
+    description: string;
+    confirmLabel: string;
+    destructive: boolean;
+    action: JjRunAction | null;
+  } => {
+    switch (request.kind) {
+      case "confirm":
+        return { ...request, action: request.action };
+      case "squash-ancestor": {
+        const target = targetCommitId;
+        return {
+          title: request.paths?.length ? "Squash file into ancestor" : "Squash into ancestor",
+          description:
+            "Moves the changes into the chosen mutable ancestor and keeps its description. An emptied source is abandoned.",
+          confirmLabel: "Squash",
+          destructive: false,
+          action: target
+            ? {
+                type: "squash",
+                sourceCommitId: request.source.commitId,
+                destinationCommitId: target,
+                mode: "into",
+                ...(request.paths?.length ? { paths: [...request.paths] } : {}),
+              }
+            : null,
+        };
+      }
+      case "bookmark": {
+        const name = bookmarkName.trim();
+        const valid = isBookmarkName(name);
+        return request.mode === "set"
+          ? {
+              title: "Set bookmark",
+              description: `Creates the local bookmark on ${revisionLabel(request.revision)}, or moves an existing one there.`,
+              confirmLabel: "Set bookmark",
+              destructive: false,
+              action: valid
+                ? { type: "bookmark-set", name, revisionCommitId: request.revision.commitId }
+                : null,
+            }
+          : {
+              title: "Advance bookmark",
+              description: `Moves a bookmark forward from an ancestor to ${revisionLabel(request.revision)}.`,
+              confirmLabel: "Advance bookmark",
+              destructive: false,
+              action: valid
+                ? { type: "bookmark-advance", name, revisionCommitId: request.revision.commitId }
+                : null,
+            };
+      }
+      case "push":
+        return {
+          title: "Push bookmarks",
+          description:
+            "Publishes only the chosen bookmarks to the remote. Undo cannot reverse a push.",
+          confirmLabel: "Push",
+          destructive: false,
+          action:
+            pushNames.length && isBookmarkName(remote)
+              ? { type: "push", bookmarkNames: [...pushNames], remote }
+              : null,
+        };
+      case "commit":
+        return {
+          title: "Commit working copy",
+          description:
+            "Saves the description on the working copy and starts a new empty change on top.",
+          confirmLabel: "Commit",
+          destructive: false,
+          action: message === null ? null : { type: "commit", description: message },
+        };
+    }
+  })();
+
+  const squashTargets =
+    request.kind === "squash-ancestor"
+      ? jjSquashTargets({ source: request.source, rows: props.rows, scope: "ancestors" })
+      : [];
+  const allBookmarks = [...new Set(props.rows.flatMap((row) => row.bookmarks ?? []))];
+  const suggestions =
+    request.kind === "bookmark"
+      ? request.mode === "advance"
+        ? ancestorBookmarks({ revision: request.revision, rows: props.rows })
+        : allBookmarks
+      : [];
+
   return (
     <AlertDialog
-      open={props.visible}
+      open
       onOpenChange={(open) => {
         if (!open && !props.busy) props.onCancel();
       }}
     >
       <AlertDialogPopup>
         <AlertDialogHeader>
-          <AlertDialogTitle>
-            {props.revertingPanelAction
-              ? "Revert last panel action"
-              : preview.squashScope
-                ? `Squash into ${preview.squashScope === "parent" ? "parent" : "ancestor"}`
-                : jjActionLabels[preview.kind]}
-          </AlertDialogTitle>
-          <AlertDialogDescription>
-            {props.revertingPanelAction
-              ? "Revert only the last action performed by this panel. This is unavailable after an intervening operation."
-              : explanations[preview.kind]}
-          </AlertDialogDescription>
+          <AlertDialogTitle>{plan.title}</AlertDialogTitle>
+          <AlertDialogDescription>{plan.description}</AlertDialogDescription>
         </AlertDialogHeader>
-        <div className="max-h-[55vh] space-y-3 overflow-y-auto px-6 pb-6 text-sm">
-          <div className="space-y-1 text-xs">
-            <p className="break-all">Workspace: {preview.panel.workspaceIdentity.workspaceRoot}</p>
-            <p className="break-all font-mono">
-              Operation: {preview.panel.operationId.slice(0, 16)}
-            </p>
-            {!["undo", "redo", "push", "bookmark-delete"].includes(preview.kind) && (
-              <>
-                <p className="break-words">Source: {revisionLabel(preview.source)}</p>
-                <p className="break-all font-mono">Commit: {preview.source.commitId}</p>
-              </>
-            )}
-            {["abandon", "insert-before", "insert-after"].includes(preview.kind) && (
-              <>
-                <p>Selected revisions:</p>
-                {selected.map((id) => (
-                  <p key={id} className="break-all font-mono">
-                    {revisionLabel(
-                      revisions.find((revision) => revision.commitId === id) ?? preview.source,
-                    )}{" "}
-                    · {id}
-                  </p>
-                ))}
-              </>
-            )}
-          </div>
-          {choosesTargets && (
-            <fieldset disabled={props.busy} className="space-y-2">
+        <div className="max-h-[55vh] space-y-3 overflow-y-auto px-6 pb-2 text-sm">
+          {request.kind === "squash-ancestor" && (
+            <fieldset disabled={props.busy} className="space-y-1">
               <legend className="mb-1 text-xs font-medium">
-                {squashing ? "Destination" : "Destination parents"}
+                Destination{request.paths?.length ? ` for ${request.paths.join(", ")}` : ""}
               </legend>
-              <div className="max-h-44 space-y-2 overflow-y-auto">
-                {targets.map((revision) => (
-                  <label key={revision.commitId} className="flex items-start gap-2 text-xs">
-                    <Checkbox
-                      disabled={props.busy}
-                      checked={fields.targetCommitIds.includes(revision.commitId)}
-                      onCheckedChange={(checked) => {
-                        update({
-                          targetCommitIds: squashing
-                            ? checked
-                              ? [revision.commitId]
-                              : []
-                            : checked
-                              ? [...fields.targetCommitIds, revision.commitId]
-                              : fields.targetCommitIds.filter((id) => id !== revision.commitId),
-                        });
-                      }}
-                    />
-                    <span className="min-w-0 break-words">
-                      {revisionLabel(revision)}
-                      {revision.immutable ? " · immutable" : ""}
-                      <span className="block break-all font-mono text-muted-foreground">
-                        {revision.commitId}
-                      </span>
-                    </span>
-                  </label>
-                ))}
-              </div>
-              {preview.panel.visibleRevisionsTruncated && (
-                <p className="text-xs text-muted-foreground">
-                  Available target list is truncated. Refresh after changing the workspace to select
-                  other revisions.
-                </p>
-              )}
-            </fieldset>
-          )}
-          {choosesTargets && fields.targetCommitIds.length > 0 && (
-            <div className="space-y-1 text-xs">
-              <p className="font-medium">
-                Selected destination{fields.targetCommitIds.length > 1 ? "s" : ""}:
-              </p>
-              {fields.targetCommitIds.map((id) => (
-                <p key={id} className="break-all">
-                  {revisions
-                    .find((revision) => revision.commitId === id)
-                    ?.description.split("\n")[0] || "(no description)"}{" "}
-                  · <span className="font-mono">{id}</span>
-                </p>
+              {squashTargets.map((row) => (
+                <Button
+                  key={row.commitId}
+                  size="xs"
+                  variant={targetCommitId === row.commitId ? "default" : "outline"}
+                  aria-pressed={targetCommitId === row.commitId}
+                  onClick={() => setTargetCommitId(row.commitId)}
+                >
+                  <span className="truncate">{revisionLabel(row)}</span>
+                </Button>
               ))}
-            </div>
-          )}
-          {preview.kind === "absorb" && (
-            <p className="text-xs">
-              Destination: mutable, conflict-free ancestors of{" "}
-              <span className="font-mono">{preview.source.changeId.slice(0, 8)}</span>, selected by
-              line history.
-            </p>
-          )}
-          {preview.kind === "restore" && (
-            <p className="break-all text-xs">
-              Restore source revision from merged parents:{" "}
-              <span className="font-mono">{preview.source.parentIds.join(", ")}</span>
-            </p>
-          )}
-          {preview.kind === "duplicate" && fields.targetCommitIds.length === 0 && (
-            <p className="break-all text-xs">
-              Keep original destination parents:{" "}
-              <span className="font-mono">{preview.source.parentIds.join(", ")}</span>
-            </p>
-          )}
-          {choosesFiles && (
-            <fieldset disabled={props.busy} className="space-y-2">
-              <legend className="mb-1 text-xs font-medium">Files moved / restored</legend>
-              <label className="flex items-center gap-2 text-xs">
-                <Checkbox
-                  disabled={props.busy}
-                  checked={fields.allFiles}
-                  onCheckedChange={(checked) => update({ allFiles: checked })}
-                />
-                All changed files
-              </label>
-              <div className="max-h-36 space-y-2 overflow-y-auto">
-                {preview.source.files.map((file) => (
-                  <label key={file.path} className="flex items-start gap-2 text-xs">
-                    {!fields.allFiles && (
-                      <Checkbox
-                        disabled={props.busy}
-                        checked={fields.paths.includes(file.path)}
-                        onCheckedChange={(checked) =>
-                          update({
-                            paths: checked
-                              ? [...fields.paths, file.path]
-                              : fields.paths.filter((path) => path !== file.path),
-                          })
-                        }
-                      />
-                    )}
-                    <span className="break-all font-mono">{file.path}</span>
-                  </label>
-                ))}
-              </div>
-              {preview.panel.filesTruncated && (
+              {squashTargets.length === 0 && (
                 <p className="text-xs text-muted-foreground">
-                  The file list is truncated.
-                  {preview.kind === "restore" && fields.allFiles
-                    ? " Restore all is unavailable; choose specific listed files."
-                    : " All files includes files beyond this list."}
+                  No mutable, conflict-free ancestor is loaded. Load more revisions or widen the
+                  revset.
                 </p>
               )}
             </fieldset>
           )}
-          {squashing && (
-            <>
-              <label className="flex items-center gap-2 text-xs">
-                <Checkbox
-                  checked={fields.replaceMessage}
+          {request.kind === "bookmark" && (
+            <div className="space-y-2 text-xs">
+              <label className="block space-y-1">
+                <span>Bookmark name</span>
+                <Input
+                  autoFocus
+                  value={bookmarkName}
                   disabled={props.busy}
-                  onCheckedChange={(checked) => update({ replaceMessage: checked })}
+                  onChange={(event) => setBookmarkName(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && plan.action) {
+                      event.preventDefault();
+                      props.onConfirm(plan.action, plan.confirmLabel);
+                    }
+                  }}
                 />
-                Replace resulting description
               </label>
-              {!fields.replaceMessage && (
-                <p className="text-xs text-muted-foreground">
-                  {preview.kind === "squash-into"
-                    ? "Keep the destination description; discard the source description."
-                    : "Keep the source description on the new child."}
-                </p>
+              {bookmarkName.trim() && !isBookmarkName(bookmarkName.trim()) && (
+                <p className="text-destructive">Use letters, digits, “.”, “_”, “-” and “/”.</p>
               )}
-            </>
-          )}
-          {(preview.kind === "commit" || (squashing && fields.replaceMessage)) && (
-            <label className="block space-y-1 text-xs">
-              <span>Resulting description</span>
-              <Textarea
-                value={fields.description}
-                disabled={props.busy}
-                onChange={(event) => update({ description: event.target.value })}
-              />
-            </label>
-          )}
-          {bookmarkAction && (
-            <label className="block space-y-1 text-xs">
-              <span>Local bookmark name</span>
-              <Input
-                value={fields.bookmarkName}
-                disabled={props.busy}
-                onChange={(event) => update({ bookmarkName: event.target.value })}
-              />
-            </label>
-          )}
-          {preview.kind === "push" && (
-            <>
-              <fieldset className="space-y-1 text-xs">
-                <legend>Bookmarks to publish</legend>
-                {pushableBookmarks.length === 0 && (
-                  <p className="text-muted-foreground">
-                    No local bookmarks on the loaded revisions. Set a bookmark first.
-                  </p>
-                )}
-                <div className="max-h-40 space-y-1 overflow-y-auto">
-                  {pushableBookmarks.map((bookmark) => (
-                    <label key={bookmark.name} className="flex items-center gap-2">
-                      <Checkbox
-                        checked={fields.bookmarkNames.includes(bookmark.name)}
-                        disabled={props.busy}
-                        onCheckedChange={(checked) =>
-                          update({
-                            bookmarkNames: checked
-                              ? [...fields.bookmarkNames, bookmark.name]
-                              : fields.bookmarkNames.filter((name) => name !== bookmark.name),
-                          })
-                        }
-                      />
-                      <span className="break-all font-mono">{bookmark.name}</span>
-                      <span className="font-mono text-muted-foreground">
-                        {bookmark.changeId.slice(0, 8)}
-                      </span>
-                    </label>
+              {suggestions.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {suggestions.map((name) => (
+                    <Button
+                      key={name}
+                      size="xs"
+                      variant={bookmarkName === name ? "secondary" : "outline"}
+                      onClick={() => setBookmarkName(name)}
+                    >
+                      {name}
+                    </Button>
                   ))}
                 </div>
+              )}
+            </div>
+          )}
+          {request.kind === "push" && (
+            <div className="space-y-2 text-xs">
+              <fieldset className="space-y-1">
+                <legend className="mb-1 font-medium">Bookmarks</legend>
+                {allBookmarks.map((name) => (
+                  <label key={name} className="flex items-center gap-2">
+                    <Checkbox
+                      checked={pushNames.includes(name)}
+                      disabled={props.busy}
+                      onCheckedChange={(checked) =>
+                        setPushNames((names) =>
+                          checked ? [...names, name] : names.filter((value) => value !== name),
+                        )
+                      }
+                    />
+                    <span className="break-all font-mono">{name}</span>
+                  </label>
+                ))}
               </fieldset>
-              {remotes.length > 0 ? (
-                <fieldset className="space-y-1 text-xs">
-                  <legend>Remote</legend>
+              <fieldset className="space-y-1">
+                <legend className="mb-1 font-medium">Remote</legend>
+                {props.remotes.length > 0 ? (
                   <div className="flex flex-wrap gap-1">
-                    {remotes.map((remote) => (
+                    {props.remotes.map((name) => (
                       <Button
-                        key={remote}
+                        key={name}
                         size="xs"
-                        variant={fields.remote === remote ? "default" : "outline"}
-                        aria-pressed={fields.remote === remote}
+                        variant={remote === name ? "default" : "outline"}
+                        aria-pressed={remote === name}
                         disabled={props.busy}
-                        onClick={() => update({ remote })}
+                        onClick={() => setRemote(name)}
                       >
-                        {remote}
+                        {name}
                       </Button>
                     ))}
                   </div>
-                </fieldset>
-              ) : (
-                <label className="block space-y-1 text-xs">
-                  <span>Remote</span>
-                  <Input
-                    value={fields.remote}
-                    disabled={props.busy}
-                    onChange={(event) => update({ remote: event.target.value })}
-                  />
-                </label>
-              )}
-              <p className="break-words text-xs">
-                Publish: {fields.bookmarkNames.filter(Boolean).join(", ") || "(choose bookmarks)"} →{" "}
-                {fields.remote || "(choose remote)"}
-              </p>
-            </>
+                ) : (
+                  <p className="text-muted-foreground">This repository has no Git remotes.</p>
+                )}
+              </fieldset>
+            </div>
           )}
-          {props.dirtyWorkingCopy && (
-            <p role="alert" className="text-xs text-warning-foreground">
-              Save or cancel the working-copy description draft before running an action.
-            </p>
-          )}
-          {props.stale && (
-            <p role="alert" className="text-xs text-destructive">
-              The workspace or operation changed. Cancel and select the action again.
-            </p>
-          )}
-          {!action && (
-            <p className="text-xs text-muted-foreground">
-              Choose valid targets, files, and names before confirming.
-            </p>
+          {request.kind === "commit" && (
+            <CommitMessage
+              environmentId={props.environmentId}
+              cwd={props.cwd}
+              revision={request.revision}
+              disabled={props.busy}
+              value={message}
+              onChange={setMessage}
+            />
           )}
           {props.error && (
             <p role="alert" className="text-xs text-destructive">
@@ -444,21 +335,13 @@ export const JjActionDialog = (props: {
             Cancel
           </Button>
           <Button
-            variant={
-              preview.kind === "abandon" ||
-              preview.kind === "restore" ||
-              preview.kind === "bookmark-delete"
-                ? "destructive"
-                : "default"
-            }
-            disabled={props.blocked || props.stale || props.dirtyWorkingCopy || !action}
+            variant={plan.destructive ? "destructive" : "default"}
+            disabled={props.busy || !plan.action}
             onClick={() => {
-              if (action) props.onConfirm(action);
+              if (plan.action) props.onConfirm(plan.action, plan.confirmLabel);
             }}
           >
-            {props.busy
-              ? "Applying…"
-              : `Confirm ${props.revertingPanelAction ? "revert panel action" : jjActionLabels[preview.kind].toLowerCase()}`}
+            {props.busy ? "Applying…" : plan.confirmLabel}
           </Button>
         </AlertDialogFooter>
       </AlertDialogPopup>

@@ -10,9 +10,11 @@ import {
   JjDiffResult,
   JjGetDiffInput,
   JjGetPanelInput,
+  JjGetRevisionInput,
   JjMutationResult,
   JjPanelError,
   JjPanelSnapshot,
+  JjRevisionDetails,
   JjRevertOperationInput,
   JjRunActionInput,
   JjSquashInput,
@@ -29,6 +31,7 @@ import {
 
 export const ZCODE_WS_METHODS = {
   jjGetPanel: "jj.getPanel",
+  jjGetRevision: "jj.getRevision",
   jjRunAction: "jj.runAction",
   jjGetDiff: "jj.getDiff",
   jjForgePreview: "jj.forgePreview",
@@ -46,6 +49,11 @@ export const ZCODE_WS_RPCS = [
   Rpc.make(ZCODE_WS_METHODS.jjGetPanel, {
     payload: JjGetPanelInput,
     success: JjPanelSnapshot,
+    error: JjPanelRpcError,
+  }),
+  Rpc.make(ZCODE_WS_METHODS.jjGetRevision, {
+    payload: JjGetRevisionInput,
+    success: JjRevisionDetails,
     error: JjPanelRpcError,
   }),
   Rpc.make(ZCODE_WS_METHODS.jjRunAction, {

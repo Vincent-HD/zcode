@@ -1,6 +1,6 @@
 import { EnvironmentId } from "@t3tools/contracts";
 import { beforeEach, describe, expect, it } from "vite-plus/test";
-import { descriptionDraftIsStale, reconcileDescriptionDrafts } from "./jj-panel-state";
+import { descriptionDraftIsStale } from "./jj-panel-state";
 import {
   jjDescriptionDraftScopeKey,
   useJjDescriptionDraftStore,
@@ -35,7 +35,7 @@ describe("Jujutsu description draft store", () => {
     const unsubscribeRemount = useJjDescriptionDraftStore.subscribe(() => {});
     useJjDescriptionDraftStore.getState().setDrafts({
       scopeKey,
-      update: (drafts) => reconcileDescriptionDrafts({ drafts, revisions: [revision] }),
+      update: (drafts) => drafts,
     });
     expect(useJjDescriptionDraftStore.getState().draftsByScope[scopeKey]?.change).toEqual(draft);
     unsubscribeRemount();
@@ -59,52 +59,23 @@ describe("Jujutsu description draft store", () => {
       const otherKey = jjDescriptionDraftScopeKey(otherScope);
       useJjDescriptionDraftStore.getState().setDrafts({
         scopeKey: otherKey,
-        update: (drafts) => reconcileDescriptionDrafts({ drafts, revisions: [revision] }),
+        update: (drafts) => drafts,
       });
-      expect(useJjDescriptionDraftStore.getState().draftsByScope[otherKey]?.change?.text).toBe(
-        revision.description,
-      );
+      expect(useJjDescriptionDraftStore.getState().draftsByScope[otherKey]?.change).toBeUndefined();
     }
     expect(useJjDescriptionDraftStore.getState().draftsByScope[scopeKey]?.change).toEqual(draft);
   });
 
-  it("preserves stale drafts after an unavailable snapshot and a rewritten revision", () => {
+  it("preserves a draft whose revision was rewritten and reports it stale", () => {
     useJjDescriptionDraftStore
       .getState()
       .setDrafts({ scopeKey, update: () => ({ change: draft }) });
-    useJjDescriptionDraftStore.getState().setDrafts({
-      scopeKey,
-      update: (drafts) => reconcileDescriptionDrafts({ drafts, revisions: [] }),
-    });
     const rewritten = { ...revision, commitId: "commit-2", description: "External edit" };
-    useJjDescriptionDraftStore.getState().setDrafts({
-      scopeKey,
-      update: (drafts) => reconcileDescriptionDrafts({ drafts, revisions: [rewritten] }),
-    });
     const retained = useJjDescriptionDraftStore.getState().draftsByScope[scopeKey]?.change;
     expect(retained).toEqual(draft);
     expect(descriptionDraftIsStale({ draft: retained!, revision: rewritten })).toBe(true);
   });
 
-  it("can discard a stale draft and resume from the canonical description", () => {
-    useJjDescriptionDraftStore
-      .getState()
-      .setDrafts({ scopeKey, update: () => ({ change: draft }) });
-    const rewritten = { ...revision, commitId: "commit-2", description: "External edit" };
-    useJjDescriptionDraftStore.getState().setDrafts({
-      scopeKey,
-      update: () => reconcileDescriptionDrafts({ drafts: {}, revisions: [rewritten] }),
-    });
-    expect(useJjDescriptionDraftStore.getState().draftsByScope[scopeKey]?.change?.text).toBe(
-      rewritten.description,
-    );
-    expect(
-      descriptionDraftIsStale({
-        draft: useJjDescriptionDraftStore.getState().draftsByScope[scopeKey]!.change!,
-        revision: rewritten,
-      }),
-    ).toBe(false);
-  });
   it("clears a successfully saved draft after navigation without clearing other workspaces", () => {
     const otherKey = jjDescriptionDraftScopeKey({ ...scope, cwd: "/other" });
     for (const key of [scopeKey, otherKey])

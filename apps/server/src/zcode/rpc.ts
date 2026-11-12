@@ -17,6 +17,5 @@ export const ZCODE_RPC_AGGREGATES = {
   [ZCODE_WS_METHODS.jjForgePublish]: "jj",
   [ZCODE_WS_METHODS.jjForgeStatus]: "jj",
   [ZCODE_WS_METHODS.jjDescribe]: "jj",
-  [ZCODE_WS_METHODS.jjSquash]: "jj",
   [ZCODE_WS_METHODS.jjRevertOperation]: "jj",
 } as const;

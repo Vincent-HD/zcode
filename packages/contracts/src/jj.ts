@@ -76,12 +76,20 @@ export const JjLogView = Schema.Struct({
   limit: Schema.optionalKey(JjLogLimit),
 });
 export type JjLogView = typeof JjLogView.Type;
+export const JjHistoryStep = Schema.Struct({
+  description: Schema.String,
+  /** Later changes, usually working-copy edits, would conflict with reverting it. */
+  blocked: Schema.optionalKey(Schema.Boolean),
+});
+export type JjHistoryStep = typeof JjHistoryStep.Type;
 export const JjPanelReady = Schema.Struct({
   status: Schema.Literal("ready"),
   cwd: Schema.String,
   workspaceIdentity: JjWorkspaceIdentity,
   operationId: JjOperationId,
-  operationDescription: Schema.String,
+  /** What Undo and Redo would revert in this workspace. */
+  undo: Schema.optionalKey(JjHistoryStep),
+  redo: Schema.optionalKey(JjHistoryStep),
   workingCopyCommitId: JjCommitId,
   /** The effective revset: the requested one, or the workspace's `revsets.log`. */
   revset: Schema.String,
@@ -133,13 +141,6 @@ export const JjSquashMessagePolicy = Schema.Union([
   Schema.Struct({ type: Schema.Literal("keep-destination") }),
   Schema.Struct({ type: Schema.Literal("replace"), description: Schema.String }),
 ]);
-export const JjSquashInput = Schema.Struct({
-  ...mutationFields,
-  sourceCommitId: JjCommitId,
-  destinationCommitId: JjCommitId,
-  messagePolicy: Schema.optionalKey(JjSquashMessagePolicy),
-});
-export type JjSquashInput = typeof JjSquashInput.Type;
 // These are exact workspace-relative files, never fileset expressions or directories.
 export const JjFilePath = Schema.String.check(
   Schema.isMinLength(1),
@@ -279,6 +280,8 @@ export class JjPanelError extends Schema.TaggedError<JjPanelError>()("JjPanelErr
     "immutable",
     "conflicted",
     "invalid-receipt",
+    "no-history",
+    "history-blocked",
     "concurrent-operation",
     "command-failed",
     "invalid-output",

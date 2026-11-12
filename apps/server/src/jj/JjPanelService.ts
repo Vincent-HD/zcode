@@ -20,7 +20,6 @@ import {
   type JjRevisionDetails,
   type JjGetRevisionInput,
   type JjDescribeInput,
-  type JjSquashInput,
   type JjRevertOperationInput,
   type JjMutationResult,
   type JjActionReceipt,
@@ -138,8 +137,81 @@ const Operation = Schema.Struct({
   parents: Schema.Array(JjOperationId),
   username: Schema.String,
   description: Schema.String,
+  is_snapshot: Schema.Boolean,
+  workspace_name: Schema.NullOr(Schema.String),
 });
 type Operation = typeof Operation.Type;
+
+interface HistoryEntry {
+  readonly operationId: string;
+  readonly description: string;
+  /** Something changed the repository after the operation, so reverting it could conflict. */
+  readonly blocked?: true;
+}
+/** What Undo and Redo would revert, both through `jj op revert`. */
+export interface OperationHistory {
+  readonly undo?: HistoryEntry;
+  readonly redo?: HistoryEntry;
+}
+const REVERTED_OPERATION = /^revert operation ([0-9a-f]+)$/;
+const isHistoryBarrier = (operation: Operation) =>
+  operation.parents.length === 0 || operation.description.startsWith("add workspace ");
+const blockHistory = (history: OperationHistory): OperationHistory => ({
+  ...(history.undo ? { undo: { ...history.undo, blocked: true } } : {}),
+  ...(history.redo ? { redo: { ...history.redo, blocked: true } } : {}),
+});
+
+/**
+ * Walks `operations` newest first; a revert cancels its target. `jj undo` would undo the panel's
+ * own snapshots and discard edits, and reverting past them can split `@` or conflict bookmarks,
+ * so this workspace's snapshots and other workspaces' actions block what lies below them.
+ */
+export const operationHistory = (
+  operations: ReadonlyArray<Operation>,
+  workspace: string,
+): OperationHistory => {
+  // Cancelled ids map to their operation once the walk reaches it.
+  const cancelled = new Map<string, Operation | undefined>();
+  const reverters: Array<{ operation: Operation; target: string; blocked: boolean }> = [];
+  let undo: HistoryEntry | undefined;
+  let blocked = false;
+  for (const operation of operations) {
+    if (isHistoryBarrier(operation)) break;
+    if (operation.workspace_name !== workspace) {
+      blocked ||= !operation.is_snapshot;
+      continue;
+    }
+    if (operation.is_snapshot) {
+      blocked = true;
+      continue;
+    }
+    const target = REVERTED_OPERATION.exec(operation.description)?.[1];
+    if (cancelled.has(operation.id)) cancelled.set(operation.id, operation);
+    else if (target !== undefined) {
+      cancelled.set(target, undefined);
+      if (!undo) reverters.push({ operation, target, blocked });
+    } else
+      undo ??= {
+        operationId: operation.id,
+        description: operation.description,
+        ...(blocked ? { blocked } : {}),
+      };
+    if (undo && reverters.every((reverter) => cancelled.get(reverter.target))) break;
+  }
+  const redo = reverters.flatMap((reverter): Array<HistoryEntry> => {
+    const undone = cancelled.get(reverter.target);
+    return undone && !REVERTED_OPERATION.test(undone.description)
+      ? [
+          {
+            operationId: reverter.operation.id,
+            description: undone.description,
+            ...(reverter.blocked ? { blocked: true } : {}),
+          },
+        ]
+      : [];
+  })[0];
+  return { ...(undo ? { undo } : {}), ...(redo ? { redo } : {}) };
+};
 
 /** Revision facts mutations and publication validate against, read at a pinned operation. */
 export interface JjRevisionTarget {
@@ -244,7 +316,6 @@ export class JjPanelService extends Context.Service<
     readonly runAction: (input: JjRunActionInput) => Effect.Effect<JjMutationResult, JjPanelError>;
     readonly getDiff: (input: JjGetDiffInput) => Effect.Effect<JjDiffResult, JjPanelError>;
     readonly describe: (input: JjDescribeInput) => Effect.Effect<JjMutationResult, JjPanelError>;
-    readonly squash: (input: JjSquashInput) => Effect.Effect<JjMutationResult, JjPanelError>;
     readonly revertOperation: (
       input: JjRevertOperationInput,
     ) => Effect.Effect<JjMutationResult, JjPanelError>;
@@ -278,6 +349,9 @@ const make = Effect.gen(function* () {
   // Commit ids address content: their description, files and conflicts never change.
   const details = new Map<string, JjRevisionDetails>();
   const configuredRevsets = new Map<string, string>();
+  // Histories are immutable per operation and workspace; names rarely change for a workspace.
+  const histories = new Map<string, OperationHistory>();
+  const workspaceNames = new Map<string, string>();
   const remember = <V>(cache: Map<string, V>, key: string, value: V, bound: number) => {
     cache.delete(key);
     cache.set(key, value);
@@ -407,6 +481,71 @@ const make = Effect.gen(function* () {
       lockFor(identity).withPermit(head({ cwd, snapshot: true })),
     );
   const pinned = (operationId: string) => ["--ignore-working-copy", "--at-operation", operationId];
+
+  const workspaceName = Effect.fn("JjPanelService.workspaceName")(function* (input: {
+    cwd: string;
+    identity: JjWorkspaceIdentity;
+  }) {
+    const cached = workspaceNames.get(input.identity.workspaceId);
+    if (cached !== undefined) return cached;
+    const output = yield* run({
+      cwd: input.cwd,
+      args: [
+        "--ignore-working-copy",
+        "workspace",
+        "list",
+        "-T",
+        'if(target.current_working_copy(), json(name) ++ "\\n")',
+      ],
+    });
+    const name = yield* decode(Schema.String, lines(output)[0] ?? "");
+    remember(workspaceNames, input.identity.workspaceId, name, 64);
+    return name;
+  });
+  const history = Effect.fn("JjPanelService.history")(function* (input: {
+    cwd: string;
+    identity: JjWorkspaceIdentity;
+    operation: Operation;
+  }) {
+    const workspace = yield* workspaceName(input);
+    const key = (operationId: string) =>
+      `${input.identity.repositoryPath}\0${workspace}\0${operationId}`;
+    const operation = input.operation;
+    const cached = histories.get(key(operation.id));
+    if (cached) return cached;
+    const parent =
+      operation.parents.length === 1 ? histories.get(key(operation.parents[0] ?? "")) : undefined;
+    const ours = !operation.is_snapshot && operation.workspace_name === workspace;
+    const scan = Effect.fn("JjPanelService.history.scan")(function* () {
+      const output = yield* run({
+        cwd: input.cwd,
+        args: [
+          ...pinned(operation.id),
+          "op",
+          "log",
+          "--no-graph",
+          "--limit",
+          "256",
+          "-T",
+          'json(self) ++ "\\n"',
+        ],
+      });
+      return yield* Effect.forEach(lines(output), (line) => decode(Operation, line));
+    });
+    // Most heads extend a known history by a snapshot, a foreign operation or a plain action.
+    const foreignSnapshot = operation.is_snapshot && operation.workspace_name !== workspace;
+    const value =
+      parent && !ours
+        ? foreignSnapshot
+          ? parent
+          : blockHistory(parent)
+        : operationHistory(
+            ours && !REVERTED_OPERATION.test(operation.description) ? [operation] : yield* scan(),
+            workspace,
+          );
+    remember(histories, key(operation.id), value, 256);
+    return value;
+  });
 
   const configuredRevset = Effect.fn("JjPanelService.configuredRevset")(function* (input: {
     cwd: string;
@@ -560,12 +699,17 @@ const make = Effect.gen(function* () {
     );
   });
 
+  const historyStep = (key: "undo" | "redo", entry: HistoryEntry | undefined) =>
+    entry
+      ? { [key]: { description: entry.description, ...(entry.blocked ? { blocked: true } : {}) } }
+      : {};
   const ready = (input: {
     cwd: string;
     identity: JjWorkspaceIdentity;
     operation: Operation;
     revset: string;
     page: Page;
+    history: OperationHistory;
     offset: number;
     limit: number;
   }): JjPanelReady => ({
@@ -573,7 +717,8 @@ const make = Effect.gen(function* () {
     cwd: input.cwd,
     workspaceIdentity: input.identity,
     operationId: input.operation.id,
-    operationDescription: input.operation.description,
+    ...historyStep("undo", input.history.undo),
+    ...historyStep("redo", input.history.redo),
     workingCopyCommitId: input.page.workingCopyCommitId,
     revset: input.revset,
     offset: input.offset,
@@ -596,14 +741,20 @@ const make = Effect.gen(function* () {
         reload: false,
       }));
     const limit = input.view?.limit ?? DEFAULT_LOG_LIMIT;
-    const page = yield* readPage({
-      cwd: input.cwd,
-      identity: input.identity,
-      operationId: input.operation.id,
-      revset,
-      limit,
-    });
-    return ready({ ...input, revset, page, offset: 0, limit });
+    const [page, operations] = yield* Effect.all(
+      [
+        readPage({
+          cwd: input.cwd,
+          identity: input.identity,
+          operationId: input.operation.id,
+          revset,
+          limit,
+        }),
+        history(input),
+      ],
+      { concurrency: "unbounded" },
+    );
+    return ready({ ...input, revset, page, history: operations, offset: 0, limit });
   });
 
   const getPanel = Effect.fn("JjPanelService.getPanel")(function* (request: JjGetPanelInput) {
@@ -651,16 +802,17 @@ const make = Effect.gen(function* () {
         cwd: input.cwd,
         operationId: operation.id,
       } satisfies JjPanelSnapshot;
-    const page = yield* readPage({
-      cwd: input.cwd,
-      identity,
-      operationId: operation.id,
-      revset,
-      limit,
-    });
+    const [page, operations] = yield* Effect.all(
+      [
+        readPage({ cwd: input.cwd, identity, operationId: operation.id, revset, limit }),
+        history({ cwd: input.cwd, identity, operation }),
+      ],
+      { concurrency: "unbounded" },
+    );
     return ready({
       cwd: input.cwd,
       identity,
+      history: operations,
       operation,
       revset,
       page,
@@ -748,7 +900,7 @@ const make = Effect.gen(function* () {
     a.workspaceRoot === b.workspaceRoot &&
     a.repositoryPath === b.repositoryPath &&
     a.workspaceId === b.workspaceId;
-  type Mutation = JjDescribeInput | JjSquashInput | JjRevertOperationInput | JjRunActionInput;
+  type Mutation = JjDescribeInput | JjRevertOperationInput | JjRunActionInput;
   interface Prepared {
     readonly cwd: string;
     readonly operationId: string;
@@ -757,6 +909,7 @@ const make = Effect.gen(function* () {
       options?: { mutable?: boolean; clean?: boolean },
     ) => Effect.Effect<ReadonlyArray<JjRevisionTarget>, JjPanelError>;
     readonly workingCopy: () => Effect.Effect<JjRevisionTarget, JjPanelError>;
+    readonly history: () => Effect.Effect<OperationHistory, JjPanelError>;
   }
   const mutate = Effect.fn("JjPanelService.mutate")(function* (input: {
     request: Mutation;
@@ -814,6 +967,7 @@ const make = Effect.gen(function* () {
                 target ? Effect.succeed(target) : Effect.fail(error("invalid-target")),
               ),
             ),
+          history: () => history({ cwd, identity, operation: before }),
         };
         const command = yield* input.prepare(context);
         const receiptId = yield* random.uuidV4();
@@ -1073,8 +1227,13 @@ const make = Effect.gen(function* () {
         return { args: ["restore", "--changes-in", action.revisionCommitId, "--", ...selected] };
       }
       case "undo":
-      case "redo":
-        return { args: [action.type] };
+      case "redo": {
+        // `jj undo` would restore past the panel's own snapshots and discard working-copy edits.
+        const target = (yield* context.history())[action.type];
+        if (!target) return yield* error("no-history");
+        if (target.blocked) return yield* error("history-blocked");
+        return { args: ["op", "revert", target.operationId] };
+      }
       case "bookmark-set":
       case "bookmark-advance": {
         yield* context.targets([action.revisionCommitId], { clean: true });
@@ -1208,49 +1367,6 @@ const make = Effect.gen(function* () {
       }),
     }),
   );
-  const squash = Effect.fn("JjPanelService.squash")((request: JjSquashInput) =>
-    mutate({
-      request,
-      action: "squash",
-      prepare: Effect.fn("JjPanelService.squash.prepare")(function* (context) {
-        const [source, destination] = yield* context.targets(
-          [request.sourceCommitId, request.destinationCommitId],
-          { mutable: true },
-        );
-        if (!source || !destination) return yield* error("invalid-target");
-        if (source.conflict || destination.conflict) return yield* error("conflicted");
-        const ancestorOutput = yield* run({
-          cwd: context.cwd,
-          args: [
-            ...pinned(context.operationId),
-            "log",
-            "--no-graph",
-            "-r",
-            `${destination.commitId} & ancestors(${source.commitId})`,
-            "-T",
-            'json(commit_id) ++ "\\n"',
-          ],
-        });
-        const ancestors = yield* Effect.forEach(lines(ancestorOutput), (line) =>
-          decode(JjCommitId, line),
-        );
-        if (!ancestors.includes(destination.commitId)) return yield* error("invalid-target");
-        const policy = request.messagePolicy;
-        return {
-          args: [
-            "squash",
-            "--from",
-            source.commitId,
-            "--into",
-            destination.commitId,
-            ...(policy?.type === "replace"
-              ? ["--message", policy.description]
-              : ["--use-destination-message"]),
-          ],
-        };
-      }),
-    }),
-  );
   const revertOperation = Effect.fn("JjPanelService.revertOperation")(
     (request: JjRevertOperationInput) =>
       mutate({
@@ -1274,7 +1390,6 @@ const make = Effect.gen(function* () {
     getPanel,
     getRevision,
     describe,
-    squash,
     revertOperation,
     runAction,
     getDiff,

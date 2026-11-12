@@ -77,7 +77,7 @@ function panel(description: string, extraRows: ReadonlyArray<string> = []): JjPa
       workspaceId: "workspace",
     },
     operationId: "d".repeat(128),
-    operationDescription: "snapshot working copy",
+    undo: { description: "new empty commit" },
     workingCopyCommitId: "a".repeat(40),
     revset: "builtin_log()",
     offset: 0,

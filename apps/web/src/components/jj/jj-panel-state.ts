@@ -1,3 +1,4 @@
+import type { JjHistoryStep } from "@t3tools/contracts";
 import * as Cause from "effect/Cause";
 
 export interface DescriptionDraft {
@@ -31,7 +32,18 @@ const REASON_MESSAGES: Readonly<Record<string, string>> = {
   "invalid-path": "That file is not changed in this revision.",
   "invalid-revset": "That revset is invalid.",
   "invalid-receipt": "That action can no longer be reverted. Use Undo in the panel header.",
+  "no-history": "Nothing to undo or redo in this workspace.",
+  "history-blocked":
+    "The repository changed after that operation, usually through working-copy edits. Reverting it now could split or conflict those changes.",
   unavailable: "Jujutsu is unavailable in this environment.",
+};
+
+export const historyLabel = (verb: "Undo" | "Redo", step: JjHistoryStep | undefined) => {
+  if (!step) return `Nothing to ${verb.toLowerCase()}`;
+  const description = step.description || "the last operation";
+  return step.blocked
+    ? `Can't ${verb.toLowerCase()} “${description}”: the repository changed since`
+    : `${verb}: ${description}`;
 };
 
 export const formatJjPanelError = (cause: Cause.Cause<unknown>) => {

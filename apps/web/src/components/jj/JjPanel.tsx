@@ -13,6 +13,7 @@ import { AsyncResult } from "effect/reactivity";
 import { Ellipsis, Redo2, RefreshCw, Undo2, X } from "lucide-react";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { Button } from "~/components/ui/button";
+import { CollapsibleSectionHeader } from "~/components/ui/collapsible-section-header";
 import { Input } from "~/components/ui/input";
 import { Menu, MenuItem, MenuPopup, MenuSeparator, MenuTrigger } from "~/components/ui/menu";
 import { toastManager } from "~/components/ui/toast";
@@ -24,6 +25,7 @@ import { useServerConfigs } from "~/state/entities";
 import { jjEnvironment } from "~/state/jj";
 import { useEnvironmentScope } from "~/state/session";
 import { useAtomCommand } from "~/state/use-atom-command";
+import { cn } from "~/lib/utils";
 import type { JjDiffContext } from "~/zcode/jj-diff-selection";
 import {
   jjDropAction,
@@ -56,6 +58,7 @@ import {
 import { JJ_LOG_PAGE, jjRefreshInput, mergeJjSnapshot, type JjLogView } from "./jj-log-state";
 import { formatJjPanelError, historyLabel } from "./jj-panel-state";
 import { JjRevisionDetailsPanel } from "./jj-revision-details";
+import { JjSourceControl } from "./jj-source-control";
 
 const OVERSCAN_PX = 400;
 const rowDomId = (commitId: string) => `jj-row-${commitId}`;
@@ -111,6 +114,8 @@ const JjPanel = (props: {
     null,
   );
   const [forgeFocus, setForgeFocus] = useState<{ commitId: string; id: number } | null>(null);
+  const [sourceControlOpen, setSourceControlOpen] = useState(true);
+  const [logOpen, setLogOpen] = useState(true);
   const [scrollTop, setScrollTop] = useState(0);
   const [viewportHeight, setViewportHeight] = useState(600);
   const generation = useRef(0);
@@ -399,6 +404,19 @@ const JjPanel = (props: {
           ? current.filter((id) => id !== row.changeId)
           : [...current, row.changeId],
     );
+  };
+
+  const selectFromSourceControl = (changeId: string) => {
+    const row = byChange.get(changeId);
+    if (!row) {
+      toastManager.add({ type: "info", title: "This revision is outside the log's revset" });
+      return;
+    }
+    activate(row, "single");
+    const index = layout.items.findIndex(
+      (item) => item.kind === "revision" && item.row.changeId === changeId,
+    );
+    if (index !== -1) scrollToItem(index);
   };
 
   const menuContext = (
@@ -717,56 +735,98 @@ const JjPanel = (props: {
             </p>
           )}
           <div
-            ref={attachList}
-            role="listbox"
-            tabIndex={0}
-            aria-label="Revision graph"
-            aria-multiselectable="true"
-            aria-activedescendant={activeRow ? rowDomId(activeRow.commitId) : undefined}
-            className="relative min-h-0 flex-1 overflow-y-auto focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
-            onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
-            onKeyDown={onListKeyDown}
+            className={cn(
+              "flex min-h-0 flex-col border-b",
+              logOpen ? "max-h-[35%] shrink-0" : "flex-1",
+            )}
           >
-            <div className="relative" style={{ height: totalHeight }}>
-              {visibleItems.map((index) => {
-                const item = layout.items[index]!;
-                const cell = layout.cells[index]!;
-                const top = offsets[index]!;
-                if (item.kind === "elided")
-                  return <JjElidedRow key={item.key} cell={cell} width={layout.width} top={top} />;
-                return (
-                  <JjRevisionRow
-                    key={item.key}
-                    id={rowDomId(item.row.commitId)}
-                    row={item.row}
-                    cell={cell}
-                    width={layout.width}
-                    top={top}
-                    selected={selection.includes(item.row.changeId)}
-                    active={activeChangeId === item.row.changeId}
-                    {...(canWrite ? { onPointerDown: onRowPointerDown } : {})}
-                    onClick={(event, row) => {
-                      if (consumeJjDragClick()) return;
-                      activate(row, event.metaKey || event.ctrlKey ? "toggle" : "single");
-                    }}
-                    onContextMenu={(event, row) => {
-                      event.preventDefault();
-                      void openContextMenu(row, { x: event.clientX, y: event.clientY });
-                    }}
-                  />
-                );
-              })}
-            </div>
-            {panel.hasMore && (
-              <div className="p-2">
-                <Button size="xs" variant="outline" disabled={loading} onClick={loadMore}>
-                  Load {JJ_LOG_PAGE} more
-                </Button>
+            <CollapsibleSectionHeader
+              variant="panel"
+              expanded={sourceControlOpen}
+              onClick={() => setSourceControlOpen((open) => !open)}
+            >
+              Source control
+            </CollapsibleSectionHeader>
+            {sourceControlOpen && (
+              <div className="min-h-0 overflow-y-auto">
+                <JjSourceControl
+                  groups={panel.sourceControl}
+                  activeChangeId={activeChangeId}
+                  canWrite={canWrite}
+                  canDiff={canDiff}
+                  onSelect={selectFromSourceControl}
+                  onOpenDiff={openDiff}
+                  onRun={run}
+                  onDialog={(request) => {
+                    setError(null);
+                    setDialog(request);
+                  }}
+                />
               </div>
             )}
           </div>
+          <CollapsibleSectionHeader
+            variant="panel"
+            expanded={logOpen}
+            onClick={() => setLogOpen((open) => !open)}
+          >
+            Log
+          </CollapsibleSectionHeader>
+          {logOpen && (
+            <div
+              ref={attachList}
+              role="listbox"
+              tabIndex={0}
+              aria-label="Revision graph"
+              aria-multiselectable="true"
+              aria-activedescendant={activeRow ? rowDomId(activeRow.commitId) : undefined}
+              className="relative min-h-0 flex-1 overflow-y-auto focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+              onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
+              onKeyDown={onListKeyDown}
+            >
+              <div className="relative" style={{ height: totalHeight }}>
+                {visibleItems.map((index) => {
+                  const item = layout.items[index]!;
+                  const cell = layout.cells[index]!;
+                  const top = offsets[index]!;
+                  if (item.kind === "elided")
+                    return (
+                      <JjElidedRow key={item.key} cell={cell} width={layout.width} top={top} />
+                    );
+                  return (
+                    <JjRevisionRow
+                      key={item.key}
+                      id={rowDomId(item.row.commitId)}
+                      row={item.row}
+                      cell={cell}
+                      width={layout.width}
+                      top={top}
+                      selected={selection.includes(item.row.changeId)}
+                      active={activeChangeId === item.row.changeId}
+                      {...(canWrite ? { onPointerDown: onRowPointerDown } : {})}
+                      onClick={(event, row) => {
+                        if (consumeJjDragClick()) return;
+                        activate(row, event.metaKey || event.ctrlKey ? "toggle" : "single");
+                      }}
+                      onContextMenu={(event, row) => {
+                        event.preventDefault();
+                        void openContextMenu(row, { x: event.clientX, y: event.clientY });
+                      }}
+                    />
+                  );
+                })}
+              </div>
+              {panel.hasMore && (
+                <div className="p-2">
+                  <Button size="xs" variant="outline" disabled={loading} onClick={loadMore}>
+                    Load {JJ_LOG_PAGE} more
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
           {activeRow && props.cwd && (
-            <div className="max-h-[45%] shrink-0 overflow-y-auto border-t">
+            <div className="max-h-[35%] shrink-0 overflow-y-auto border-t">
               <JjRevisionDetailsPanel
                 key={`${activeRow.commitId}:${editRequested ? (describeRequest?.id ?? 0) : 0}`}
                 environmentId={props.environmentId}

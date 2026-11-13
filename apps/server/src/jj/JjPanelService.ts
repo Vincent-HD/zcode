@@ -17,6 +17,7 @@ import {
   type JjWorkspaceIdentity,
   type JjPanelReady,
   type JjPanelSnapshot,
+  type JjSourceControlGroup,
   type JjRevisionDetails,
   type JjGetRevisionInput,
   type JjDescribeInput,
@@ -39,6 +40,8 @@ const DEFAULT_LOG_LIMIT = 100;
 // Each elided row adds a revset to the one follow-up query; deeper rows render as truncated.
 const MAX_ELIDED_ROWS = 64;
 const MAX_DETAIL_FILES = 512;
+// jj-view's `maxMutableAncestors` default.
+const MAX_SOURCE_CONTROL_ANCESTORS = 10;
 
 const quote = Schema.encodeSync(Schema.fromJsonString(Schema.String));
 const jsonObjectTemplate = (fields: Readonly<Record<string, string>>) =>
@@ -112,13 +115,14 @@ const TargetOutput = Schema.Tuple([
   Schema.Array(Schema.String),
 ]);
 const fileTemplate = jsonObjectTemplate({ path: "json(f.path())", status: "json(f.status())" });
+const filesTemplate = `${quote("[")} ++ diff.files().take(${MAX_DETAIL_FILES}).map(|f| ${fileTemplate}).join(",") ++ ${quote("]")}`;
 const detailsTemplate = jsonObjectTemplate({
   commitId: "json(commit_id)",
   changeId: "json(change_id)",
   description: "json(description)",
   author: "json(author)",
   committer: "json(committer)",
-  files: `${quote("[")} ++ diff.files().take(${MAX_DETAIL_FILES}).map(|f| ${fileTemplate}).join(",") ++ ${quote("]")}`,
+  files: filesTemplate,
   filesTruncated: `json(diff.files().len() > ${MAX_DETAIL_FILES})`,
   conflictPaths: `json(conflicted_files.take(${MAX_DETAIL_FILES}).map(|f| f.path()))`,
 });
@@ -132,6 +136,78 @@ const DetailsOutput = Schema.Struct({
   filesTruncated: Schema.Boolean,
   conflictPaths: Schema.Array(Schema.String),
 });
+const sourceControlTemplate = `${jsonArrayTemplate([
+  "json(commit_id)",
+  "json(change_id)",
+  "json(parents.map(|p| p.commit_id()))",
+  "json(parents.map(|p| p.immutable()))",
+  "json(description.first_line())",
+  "json(change_id.shortest().prefix().len())",
+  flagsTemplate,
+  filesTemplate,
+  `json(diff.files().len() > ${MAX_DETAIL_FILES})`,
+  `json(conflicted_files.take(${MAX_DETAIL_FILES}).map(|f| f.path()))`,
+])} ++ "\\n"`;
+const SourceControlOutput = Schema.Tuple([
+  JjCommitId,
+  JjChangeId,
+  Schema.Array(JjCommitId),
+  Schema.Array(Schema.Boolean),
+  Schema.String,
+  Schema.Number,
+  Schema.String,
+  Schema.Array(JjChangedFile),
+  Schema.Boolean,
+  Schema.Array(Schema.String),
+]);
+type SourceControlOutput = typeof SourceControlOutput.Type;
+// The working copy, its first-parent ancestors and their merge parents, cut to mutable ones.
+const SOURCE_CONTROL_REVSET = `(first_ancestors(@, ${MAX_SOURCE_CONTROL_ANCESTORS + 1}) | parents(first_ancestors(@, ${MAX_SOURCE_CONTROL_ANCESTORS}))) & (mutable() | @)`;
+
+/**
+ * jj-view's source control groups: the working copy, then mutable ancestors along first parents,
+ * stopping at an immutable one or after listing a merge's parents.
+ */
+const sourceControlGroups = (
+  outputs: ReadonlyArray<SourceControlOutput>,
+): ReadonlyArray<JjSourceControlGroup> => {
+  const byId = new Map(outputs.map((output) => [output[0], output]));
+  const group = (output: SourceControlOutput, position: string): JjSourceControlGroup => {
+    const [commitId, changeId, parentIds, parentsImmutable, summary, changePrefixLength] = output;
+    const [, , , , , , flags, files, filesTruncated, conflictPaths] = output;
+    const set = flagSet(flags);
+    return {
+      position,
+      commitId,
+      changeId,
+      parentIds,
+      changePrefixLength,
+      summary,
+      ...(set.conflict ? { conflict: true } : {}),
+      ...(set.empty ? { empty: true } : {}),
+      ...(parentsImmutable.length === 1 && !parentsImmutable[0] ? { squashable: true } : {}),
+      files,
+      ...(filesTruncated ? { filesTruncated: true } : {}),
+      ...(conflictPaths.length ? { conflictPaths } : {}),
+    };
+  };
+  const workingCopy = outputs.find((output) => flagSet(output[6]).current);
+  if (!workingCopy) return [];
+  const groups = [group(workingCopy, "@")];
+  let focus = workingCopy;
+  for (let depth = 1; groups.length <= MAX_SOURCE_CONTROL_ANCESTORS; depth++) {
+    const parents = focus[2].map((id) => byId.get(id));
+    const merge = parents.length > 1;
+    parents.forEach((parent, index) => {
+      if (parent) groups.push(group(parent, merge ? `@-${depth}^${index + 1}` : `@-${depth}`));
+    });
+    const next = parents[0];
+    if (merge || !next) break;
+    focus = next;
+  }
+  return groups.slice(0, MAX_SOURCE_CONTROL_ANCESTORS + 1);
+};
+
 const Operation = Schema.Struct({
   id: JjOperationId,
   parents: Schema.Array(JjOperationId),
@@ -344,6 +420,11 @@ const make = Effect.gen(function* () {
   const receipts = new Map<string, { identity: JjWorkspaceIdentity; receipt: JjActionReceipt }>();
   const inflightHeads = new Map<string, Deferred.Deferred<Operation, JjPanelError>>();
   const inflightPages = new Map<string, Deferred.Deferred<Page, JjPanelError>>();
+  const inflightSourceControl = new Map<
+    string,
+    Deferred.Deferred<ReadonlyArray<JjSourceControlGroup>, JjPanelError>
+  >();
+  const sourceControls = new Map<string, ReadonlyArray<JjSourceControlGroup>>();
   // Pages are immutable per operation, so a page cache never needs invalidation, only bounds.
   const pages = new Map<string, Page>();
   // Commit ids address content: their description, files and conflicts never change.
@@ -699,6 +780,40 @@ const make = Effect.gen(function* () {
     );
   });
 
+  const readSourceControl = Effect.fn("JjPanelService.readSourceControl")(function* (input: {
+    cwd: string;
+    identity: JjWorkspaceIdentity;
+    operationId: string;
+  }) {
+    const key = `${input.identity.workspaceId}\0${input.operationId}`;
+    const cached = sourceControls.get(key);
+    if (cached) return cached;
+    return yield* coalesce(
+      inflightSourceControl,
+      key,
+      Effect.gen(function* () {
+        const output = yield* run({
+          cwd: input.cwd,
+          args: [
+            ...pinned(input.operationId),
+            "log",
+            "--no-graph",
+            "-r",
+            SOURCE_CONTROL_REVSET,
+            "-T",
+            sourceControlTemplate,
+          ],
+        });
+        const outputs = yield* Effect.forEach(lines(output), (line) =>
+          decode(SourceControlOutput, line),
+        );
+        const groups = sourceControlGroups(outputs);
+        remember(sourceControls, key, groups, 8);
+        return groups;
+      }),
+    );
+  });
+
   const historyStep = (key: "undo" | "redo", entry: HistoryEntry | undefined) =>
     entry
       ? { [key]: { description: entry.description, ...(entry.blocked ? { blocked: true } : {}) } }
@@ -710,6 +825,7 @@ const make = Effect.gen(function* () {
     revset: string;
     page: Page;
     history: OperationHistory;
+    sourceControl: ReadonlyArray<JjSourceControlGroup>;
     offset: number;
     limit: number;
   }): JjPanelReady => ({
@@ -720,6 +836,7 @@ const make = Effect.gen(function* () {
     ...historyStep("undo", input.history.undo),
     ...historyStep("redo", input.history.redo),
     workingCopyCommitId: input.page.workingCopyCommitId,
+    sourceControl: input.sourceControl,
     revset: input.revset,
     offset: input.offset,
     rows: input.page.rows.slice(input.offset, input.limit),
@@ -741,7 +858,7 @@ const make = Effect.gen(function* () {
         reload: false,
       }));
     const limit = input.view?.limit ?? DEFAULT_LOG_LIMIT;
-    const [page, operations] = yield* Effect.all(
+    const [page, operations, sourceControl] = yield* Effect.all(
       [
         readPage({
           cwd: input.cwd,
@@ -751,10 +868,11 @@ const make = Effect.gen(function* () {
           limit,
         }),
         history(input),
+        readSourceControl({ ...input, operationId: input.operation.id }),
       ],
       { concurrency: "unbounded" },
     );
-    return ready({ ...input, revset, page, history: operations, offset: 0, limit });
+    return ready({ ...input, revset, page, history: operations, sourceControl, offset: 0, limit });
   });
 
   const getPanel = Effect.fn("JjPanelService.getPanel")(function* (request: JjGetPanelInput) {
@@ -802,10 +920,11 @@ const make = Effect.gen(function* () {
         cwd: input.cwd,
         operationId: operation.id,
       } satisfies JjPanelSnapshot;
-    const [page, operations] = yield* Effect.all(
+    const [page, operations, sourceControl] = yield* Effect.all(
       [
         readPage({ cwd: input.cwd, identity, operationId: operation.id, revset, limit }),
         history({ cwd: input.cwd, identity, operation }),
+        readSourceControl({ cwd: input.cwd, identity, operationId: operation.id }),
       ],
       { concurrency: "unbounded" },
     );
@@ -813,6 +932,7 @@ const make = Effect.gen(function* () {
       cwd: input.cwd,
       identity,
       history: operations,
+      sourceControl,
       operation,
       revset,
       page,

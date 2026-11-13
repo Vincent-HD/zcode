@@ -189,7 +189,10 @@ export const JjHint = (props: { label: ReactNode; render: ReactElement; children
   </Tooltip>
 );
 
-export const JjChangeId = (props: { row: JjLogRow; length?: number }) => {
+export const JjChangeId = (props: {
+  row: Pick<JjLogRow, "changeId" | "changePrefixLength" | "hidden" | "divergent" | "changeOffset">;
+  length?: number;
+}) => {
   const length = Math.max(props.length ?? 8, props.row.changePrefixLength);
   const prefix = props.row.changeId.slice(0, props.row.changePrefixLength);
   const rest = props.row.changeId.slice(props.row.changePrefixLength, length);

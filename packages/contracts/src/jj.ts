@@ -82,6 +82,24 @@ export const JjHistoryStep = Schema.Struct({
   blocked: Schema.optionalKey(Schema.Boolean),
 });
 export type JjHistoryStep = typeof JjHistoryStep.Type;
+/** The working copy or one of its mutable ancestors, with the files it changes. */
+export const JjSourceControlGroup = Schema.Struct({
+  /** `@`, `@-1`, or `@-2^1` for the parents of a merge. */
+  position: Schema.String,
+  commitId: JjCommitId,
+  changeId: JjChangeId,
+  parentIds: Schema.Array(JjCommitId),
+  changePrefixLength: Schema.Number,
+  summary: Schema.String,
+  conflict: flag,
+  empty: flag,
+  /** Its only parent is mutable, so its files can squash into it. */
+  squashable: flag,
+  files: Schema.Array(JjChangedFile),
+  filesTruncated: flag,
+  conflictPaths: names,
+});
+export type JjSourceControlGroup = typeof JjSourceControlGroup.Type;
 export const JjPanelReady = Schema.Struct({
   status: Schema.Literal("ready"),
   cwd: Schema.String,
@@ -91,6 +109,8 @@ export const JjPanelReady = Schema.Struct({
   undo: Schema.optionalKey(JjHistoryStep),
   redo: Schema.optionalKey(JjHistoryStep),
   workingCopyCommitId: JjCommitId,
+  /** The working copy then up to ten mutable ancestors, independent of the revset. */
+  sourceControl: Schema.Array(JjSourceControlGroup),
   /** The effective revset: the requested one, or the workspace's `revsets.log`. */
   revset: Schema.String,
   /** Rows start at this log index: 0 replaces the client's rows, otherwise they append. */

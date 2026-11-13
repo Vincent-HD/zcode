@@ -79,6 +79,7 @@ function panel(description: string, extraRows: ReadonlyArray<string> = []): JjPa
     operationId: "d".repeat(128),
     undo: { description: "new empty commit" },
     workingCopyCommitId: "a".repeat(40),
+    sourceControl: [],
     revset: "builtin_log()",
     offset: 0,
     hasMore: false,

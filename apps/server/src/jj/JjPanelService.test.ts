@@ -840,6 +840,57 @@ describe("expanded JjPanelService actions", () => {
       }).pipe(Effect.provide(live)),
   );
 
+  it.live("lists the working copy and its mutable ancestors like jj-view's source control", () =>
+    Effect.gen(function* () {
+      const f = yield* fixture;
+      const commit = (name: string) =>
+        f.fs
+          .writeFileString(`${f.cwd}/${name}`, name)
+          .pipe(Effect.andThen(f.cli(["commit", "-m", name])));
+      const positions = (panel: JjPanelReady) =>
+        panel.sourceControl.map((group) => [group.position, group.summary]);
+
+      yield* commit("one");
+      yield* commit("two");
+      yield* f.fs.writeFileString(`${f.cwd}/wip`, "wip");
+      const linear = yield* f.ready();
+      expect(positions(linear)).toEqual([
+        ["@", ""],
+        ["@-1", "two"],
+        ["@-2", "one"],
+      ]);
+      expect(linear.sourceControl[0]?.files).toEqual([{ path: "wip", status: "added" }]);
+      expect(linear.sourceControl.map((group) => group.squashable === true)).toEqual([
+        true,
+        true,
+        false,
+      ]);
+
+      yield* f.cli(["config", "set", "--repo", 'revset-aliases."immutable_heads()"', "@--"]);
+      // Panel reads are cached per operation, so the next one needs a new snapshot.
+      yield* f.fs.writeFileString(`${f.cwd}/wip`, "wip 2");
+      const cut = yield* f.ready();
+      expect(positions(cut)).toEqual([
+        ["@", ""],
+        ["@-1", "two"],
+      ]);
+      yield* f.cli(["config", "unset", "--repo", 'revset-aliases."immutable_heads()"']);
+
+      yield* f.cli(["new", "-m", "side", "@--"]);
+      yield* f.cli(["new", "-m", "merge", "@", cut.workingCopyCommitId]);
+      expect(positions(yield* f.ready())).toEqual([
+        ["@", "merge"],
+        ["@-1^1", "side"],
+        ["@-1^2", ""],
+      ]);
+
+      for (const index of Array.from({ length: 11 }, (_, n) => n)) yield* commit(`deep-${index}`);
+      const deep = yield* f.ready();
+      expect(deep.sourceControl).toHaveLength(11);
+      expect(positions(deep).at(-1)).toEqual(["@-10", "deep-1"]);
+    }).pipe(Effect.provide(live)),
+  );
+
   it.live(
     "reverts the last action and blocks Undo past working-copy edits instead of discarding them",
     () =>
@@ -1164,7 +1215,7 @@ describe("JjPanelService graph log", () => {
         yield* f.cli(["new", "-m", "top"]);
         f.log.jj.length = 0;
         const cold = yield* f.ready();
-        expect(commandsOf(f.log.jj)).toEqual(["config", "git", "log", "op", "workspace"]);
+        expect(commandsOf(f.log.jj)).toEqual(["config", "git", "log", "log", "op", "workspace"]);
         expect(cold.revset).toBe("builtin_log()");
         expect(cold.rows.map((row) => row.summary)).toEqual(["top", "base", ""]);
         expect(cold.rows[0]).toMatchObject({ current: true, empty: true });
@@ -1191,7 +1242,7 @@ describe("JjPanelService graph log", () => {
           loadedCount: cold.rows.length,
         });
         expect(edited).toMatchObject({ status: "ready", offset: 0 });
-        expect(commandsOf(f.log.jj)).toEqual(["git", "log", "op"]);
+        expect(commandsOf(f.log.jj)).toEqual(["git", "log", "log", "op"]);
 
         yield* f.fs.writeFileString(`${f.cwd}/file`, "concurrent\n");
         f.log.jj.length = 0;
@@ -1202,7 +1253,11 @@ describe("JjPanelService graph log", () => {
           },
         );
         expect(pair[0].operationId).toBe(pair[1].operationId);
-        expect(commandsOf(f.log.jj).filter((command) => command !== "git")).toEqual(["log", "op"]);
+        expect(commandsOf(f.log.jj).filter((command) => command !== "git")).toEqual([
+          "log",
+          "log",
+          "op",
+        ]);
       }).pipe(Effect.provide(live)),
   );
 
@@ -1249,7 +1304,7 @@ describe("JjPanelService graph log", () => {
       const first = yield* f.ready(view);
       expect(first.rows).toHaveLength(100);
       expect(first.hasMore).toBe(true);
-      expect(commandsOf(f.log.jj)).toEqual(["git", "log", "op", "workspace"]);
+      expect(commandsOf(f.log.jj)).toEqual(["git", "log", "log", "op", "workspace"]);
       f.log.jj.length = 0;
       const more = yield* f.ready({
         ...view,

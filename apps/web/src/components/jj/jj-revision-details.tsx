@@ -5,56 +5,21 @@ import type {
   JjRunAction,
   JjSignature,
 } from "@t3tools/contracts";
-import { ArrowDown, ChevronsDown, FileDiff, Undo2 } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
-import { PierreEntryIcon } from "~/components/chat/PierreEntryIcon";
+import { FileDiff } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Textarea } from "~/components/ui/textarea";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
-import { useTheme } from "~/hooks/useTheme";
 import { jjEnvironment } from "~/state/jj";
 import { useAtomCommand } from "~/state/use-atom-command";
 import type { JjDialogRequest } from "./jj-actions";
+import { JjFileActions, JjFileRow } from "./jj-file-row";
 import { JjChangeId, JjHint, JjRefPills, JjRelativeTime } from "./jj-graph-rows";
 import {
   descriptionDraftIsStale,
   formatJjPanelError,
   type DescriptionDraft,
 } from "./jj-panel-state";
-
-const STATUS_LETTERS = { added: "A", modified: "M", removed: "D", renamed: "R", copied: "C" };
-const STATUS_COLORS = {
-  added: "text-diff-addition-foreground",
-  removed: "text-destructive",
-  modified: "text-warning-foreground",
-  renamed: "text-warning-foreground",
-  copied: "text-warning-foreground",
-};
-
-const IconAction = (props: {
-  label: string;
-  icon: ReactNode;
-  disabled: boolean;
-  onClick: () => void;
-}) => (
-  <Tooltip>
-    <TooltipTrigger
-      render={
-        <Button
-          variant="ghost"
-          size="icon-xs"
-          aria-label={props.label}
-          disabled={props.disabled}
-          onClick={props.onClick}
-        />
-      }
-    >
-      {props.icon}
-    </TooltipTrigger>
-    <TooltipPopup>{props.label}</TooltipPopup>
-  </Tooltip>
-);
 
 const Signature = (props: { label: string; signature: JjSignature }) => (
   <JjHint
@@ -94,7 +59,6 @@ export interface JjRevisionDetailsProps {
 /** Details for one revision. Content is read lazily per commit id, which never changes. */
 export const JjRevisionDetailsPanel = (props: JjRevisionDetailsProps) => {
   const { row } = props;
-  const { resolvedTheme } = useTheme();
   const getRevision = useAtomCommand(jjEnvironment.getRevision, {
     reportFailure: false,
     reportDefect: false,
@@ -312,92 +276,40 @@ export const JjRevisionDetailsPanel = (props: JjRevisionDetailsProps) => {
           </div>
           <ul className="space-y-0.5">
             {details.files.map((file) => (
-              <li
+              <JjFileRow
                 key={file.path}
-                className="group/file flex h-7 min-w-0 items-center gap-1 rounded hover:bg-accent/50"
-              >
-                <JjHint
-                  label={`${file.path} · ${file.status}`}
-                  render={
-                    <button
-                      type="button"
-                      className="flex min-w-0 flex-1 items-center gap-2 ps-1 text-left focus-visible:outline-2 focus-visible:outline-ring disabled:cursor-default"
-                      disabled={!props.canDiff}
-                      onClick={() =>
-                        props.onOpenDiff({ commitId: row.commitId, filePath: file.path })
-                      }
-                    />
-                  }
-                >
-                  <PierreEntryIcon pathValue={file.path} kind="file" theme={resolvedTheme} />
-                  <span className="truncate">{file.path}</span>
-                  {details.conflictPaths.includes(file.path) && (
-                    <span className="shrink-0 text-destructive">conflict</span>
-                  )}
-                </JjHint>
-                {!locked && (
-                  <div className="flex shrink-0 opacity-0 group-hover/file:opacity-100 group-focus-within/file:opacity-100">
-                    <IconAction
-                      label="Restore file"
-                      icon={<Undo2 />}
+                file={file}
+                conflict={details.conflictPaths.includes(file.path)}
+                canDiff={props.canDiff}
+                onOpenDiff={() => props.onOpenDiff({ commitId: row.commitId, filePath: file.path })}
+                actions={
+                  !locked && (
+                    <JjFileActions
+                      commitId={row.commitId}
+                      path={file.path}
                       disabled={fileActionsDisabled}
-                      onClick={() =>
-                        props.onDialog({
-                          kind: "confirm",
-                          title: `Restore ${file.path}?`,
-                          description:
-                            "Discards this revision's changes to the file, restoring it from the parent. Undo brings them back.",
-                          confirmLabel: "Restore",
-                          destructive: true,
-                          action: {
-                            type: "restore",
-                            revisionCommitId: row.commitId,
-                            paths: [file.path],
-                          },
-                        })
-                      }
-                    />
-                    <IconAction
-                      label="Squash file into ancestor"
-                      icon={<ChevronsDown />}
-                      disabled={
-                        fileActionsDisabled || row.conflict === true || !props.hasSquashAncestor
-                      }
-                      onClick={() =>
-                        props.onDialog({ kind: "squash-ancestor", source: row, paths: [file.path] })
-                      }
-                    />
-                    <IconAction
-                      label="Squash file into parent"
-                      icon={<ArrowDown />}
-                      disabled={
-                        fileActionsDisabled ||
-                        row.conflict === true ||
+                      squashParentId={
+                        row.conflict ||
                         row.parentIds.length !== 1 ||
-                        Boolean(props.parent && (props.parent.immutable || props.parent.conflict))
+                        (props.parent && (props.parent.immutable || props.parent.conflict))
+                          ? undefined
+                          : row.parentIds[0]
                       }
-                      onClick={() =>
-                        props.onRun(
-                          {
-                            type: "squash",
-                            sourceCommitId: row.commitId,
-                            destinationCommitId: row.parentIds[0] ?? "",
-                            mode: "into",
+                      squashAncestor={{
+                        enabled: !row.conflict && props.hasSquashAncestor,
+                        onClick: () =>
+                          props.onDialog({
+                            kind: "squash-ancestor",
+                            source: row,
                             paths: [file.path],
-                          },
-                          "File squashed into parent",
-                        )
-                      }
+                          }),
+                      }}
+                      onRun={props.onRun}
+                      onDialog={props.onDialog}
                     />
-                  </div>
-                )}
-                <span
-                  className={`w-3 shrink-0 text-center ${STATUS_COLORS[file.status]}`}
-                  aria-label={file.status}
-                >
-                  {STATUS_LETTERS[file.status]}
-                </span>
-              </li>
+                  )
+                }
+              />
             ))}
           </ul>
           {details.conflictPaths

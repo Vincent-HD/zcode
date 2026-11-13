@@ -22,6 +22,7 @@ const panel = (input: {
   workspaceIdentity: { workspaceRoot: "/repo", repositoryPath: "/repo/.jj/repo", workspaceId: "w" },
   operationId: input.operation.repeat(128),
   workingCopyCommitId: "a".repeat(40),
+  sourceControl: [],
   revset: "builtin_log()",
   offset: input.offset ?? 0,
   rows: input.rows,

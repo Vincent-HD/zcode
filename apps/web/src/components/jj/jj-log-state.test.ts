@@ -24,6 +24,7 @@ const panel = (input: {
   workingCopyCommitId: "a".repeat(40),
   sourceControl: [],
   revset: "builtin_log()",
+  revsetAliases: [],
   offset: input.offset ?? 0,
   rows: input.rows,
   hasMore: input.hasMore ?? false,

@@ -20,7 +20,7 @@ upstream entry points to re-check after a rebase are in [`ZCODE.md`](./ZCODE.md)
 - **Jujutsu panel:** Open the **Jujutsu** tab from the chat's right-panel menu. Like jj-view,
   its **Source control** section lists the files changed in the working copy and up to ten of its
   mutable ancestors (`@-1`, `@-2`…), with restore and squash-into-parent per file; below it,
-  the **Log** section shows a revision graph of the workspace's `revsets.log` (or a revset typed in the panel), loaded 100 revisions
+  the **Log** section shows a revision graph of the workspace's `revsets.log` (or a revset typed in the panel, which completes jj functions, your `revset-aliases`, bookmarks and tags, and offers common presets), loaded 100 revisions
   at a time. Click a revision for its details and changed files, which open in T3 Code's diff
   panel; Ctrl/Cmd+click selects several, Escape clears. Right-click (or Shift+F10) for jj-view's
   actions: new child/before/after, edit, describe, duplicate, abandon, absorb, squash into parent

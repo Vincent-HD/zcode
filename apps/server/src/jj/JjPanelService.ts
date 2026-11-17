@@ -17,6 +17,7 @@ import {
   type JjWorkspaceIdentity,
   type JjPanelReady,
   type JjPanelSnapshot,
+  type JjRevsetAlias,
   type JjSourceControlGroup,
   type JjRevisionDetails,
   type JjGetRevisionInput,
@@ -161,6 +162,11 @@ const SourceControlOutput = Schema.Tuple([
   Schema.Array(Schema.String),
 ]);
 type SourceControlOutput = typeof SourceControlOutput.Type;
+const ConfigEntry = Schema.Tuple([Schema.String, Schema.Unknown]);
+const configTemplate = `"[" ++ json(name) ++ "," ++ json(value) ++ "]\\n"`;
+const ALIAS_PREFIX = "revset-aliases.";
+const decodeQuotedKey = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.String));
+type WorkspaceConfig = { revset: string; revsetAliases: ReadonlyArray<JjRevsetAlias> };
 // The working copy, its first-parent ancestors and their merge parents, cut to mutable ones.
 const SOURCE_CONTROL_REVSET = `(first_ancestors(@, ${MAX_SOURCE_CONTROL_ANCESTORS + 1}) | parents(first_ancestors(@, ${MAX_SOURCE_CONTROL_ANCESTORS}))) & (mutable() | @)`;
 
@@ -429,7 +435,7 @@ const make = Effect.gen(function* () {
   const pages = new Map<string, Page>();
   // Commit ids address content: their description, files and conflicts never change.
   const details = new Map<string, JjRevisionDetails>();
-  const configuredRevsets = new Map<string, string>();
+  const workspaceConfigs = new Map<string, WorkspaceConfig>();
   // Histories are immutable per operation and workspace; names rarely change for a workspace.
   const histories = new Map<string, OperationHistory>();
   const workspaceNames = new Map<string, string>();
@@ -628,20 +634,34 @@ const make = Effect.gen(function* () {
     return value;
   });
 
-  const configuredRevset = Effect.fn("JjPanelService.configuredRevset")(function* (input: {
+  /** `revsets.log` and `revset-aliases` in one call; the rest of the config never leaves. */
+  const workspaceConfig = Effect.fn("JjPanelService.workspaceConfig")(function* (input: {
     cwd: string;
     workspaceRoot: string;
     reload: boolean;
   }) {
-    const cached = configuredRevsets.get(input.workspaceRoot);
+    const cached = workspaceConfigs.get(input.workspaceRoot);
     if (cached !== undefined && !input.reload) return cached;
-    const value = (yield* run({
+    const output = yield* run({
       cwd: input.cwd,
-      args: ["--ignore-working-copy", "config", "get", "revsets.log"],
-    })).trim();
-    const revset = value || "builtin_log()";
-    remember(configuredRevsets, input.workspaceRoot, revset, 64);
-    return revset;
+      args: ["--ignore-working-copy", "config", "list", "-T", configTemplate],
+    });
+    let revset = "";
+    const revsetAliases: JjRevsetAlias[] = [];
+    for (const line of lines(output)) {
+      const [name, value] = yield* decode(ConfigEntry, line);
+      if (typeof value !== "string") continue;
+      if (name === "revsets.log") revset = value.trim();
+      if (!name.startsWith(ALIAS_PREFIX)) continue;
+      const key = name.slice(ALIAS_PREFIX.length);
+      revsetAliases.push({
+        name: Option.getOrElse(decodeQuotedKey(key), () => key),
+        definition: value,
+      });
+    }
+    const config = { revset: revset || "builtin_log()", revsetAliases };
+    remember(workspaceConfigs, input.workspaceRoot, config, 64);
+    return config;
   });
 
   /** Nearest in-revset ancestors for rows whose parents leave the revset, in one jj call. */
@@ -823,6 +843,7 @@ const make = Effect.gen(function* () {
     identity: JjWorkspaceIdentity;
     operation: Operation;
     revset: string;
+    revsetAliases: ReadonlyArray<JjRevsetAlias>;
     page: Page;
     history: OperationHistory;
     sourceControl: ReadonlyArray<JjSourceControlGroup>;
@@ -838,6 +859,7 @@ const make = Effect.gen(function* () {
     workingCopyCommitId: input.page.workingCopyCommitId,
     sourceControl: input.sourceControl,
     revset: input.revset,
+    revsetAliases: input.revsetAliases,
     offset: input.offset,
     rows: input.page.rows.slice(input.offset, input.limit),
     hasMore: input.page.hasMore || input.page.rows.length > input.limit,
@@ -850,13 +872,12 @@ const make = Effect.gen(function* () {
     operation: Operation;
     view: JjLogView | undefined;
   }) {
-    const revset =
-      input.view?.revset ??
-      (yield* configuredRevset({
-        cwd: input.cwd,
-        workspaceRoot: input.identity.workspaceRoot,
-        reload: false,
-      }));
+    const config = yield* workspaceConfig({
+      cwd: input.cwd,
+      workspaceRoot: input.identity.workspaceRoot,
+      reload: false,
+    });
+    const revset = input.view?.revset ?? config.revset;
     const limit = input.view?.limit ?? DEFAULT_LOG_LIMIT;
     const [page, operations, sourceControl] = yield* Effect.all(
       [
@@ -872,7 +893,16 @@ const make = Effect.gen(function* () {
       ],
       { concurrency: "unbounded" },
     );
-    return ready({ ...input, revset, page, history: operations, sourceControl, offset: 0, limit });
+    return ready({
+      ...input,
+      revset,
+      revsetAliases: config.revsetAliases,
+      page,
+      history: operations,
+      sourceControl,
+      offset: 0,
+      limit,
+    });
   });
 
   const getPanel = Effect.fn("JjPanelService.getPanel")(function* (request: JjGetPanelInput) {
@@ -886,13 +916,11 @@ const make = Effect.gen(function* () {
     const head = yield* Effect.all(
       [
         snapshotHead(input.cwd, identity),
-        input.revset !== undefined
-          ? Effect.succeed(input.revset)
-          : configuredRevset({
-              cwd: input.cwd,
-              workspaceRoot: identity.workspaceRoot,
-              reload: known === undefined,
-            }),
+        workspaceConfig({
+          cwd: input.cwd,
+          workspaceRoot: identity.workspaceRoot,
+          reload: known === undefined && input.revset === undefined,
+        }),
       ],
       { concurrency: "unbounded" },
     ).pipe(
@@ -908,7 +936,8 @@ const make = Effect.gen(function* () {
         cwd: input.cwd,
         reason: "missing-executable",
       } satisfies JjPanelSnapshot;
-    const [operation, revset] = head.value;
+    const [operation, config] = head.value;
+    const revset = input.revset ?? config.revset;
     const loaded = known === operation.id ? (input.loadedCount ?? 0) : 0;
     const exhausted = pages.get(`${identity.workspaceId}\0${operation.id}\0${revset}`);
     if (
@@ -935,6 +964,7 @@ const make = Effect.gen(function* () {
       sourceControl,
       operation,
       revset,
+      revsetAliases: config.revsetAliases,
       page,
       offset: Math.min(loaded, page.rows.length),
       limit,

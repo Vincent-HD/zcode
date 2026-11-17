@@ -44,13 +44,6 @@ import { cn } from "~/lib/utils";
 import { textDirection } from "~/textDirection";
 import { useClientSettings } from "../../hooks/useSettings";
 import { GuestShareIndicator } from "./GuestShareControls";
-import {
-  ZcodeDraftConversationTitle,
-  ZcodeTemporaryBadge,
-  ZcodeTemporaryHeaderActions,
-  useZcodeTemporaryHeader,
-  type ZcodeTemporaryConversation,
-} from "../../zcode/temporary-header";
 
 interface ChatHeaderProps {
   activeThreadEnvironmentId: EnvironmentId;
@@ -65,7 +58,6 @@ interface ChatHeaderProps {
   onNewThreadInProject: () => void;
   onOpenProjectSettings?: (() => void) | undefined;
   onFindInThread?: ((threadRef: ScopedThreadRef) => void) | undefined;
-  zcodeTemporary?: ZcodeTemporaryConversation | undefined;
 }
 
 function resolveRenameCommit(input: {
@@ -91,7 +83,6 @@ export const ChatHeader = memo(function ChatHeader({
   onNewThreadInProject,
   onOpenProjectSettings,
   onFindInThread,
-  zcodeTemporary,
 }: ChatHeaderProps) {
   const gt = useGT();
   const activeProjectName = activeProject?.isScratch ? gt("No project") : activeProject?.title;
@@ -100,11 +91,6 @@ export const ChatHeader = memo(function ChatHeader({
   const breadcrumbContainerRef = useRef<HTMLDivElement>(null);
   const [collapseParentTitle, setCollapseParentTitle] = useState(false);
   const activeThreadRef = scopeThreadRef(activeThreadEnvironmentId, activeThreadId);
-  const temporary = useZcodeTemporaryHeader({
-    conversation: zcodeTemporary,
-    activeThreadRef,
-    onOpenProjectSettings,
-  });
   const canOperateThread = useEnvironmentScope(
     activeThreadEnvironmentId,
     AuthOrchestrationOperateScope,
@@ -234,7 +220,6 @@ export const ChatHeader = memo(function ChatHeader({
   };
   const handleHeaderContextMenu = (event: ReactMouseEvent) => {
     if (renamingTitle !== null) return;
-    if (!isServerThread) return temporary.openDraftMenu(event);
     if (!isServerThread && onOpenProjectSettings === undefined) return;
     event.preventDefault();
     if (!isServerThread) {
@@ -368,8 +353,6 @@ export const ChatHeader = memo(function ChatHeader({
               onFocus={(event) => event.currentTarget.select()}
               onKeyDown={handleRenameKeyDown}
             />
-          ) : !isServerThread ? (
-            <ZcodeDraftConversationTitle title={activeThreadTitle} header={temporary} />
           ) : isServerThread ? (
             <Tooltip>
               <TooltipTrigger
@@ -384,12 +367,8 @@ export const ChatHeader = memo(function ChatHeader({
                   />
                 }
               >
-                <h2
-                  className="flex min-w-0 items-center gap-2"
-                  dir={textDirection(activeThreadTitle)}
-                >
+                <h2 className="min-w-0" dir={textDirection(activeThreadTitle)}>
                   <WorkspaceBreadcrumbText>{activeThreadTitle}</WorkspaceBreadcrumbText>
-                  <ZcodeTemporaryBadge header={temporary} />
                 </h2>
                 <ChevronDownIcon
                   aria-hidden
@@ -432,7 +411,6 @@ export const ChatHeader = memo(function ChatHeader({
           ) : null}
         </WorkspaceBreadcrumbItem>
       </WorkspaceBreadcrumb>
-      <ZcodeTemporaryHeaderActions header={temporary} canOperateThread={canOperateThread} />
       {isServerThread ? <GuestShareIndicator threadRef={activeThreadRef} /> : null}
     </div>
   );

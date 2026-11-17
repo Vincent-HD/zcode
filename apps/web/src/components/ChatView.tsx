@@ -3075,7 +3075,6 @@ export default function ChatView(props: ChatViewProps) {
   const { onResume, isResuming } = useComposerResume({
     environmentId,
     routeThreadKey,
-    draftId,
     currentRouteThreadKeyRef,
     activeThread,
     resumableRunId,
@@ -3561,7 +3560,6 @@ export default function ChatView(props: ChatViewProps) {
               onOpenThread={onOpenRelatedThreadStable}
               rightPanelOpen={inlineRightPanelOwnsTitleBar}
               onNewThreadInProject={handleNewThreadInActiveProjectStable}
-              zcodeTemporary={zcode.temporary}
               {...(activeDraftLogicalProjectKey
                 ? { onOpenProjectSettings: handleOpenDraftProjectSettingsStable }
                 : {})}
@@ -3829,7 +3827,6 @@ export default function ChatView(props: ChatViewProps) {
                                 supportsQuestionAttachments={supportsQuestionAttachments}
                                 maxFileAttachmentBytes={maxFileAttachmentBytes}
                                 routeKind={routeKind}
-                                isTemporaryConversation={zcode.isTemporaryConversation}
                                 routeThreadRef={routeThreadRef}
                                 draftId={draftId}
                                 activeThreadId={activeThreadId}

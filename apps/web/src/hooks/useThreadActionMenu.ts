@@ -51,7 +51,6 @@ import { useCopyToClipboard } from "./useCopyToClipboard";
 import { useNewThreadHandler } from "./useHandleNewThread";
 import { useClientSettings } from "./useSettings";
 import { canTurnThreadIntoProject, useThreadActions } from "./useThreadActions";
-import { handleZcodeThreadRefAction, isTemporaryThreadRef } from "../zcode/thread-actions";
 
 function failureToast(title: string, error: unknown) {
   toastManager.add(
@@ -150,7 +149,6 @@ export function useThreadActionMenu(input: {
         isSnoozed: supports.snooze && effectiveSnoozed(thread, { now: now.toISOString() }),
         canSnoozeNow: canSnooze(thread, { now: now.toISOString() }),
         isRegeneratingTitle,
-        isTemporary: isTemporaryThreadRef(threadRef),
         isRunning: !threadRuntimeCanArchive(thread.runtime),
         supports,
         snoozePresets,
@@ -196,7 +194,6 @@ export function useThreadActionMenu(input: {
           failureToast(title, squashAtomCommandFailure(result));
         }
       };
-      if (handleZcodeThreadRefAction(action, threadRef)) return;
       switch (action) {
         case "find":
           onFind?.(threadRef);

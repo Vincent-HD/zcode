@@ -64,7 +64,6 @@ import { showThreadUndoNotice } from "./showThreadUndoNotice";
 import { useAtomCommand } from "../state/use-atom-command";
 import { useOrchestrationCommand } from "../state/use-orchestration-command";
 import { useAtomQueryRunner } from "../state/use-atom-query-runner";
-import { clearZcodeThreadState, type ZcodeDeleteThreadOptions } from "../zcode/thread-cleanup";
 
 export class ThreadArchiveBlockedError extends Schema.TaggedError<ThreadArchiveBlockedError>()(
   "ThreadArchiveBlockedError",
@@ -272,7 +271,6 @@ function clearDeletedThreadPanelState(ref: ScopedThreadRef) {
   useRightPanelStore.getState().removeThread(ref);
   useDiffPanelStore.getState().removeThread(ref);
   usePreviewMiniPlayerStore.getState().removeThread(ref);
-  clearZcodeThreadState(ref);
 }
 
 /** A No project thread that already has its own folder, on a server that can promote it. */
@@ -467,7 +465,7 @@ export function useThreadActions() {
 
   const deleteThread = async (
     target: ScopedThreadRef,
-    opts: { deletedThreadKeys?: ReadonlySet<string> } & ZcodeDeleteThreadOptions = {},
+    opts: { deletedThreadKeys?: ReadonlySet<string> } = {},
   ) => {
     const permissionFailure = threadOperationFailure(target);
     if (permissionFailure) return permissionFailure;
@@ -568,7 +566,6 @@ export function useThreadActions() {
     const localApi = readLocalApi();
     let canDeleteWorktree = false;
     if (
-      opts.deleteWorktree !== false &&
       orphanedWorktreePath !== null &&
       threadProject !== null &&
       !isScratchProject(threadProject, environmentConfig?.scratchWorkspaceRoot) &&

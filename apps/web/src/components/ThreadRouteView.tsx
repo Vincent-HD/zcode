@@ -26,8 +26,6 @@ import {
   resolveThreadRouteRenderState,
   type ThreadRouteTarget,
 } from "../threadRoutes";
-import { isTemporaryConversationDiscarding } from "../temporaryConversationNavigation";
-import { useTemporaryMarkerPromotion } from "../zcode/temporary-conversation-promotion";
 
 /**
  * Keeps the family of an open thread the shell leaves out (an older settled thread) in the shell
@@ -141,11 +139,9 @@ export function ThreadRouteView({
     draftThreadExists: draftThread !== null,
   });
   const environmentHasAnyThreads = environmentThreadRefs.length > 0 || environmentHasDraftThreads;
-  useTemporaryMarkerPromotion(draftSession);
 
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- clears pending file drops and navigates the router home once a server thread is confirmed missing
   useEffect(() => {
-    if (target.kind === "server" && isTemporaryConversationDiscarding(target)) return;
     if (target.kind !== "server" || !bootstrapComplete) {
       return;
     }
@@ -209,7 +205,7 @@ export function ThreadRouteView({
           replace
         />
       );
-    } else if (!isTemporaryConversationDiscarding(target)) {
+    } else {
       redirect = <Navigate to="/" replace />;
     }
   } else if (hiddenByTagFilter) {

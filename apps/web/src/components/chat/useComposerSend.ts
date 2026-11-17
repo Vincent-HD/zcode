@@ -98,7 +98,6 @@ import {
 import { environmentServerConfigsAtom } from "../../state/server";
 import { threadEnvironment } from "../../state/threads";
 import { runMobileComposerTransition } from "./draftHeroTransition";
-import { useTemporaryComposerSend } from "../../zcode/temporary-composer-send";
 import { useClientSettingsHydrated } from "../../hooks/useSettings";
 import { useStableCallback } from "../../hooks/useStableCallback";
 import { environmentPresentations } from "../../state/presentation";
@@ -380,7 +379,6 @@ export function useComposerSend(input: ComposerSendInput) {
   const linkedEnvironments = useLinkedEnvironments(environmentId);
   const handleNewThread = useNewThreadHandler();
   const navigate = useNavigate();
-  const zcodeSend = useTemporaryComposerSend({ routeThreadKey, draftId, draftThread });
   const clientSettingsHydrated = useClientSettingsHydrated();
   const startThreadTurn = useOrchestrationCommand(threadEnvironment.startTurn, {
     reportFailure: false,
@@ -430,7 +428,6 @@ export function useComposerSend(input: ComposerSendInput) {
     },
   ) => {
     e?.preventDefault();
-    if (zcodeSend.blocksSend(submissionIntent)) return;
     // What the user pressed send on; uploads below can take a while, and a redirect must not
     // decline approvals for a draft that changed meanwhile.
     let promptAtSend = detachedOverride ? detachedOverride.prompt : promptRef.current;
@@ -1569,8 +1566,8 @@ export function useComposerSend(input: ComposerSendInput) {
       });
       if (backgroundThreadRef) {
         try {
-          backgroundDraftOpened = await zcodeSend.openBackgroundDraft(backgroundThreadRef, () =>
-            handleNewThread(
+          backgroundDraftOpened = Boolean(
+            await handleNewThread(
               scopeProjectRef(activeProject.environmentId, activeProject.id),
               resolveBackgroundDraftWorkspaceOptions({
                 envMode: sendEnvMode,
@@ -1617,7 +1614,6 @@ export function useComposerSend(input: ComposerSendInput) {
           }
         }
         if (backgroundThreadRef) {
-          zcodeSend.announceKeptBackgroundSend(backgroundThreadRef);
           if (backgroundDraftOpened) {
             toastManager.add({
               type: "success",
@@ -1638,7 +1634,7 @@ export function useComposerSend(input: ComposerSendInput) {
           submissionIntent === "background" &&
           currentRouteThreadKeyRef.current === routeThreadKey
         ) {
-          zcodeSend.startFreshComposer(handleNewThreadInActiveProject);
+          handleNewThreadInActiveProject();
         }
         void recordPromptSent(environmentId);
       }
@@ -1646,7 +1642,6 @@ export function useComposerSend(input: ComposerSendInput) {
 
     if (failure !== null) {
       if (isLocalDraftThread && draftId && draftThread) {
-        const zcodeMarkerKeys = zcodeSend.captureMarkers(environmentId, threadIdForSend);
         restoreFailedDraftThread(
           draftId,
           draftThread,
@@ -1655,7 +1650,6 @@ export function useComposerSend(input: ComposerSendInput) {
             : threadIdForSend,
         );
         clearBackgroundDraftSubmissionByRef(scopeThreadRef(environmentId, threadIdForSend));
-        zcodeSend.restoreMarkers(zcodeMarkerKeys);
       }
       // Only an acknowledged send replaces its optimistic row, so a failed one leaves here.
       setOptimisticUserMessages((existing) => {

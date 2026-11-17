@@ -21,14 +21,12 @@ import { threadEnvironment } from "../../state/threads";
 import { useOrchestrationCommand } from "../../state/use-orchestration-command";
 import type { makeThreadErrorSetter } from "../ChatView.logic";
 import { draftSendState } from "./chatViewSend";
-import { isTemporaryConversationSendBlocked } from "../../temporaryConversationNavigation";
 import type { useTimelineFollow } from "./useTimelineFollow";
 import type { useUsageLimitsPanel } from "./useUsageLimitsPanel";
 
 interface ComposerResumeInput {
   readonly environmentId: EnvironmentId;
   readonly routeThreadKey: string;
-  readonly draftId?: string | null | undefined;
   readonly currentRouteThreadKeyRef: { readonly current: string | null };
   readonly activeThread: EnvironmentThreadShell | undefined;
   readonly resumableRunId: RunId | null;
@@ -99,10 +97,6 @@ export function useComposerResume(input: ComposerResumeInput) {
       isRevertingCheckpoint ||
       threadDetailLoading ||
       activeEnvironmentUnavailable ||
-      isTemporaryConversationSendBlocked({
-        draftId: input.draftId ?? null,
-        threadKey: routeThreadKey,
-      }) ||
       sendInFlightRef.current
     ) {
       return;

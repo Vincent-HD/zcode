@@ -2712,7 +2712,6 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
               isSnoozed,
               canSnoozeNow: canSnooze(thread, { now: new Date().toISOString() }),
               isRegeneratingTitle,
-              isTemporary: isTemporaryThreadKey(threadKey),
               isRunning: !threadRuntimeCanArchive(thread.runtime),
               canShareWithGuest: appAtomRegistry.get(
                 canShareWithGuestAtom(threadRef.environmentId),
@@ -2747,7 +2746,6 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
           if (preset) attemptSnooze(threadRef, preset);
           return;
         }
-        if (handleZcodeThreadAction(clicked.value, threadKey)) return;
         switch (clicked.value) {
           case "filter-by-project":
             if (threadProjectGroup) {

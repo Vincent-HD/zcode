@@ -20,11 +20,9 @@ added_tests=(
   apps/server/src/jj/JjWorktrees.test.ts
   apps/web/src/components/chat/composer-usage.logic.test.ts
   apps/web/src/components/chat/models-dev-pricing.test.ts
-  apps/web/src/components/chat/temporaryConversationDestroy.test.ts
   apps/web/src/components/chat/turn-usage.logic.test.ts
   apps/web/src/components/chat/usage-popover.browser.test.tsx
   apps/web/src/components/chat/usage-pricing.test.ts
-  apps/web/src/components/chat/useComposerSend.logic.test.ts
   apps/web/src/components/jj/JjPanel.permissions.browser.test.tsx
   apps/web/src/components/jj/jj-actions.test.ts
   apps/web/src/components/jj/jj-description-draft-store.test.ts
@@ -32,14 +30,8 @@ added_tests=(
   apps/web/src/components/jj/jj-graph-layout.test.ts
   apps/web/src/components/jj/jj-log-state.test.ts
   apps/web/src/components/jj/jj-panel-state.test.ts
-  apps/web/src/temporaryConversationNavigation.test.ts
   apps/web/src/zcode/jj-diff-selection.test.ts
   apps/web/src/zcode/right-panel.test.ts
-  apps/web/src/zcode/temporary-conversation-send.test.ts
-  apps/web/src/zcode/temporary-conversation-store.browser.test.ts
-  apps/web/src/zcode/temporary-conversations.test.ts
-  apps/web/src/zcode/temporary-header.browser.test.tsx
-  apps/web/src/zcode/thread-deletion.test.ts
   packages/client-runtime/src/state/zcode-command-permissions.test.ts
   packages/contracts/src/jj-forge.test.ts
   packages/contracts/src/jj.test.ts

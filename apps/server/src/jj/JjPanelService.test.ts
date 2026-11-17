@@ -11,6 +11,7 @@ import {
   type JjRunAction,
   type JjRunActionInput,
   WS_METHODS,
+  JJ_ORPHAN_REVSET,
   WsRpcGroup,
   AuthOrchestrationReadScope,
   AuthSourceControlWriteScope,
@@ -567,6 +568,19 @@ describe("JjPanelService real jj repositories", () => {
       expect(colocated.panel.colocated).toBe(true);
       expect(colocated.receipt.undoAvailable).toBe(false);
       expect(yield* f.fs.exists(`${second}/.git`)).toBe(true);
+      // Forgetting a workspace with edits leaves its working copy behind as an orphan.
+      yield* f.fs.writeFileString(`${second}/orphan.txt`, "orphan\n");
+      yield* f.service.getPanel({ cwd: second });
+      yield* f.cli(["workspace", "forget", "second"]);
+      const orphans = () =>
+        f
+          .cli(["log", "--no-graph", "-r", JJ_ORPHAN_REVSET, "-T", 'commit_id ++ "\\n"'])
+          .pipe(Effect.map((output) => output.stdout.trim().split("\n").filter(Boolean)));
+      expect(yield* orphans()).toHaveLength(1);
+      const cleaned = yield* f.action({ type: "abandon-orphans" });
+      expect(cleaned.receipt.undoAvailable).toBe(true);
+      expect(yield* orphans()).toEqual([]);
+      expect(cleaned.panel.workingCopyCommitId).toBe(first.workingCopyCommitId);
       const gitOnly = yield* f.fs.makeTempDirectoryScoped({ prefix: "t3-jj-git-only-" });
       const process = yield* VcsProcess.VcsProcess;
       yield* process.run({

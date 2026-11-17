@@ -1,5 +1,6 @@
 import * as SecureRandom from "effect/crypto/SecureRandom";
 import {
+  JJ_ORPHAN_REVSET,
   JjPanelError,
   JjCommitId,
   JjChangeId,
@@ -1423,6 +1424,8 @@ const make = Effect.gen(function* () {
       }
       case "bookmark-delete":
         return { args: ["bookmark", "delete", "--", `exact:${action.name}`] };
+      case "abandon-orphans":
+        return { args: ["abandon", "--", JJ_ORPHAN_REVSET] };
       case "colocate":
         return { args: ["git", "colocation", "enable"] };
       case "push":

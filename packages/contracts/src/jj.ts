@@ -180,6 +180,9 @@ const commitIds = Schema.Array(JjCommitId).check(Schema.isMinLength(1), Schema.i
 export const JjBookmarkName = Schema.String.check(
   Schema.isPattern(/^[A-Za-z0-9_][A-Za-z0-9._/-]{0,255}$/),
 );
+/** Undescribed heads no workspace, bookmark or tag keeps: mostly working copies of forgotten workspaces. */
+export const JJ_ORPHAN_REVSET =
+  'visible_heads() & mutable() & description(exact:"") ~ working_copies() ~ bookmarks() ~ remote_bookmarks() ~ tags()';
 export const JjRunAction = Schema.Union([
   Schema.Struct({ type: Schema.Literal("new"), parentCommitIds: commitIds }),
   Schema.Struct({ type: Schema.Literal("commit"), description: Schema.String }),
@@ -241,6 +244,7 @@ export const JjRunAction = Schema.Union([
     remote: JjBookmarkName,
   }),
   Schema.Struct({ type: Schema.Literal("colocate") }),
+  Schema.Struct({ type: Schema.Literal("abandon-orphans") }),
 ]);
 export type JjRunAction = typeof JjRunAction.Type;
 export const JjRunActionInput = Schema.Struct({ ...mutationFields, action: JjRunAction });
@@ -289,6 +293,7 @@ export const JjActionReceipt = Schema.Struct({
     "bookmark-advance",
     "push",
     "colocate",
+    "abandon-orphans",
   ]),
   beforeOperationId: JjOperationId,
   operationId: JjOperationId,

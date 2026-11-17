@@ -37,7 +37,9 @@ upstream entry points to re-check after a rebase are in [`ZCODE.md`](./ZCODE.md)
   workspaces (`jj workspace add --colocate`, jj 0.46 or newer), so jj and the Jujutsu panel work
   in them. The thread's branch is still checked out for T3 Code's Git features, but it only
   follows commits made with Git; `jj commit` there detaches Git's HEAD as usual. Removing the
-  worktree also forgets its jj workspace.
+  worktree also forgets its jj workspace; if it had uncommitted edits, its working copy stays in
+  the log until **Abandon orphaned revisions…** in the panel's menu clears such undescribed heads
+  (the **Orphaned revisions** revset preset lists them first).
 - **Temporary conversations:** Mark a draft or conversation temporary from the header. Leaving it
   does not discard it. The header trash button confirms, then removes it from history through the
   normal deletion flow and preserves the workspace and worktree. The temporary marker is local to

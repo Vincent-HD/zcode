@@ -1,4 +1,4 @@
-import type { JjLogRow, JjRevsetAlias } from "@t3tools/contracts";
+import { JJ_ORPHAN_REVSET, type JjLogRow, type JjRevsetAlias } from "@t3tools/contracts";
 
 export interface JjRevsetSuggestion {
   readonly id: string;
@@ -17,6 +17,7 @@ const PRESETS: ReadonlyArray<readonly [revset: string, detail: string]> = [
   ["mutable() & empty() ~ @", "Empty mutable revisions to clean up"],
   ["divergent()", "Divergent changes"],
   ["all()", "Every visible revision"],
+  [JJ_ORPHAN_REVSET, "Orphaned revisions: undescribed heads nothing keeps"],
 ];
 
 // From `jj help -k revsets` (jj 0.46).

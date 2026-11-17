@@ -707,6 +707,22 @@ const JjPanel = (props: {
               >
                 Push bookmarks…
               </MenuItem>
+              <MenuItem
+                disabled={blocked}
+                onClick={() =>
+                  setDialog({
+                    kind: "confirm",
+                    title: "Abandon orphaned revisions?",
+                    description:
+                      'Abandons mutable heads that have no description and no workspace, bookmark or tag, such as working copies left by removed worktrees. The "Orphaned revisions" revset preset lists them first. Undo restores them.',
+                    confirmLabel: "Abandon",
+                    destructive: true,
+                    action: { type: "abandon-orphans" },
+                  })
+                }
+              >
+                Abandon orphaned revisions…
+              </MenuItem>
               <MenuSeparator />
               <MenuItem
                 disabled={view.revset === undefined}

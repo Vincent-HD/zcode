@@ -81,6 +81,7 @@ function panel(description: string, extraRows: ReadonlyArray<string> = []): JjPa
     workingCopyCommitId: "a".repeat(40),
     sourceControl: [],
     revset: "builtin_log()",
+    revsetAliases: [],
     offset: 0,
     hasMore: false,
     remotes: [],

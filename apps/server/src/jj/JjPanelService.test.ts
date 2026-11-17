@@ -1213,10 +1213,12 @@ describe("JjPanelService graph log", () => {
         const f = yield* fixture;
         yield* f.cli(["describe", "-m", "base"]);
         yield* f.cli(["new", "-m", "top"]);
+        yield* f.cli(["config", "set", "--repo", 'revset-aliases."user(x)"', "author(x)"]);
         f.log.jj.length = 0;
         const cold = yield* f.ready();
         expect(commandsOf(f.log.jj)).toEqual(["config", "git", "log", "log", "op", "workspace"]);
         expect(cold.revset).toBe("builtin_log()");
+        expect(cold.revsetAliases).toContainEqual({ name: "user(x)", definition: "author(x)" });
         expect(cold.rows.map((row) => row.summary)).toEqual(["top", "base", ""]);
         expect(cold.rows[0]).toMatchObject({ current: true, empty: true });
         expect(cold.rows[0]?.immutable).toBeUndefined();
@@ -1304,7 +1306,7 @@ describe("JjPanelService graph log", () => {
       const first = yield* f.ready(view);
       expect(first.rows).toHaveLength(100);
       expect(first.hasMore).toBe(true);
-      expect(commandsOf(f.log.jj)).toEqual(["git", "log", "log", "op", "workspace"]);
+      expect(commandsOf(f.log.jj)).toEqual(["config", "git", "log", "log", "op", "workspace"]);
       f.log.jj.length = 0;
       const more = yield* f.ready({
         ...view,

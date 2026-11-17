@@ -100,6 +100,9 @@ export const JjSourceControlGroup = Schema.Struct({
   conflictPaths: names,
 });
 export type JjSourceControlGroup = typeof JjSourceControlGroup.Type;
+/** A `revset-aliases` entry from the workspace config; `name` may take parameters, as in `user(x)`. */
+export const JjRevsetAlias = Schema.Struct({ name: Schema.String, definition: Schema.String });
+export type JjRevsetAlias = typeof JjRevsetAlias.Type;
 export const JjPanelReady = Schema.Struct({
   status: Schema.Literal("ready"),
   cwd: Schema.String,
@@ -113,6 +116,7 @@ export const JjPanelReady = Schema.Struct({
   sourceControl: Schema.Array(JjSourceControlGroup),
   /** The effective revset: the requested one, or the workspace's `revsets.log`. */
   revset: Schema.String,
+  revsetAliases: Schema.Array(JjRevsetAlias),
   /** Rows start at this log index: 0 replaces the client's rows, otherwise they append. */
   offset: Schema.Number,
   rows: Schema.Array(JjLogRow),

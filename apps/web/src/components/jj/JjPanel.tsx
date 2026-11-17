@@ -14,7 +14,6 @@ import { Ellipsis, Redo2, RefreshCw, Undo2, X } from "lucide-react";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { Button } from "~/components/ui/button";
 import { CollapsibleSectionHeader } from "~/components/ui/collapsible-section-header";
-import { Input } from "~/components/ui/input";
 import { Menu, MenuItem, MenuPopup, MenuSeparator, MenuTrigger } from "~/components/ui/menu";
 import { toastManager } from "~/components/ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
@@ -58,6 +57,7 @@ import {
 import { JJ_LOG_PAGE, jjRefreshInput, mergeJjSnapshot, type JjLogView } from "./jj-log-state";
 import { formatJjPanelError, historyLabel } from "./jj-panel-state";
 import { JjRevisionDetailsPanel } from "./jj-revision-details";
+import { JjRevsetInput } from "./jj-revset-input";
 import { JjSourceControl } from "./jj-source-control";
 
 const OVERSCAN_PX = 400;
@@ -702,23 +702,15 @@ const JjPanel = (props: {
             </MenuPopup>
           </Menu>
         </div>
-        <Input
-          size="sm"
-          aria-label="Revset"
-          spellCheck={false}
-          placeholder={panel?.revset ?? "revset"}
+        <JjRevsetInput
           value={revsetDraft ?? view.revset ?? panel?.revset ?? ""}
-          onChange={(event) => setRevsetDraft(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              event.preventDefault();
-              applyRevset();
-            }
-            if (event.key === "Escape") {
-              event.preventDefault();
-              setRevsetDraft(null);
-            }
-          }}
+          edited={revsetDraft !== null}
+          placeholder={panel?.revset ?? "revset"}
+          aliases={panel?.revsetAliases ?? []}
+          rows={panel?.rows ?? []}
+          onChange={setRevsetDraft}
+          onApply={applyRevset}
+          onCancel={() => setRevsetDraft(null)}
         />
         {error && (
           <p role="alert" className="text-xs text-destructive">

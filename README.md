@@ -32,6 +32,12 @@ upstream entry points to re-check after a rebase are in [`ZCODE.md`](./ZCODE.md)
   `jj` in the thread's environment and an existing jj workspace; it never initializes a
   repository. Destructive actions ask first, available actions depend on environment
   capabilities and permissions, and Squash Onto requires jj's experimental `--onto` option.
+  A workspace without Git beside it shows a **Colocate** button (`jj git colocation enable`).
+- **Jujutsu worktrees:** In a colocated jj repository, T3 Code's worktrees are created as jj
+  workspaces (`jj workspace add --colocate`, jj 0.46 or newer), so jj and the Jujutsu panel work
+  in them. The thread's branch is still checked out for T3 Code's Git features, but it only
+  follows commits made with Git; `jj commit` there detaches Git's HEAD as usual. Removing the
+  worktree also forgets its jj workspace.
 - **Temporary conversations:** Mark a draft or conversation temporary from the header. Leaving it
   does not discard it. The header trash button confirms, then removes it from history through the
   normal deletion flow and preserves the workspace and worktree. The temporary marker is local to

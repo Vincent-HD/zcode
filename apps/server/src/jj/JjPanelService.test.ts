@@ -549,7 +549,7 @@ describe("JjPanelService real jj repositories", () => {
     Effect.gen(function* () {
       const f = yield* fixture;
       const second = `${f.cwd}/second`;
-      yield* f.cli(["workspace", "add", second]);
+      yield* f.cli(["workspace", "add", "--no-colocate", second]);
       const first = yield* f.panel();
       const other = yield* f.service.getPanel({ cwd: second });
       expect(other.status).toBe("ready");
@@ -557,6 +557,16 @@ describe("JjPanelService real jj repositories", () => {
       expect(other.workspaceIdentity.repositoryPath).toBe(first.workspaceIdentity.repositoryPath);
       expect(other.workspaceIdentity.workspaceId).not.toBe(first.workspaceIdentity.workspaceId);
       expect(other.workingCopyCommitId).not.toBe(first.workingCopyCommitId);
+      expect([first.colocated, other.colocated]).toEqual([true, false]);
+      const colocated = yield* f.service.runAction({
+        cwd: second,
+        workspaceIdentity: other.workspaceIdentity,
+        expectedOperationId: other.operationId,
+        action: { type: "colocate" },
+      });
+      expect(colocated.panel.colocated).toBe(true);
+      expect(colocated.receipt.undoAvailable).toBe(false);
+      expect(yield* f.fs.exists(`${second}/.git`)).toBe(true);
       const gitOnly = yield* f.fs.makeTempDirectoryScoped({ prefix: "t3-jj-git-only-" });
       const process = yield* VcsProcess.VcsProcess;
       yield* process.run({

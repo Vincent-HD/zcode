@@ -82,6 +82,7 @@ function panel(description: string, extraRows: ReadonlyArray<string> = []): JjPa
     sourceControl: [],
     revset: "builtin_log()",
     revsetAliases: [],
+    colocated: true,
     offset: 0,
     hasMore: false,
     remotes: [],

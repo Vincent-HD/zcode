@@ -25,6 +25,7 @@ const panel = (input: {
   sourceControl: [],
   revset: "builtin_log()",
   revsetAliases: [],
+  colocated: true,
   offset: input.offset ?? 0,
   rows: input.rows,
   hasMore: input.hasMore ?? false,

@@ -45,6 +45,7 @@ import { removeEmptyDirectory, type RemoveEmptyDirectoryError } from "./removeEm
 import { explicitBareRepositoryEnv, gitConfigEnv } from "./VcsProcess.ts";
 import { makeWorktreeCheckoutCache } from "./worktreeCheckoutCache.ts";
 import { removeLinkedWorktree } from "./worktreeRemoval.ts";
+import { makeJjWorktrees } from "../jj/JjWorktrees.ts";
 import { resolveWorktreesDirectory } from "../worktreesDirectory.ts";
 import {
   parseRemoteNames,
@@ -951,6 +952,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
   const digest = yield* Digest.Digest;
   const hostPlatform = yield* HostProcess.Platform;
   const serviceScope = yield* Effect.scope;
+  const jjWorktrees = yield* makeJjWorktrees;
   const statusFetches = new Map<string, Fiber.Fiber<void, GitCommandError>>();
   const statusFetchProcesses = yield* Semaphore.make(4);
 
@@ -4306,7 +4308,13 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
       { concurrency: "unbounded" },
     );
     const checkoutWorkers = configuredCheckoutWorkers ?? "0";
-    const fastCheckout = checkoutCache !== undefined && options?.fastCheckout === true;
+    const jjCheckout = yield* jjWorktrees.checkout({
+      cwd: input.cwd,
+      worktreePath,
+      refName: checkoutRef,
+    });
+    const fastCheckout =
+      jjCheckout === null && checkoutCache !== undefined && options?.fastCheckout === true;
     const cacheGeneration = fastCheckout ? yield* checkoutCache.currentGeneration : 0;
     const stockCheckout = executeGitWithStableDiagnostics(
       "GitVcsDriver.createWorktree",
@@ -4341,11 +4349,12 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
       },
     );
     yield* (
-      fastCheckout
+      jjCheckout ??
+      (fastCheckout
         ? checkoutCache
             .create({ cwd: input.cwd, worktreePath, refName: checkoutRef, checkoutWorkers })
             .pipe(Effect.flatMap((cloned) => (cloned ? Effect.void : stockCheckout)))
-        : stockCheckout
+        : stockCheckout)
     ).pipe(
       Effect.onError(() =>
         newRefName
@@ -4830,6 +4839,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
       Effect.provideService(Path.Path, path),
     );
     if (result.exitCode === 0) {
+      yield* jjWorktrees.forgetRemoved({ cwd: input.cwd, worktreePath: target });
       // Git for Windows reports success without removing NTFS junctions or their parent directories.
       // Log leftover cleanup failures: Git already unregistered the worktree, so removal cannot be retried.
       if (yield* fileSystem.exists(target).pipe(Effect.orElseSucceed(() => false))) {

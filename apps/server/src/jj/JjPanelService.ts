@@ -532,6 +532,9 @@ const make = Effect.gen(function* () {
       workspaceId: `${directory}:${wcInfo.dev}:${Option.getOrElse(wcInfo.ino, () => 0)}`,
     } satisfies JjWorkspaceIdentity;
   });
+  // A colocated workspace has Git beside `.jj`; on a read error, assume it is, which hides the offer.
+  const isColocated = (identity: JjWorkspaceIdentity) =>
+    fs.exists(path.join(identity.workspaceRoot, ".git")).pipe(Effect.orElseSucceed(() => true));
   const lockFor = (identity: JjWorkspaceIdentity) => {
     const existing = locks.get(identity.repositoryPath);
     if (existing) return existing;
@@ -846,6 +849,7 @@ const make = Effect.gen(function* () {
     revsetAliases: ReadonlyArray<JjRevsetAlias>;
     page: Page;
     history: OperationHistory;
+    colocated: boolean;
     sourceControl: ReadonlyArray<JjSourceControlGroup>;
     offset: number;
     limit: number;
@@ -853,6 +857,7 @@ const make = Effect.gen(function* () {
     status: "ready",
     cwd: input.cwd,
     workspaceIdentity: input.identity,
+    colocated: input.colocated,
     operationId: input.operation.id,
     ...historyStep("undo", input.history.undo),
     ...historyStep("redo", input.history.redo),
@@ -879,7 +884,7 @@ const make = Effect.gen(function* () {
     });
     const revset = input.view?.revset ?? config.revset;
     const limit = input.view?.limit ?? DEFAULT_LOG_LIMIT;
-    const [page, operations, sourceControl] = yield* Effect.all(
+    const [page, operations, sourceControl, colocated] = yield* Effect.all(
       [
         readPage({
           cwd: input.cwd,
@@ -890,11 +895,13 @@ const make = Effect.gen(function* () {
         }),
         history(input),
         readSourceControl({ ...input, operationId: input.operation.id }),
+        isColocated(input.identity),
       ],
       { concurrency: "unbounded" },
     );
     return ready({
       ...input,
+      colocated,
       revset,
       revsetAliases: config.revsetAliases,
       page,
@@ -949,17 +956,19 @@ const make = Effect.gen(function* () {
         cwd: input.cwd,
         operationId: operation.id,
       } satisfies JjPanelSnapshot;
-    const [page, operations, sourceControl] = yield* Effect.all(
+    const [page, operations, sourceControl, colocated] = yield* Effect.all(
       [
         readPage({ cwd: input.cwd, identity, operationId: operation.id, revset, limit }),
         history({ cwd: input.cwd, identity, operation }),
         readSourceControl({ cwd: input.cwd, identity, operationId: operation.id }),
+        isColocated(identity),
       ],
       { concurrency: "unbounded" },
     );
     return ready({
       cwd: input.cwd,
       identity,
+      colocated,
       history: operations,
       sourceControl,
       operation,
@@ -1155,7 +1164,10 @@ const make = Effect.gen(function* () {
           beforeOperationId: before.id,
           operationId: after.id,
           undoAvailable:
-            input.action !== "push" && verified && (yield* head({ cwd })).id === after.id,
+            input.action !== "push" &&
+            input.action !== "colocate" &&
+            verified &&
+            (yield* head({ cwd })).id === after.id,
         };
         if (receipt.undoAvailable) remember(receipts, receiptId, { identity, receipt }, 256);
         return { panel, receipt };
@@ -1411,6 +1423,8 @@ const make = Effect.gen(function* () {
       }
       case "bookmark-delete":
         return { args: ["bookmark", "delete", "--", `exact:${action.name}`] };
+      case "colocate":
+        return { args: ["git", "colocation", "enable"] };
       case "push":
         return {
           args: [

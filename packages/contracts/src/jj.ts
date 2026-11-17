@@ -117,6 +117,8 @@ export const JjPanelReady = Schema.Struct({
   /** The effective revset: the requested one, or the workspace's `revsets.log`. */
   revset: Schema.String,
   revsetAliases: Schema.Array(JjRevsetAlias),
+  /** False when the workspace has no Git worktree beside it, so Git tools cannot see it. */
+  colocated: Schema.Boolean,
   /** Rows start at this log index: 0 replaces the client's rows, otherwise they append. */
   offset: Schema.Number,
   rows: Schema.Array(JjLogRow),
@@ -238,6 +240,7 @@ export const JjRunAction = Schema.Union([
     ),
     remote: JjBookmarkName,
   }),
+  Schema.Struct({ type: Schema.Literal("colocate") }),
 ]);
 export type JjRunAction = typeof JjRunAction.Type;
 export const JjRunActionInput = Schema.Struct({ ...mutationFields, action: JjRunAction });
@@ -285,6 +288,7 @@ export const JjActionReceipt = Schema.Struct({
     "bookmark-delete",
     "bookmark-advance",
     "push",
+    "colocate",
   ]),
   beforeOperationId: JjOperationId,
   operationId: JjOperationId,

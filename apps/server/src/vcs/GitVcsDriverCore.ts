@@ -54,6 +54,7 @@ import {
 } from "./VcsProcess.ts";
 import { makeWorktreeCheckoutCache } from "./worktreeCheckoutCache.ts";
 import { removeLinkedWorktree } from "./worktreeRemoval.ts";
+import { makeJjWorktrees } from "../jj/JjWorktrees.ts";
 import { resolveWorktreesDirectory } from "../worktreesDirectory.ts";
 import {
   parseRemoteNames,
@@ -5995,7 +5996,8 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
     let claimed = false;
     const onWorktreeClaimed = progress?.onWorktreeClaimed;
     yield* (
-      fastCheckout
+      jjCheckout ??
+      (fastCheckout
         ? checkoutCache
             .create({
               cwd: input.cwd,
@@ -6005,7 +6007,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
               lockReason,
             })
             .pipe(Effect.flatMap((cloned) => (cloned ? Effect.void : stockCheckout)))
-        : stockCheckout
+        : stockCheckout)
     ).pipe(
       Effect.andThen(sparseCheckout),
       Effect.andThen(
@@ -6654,6 +6656,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
       Effect.provideService(Path.Path, path),
     );
     if (result.exitCode === 0) {
+      yield* jjWorktrees.forgetRemoved({ cwd: input.cwd, worktreePath: target });
       // Git for Windows reports success without removing NTFS junctions or their parent directories.
       // Log leftover cleanup failures: Git already unregistered the worktree, so removal cannot be retried.
       if (yield* fileSystem.exists(target).pipe(Effect.orElseSucceed(() => false))) {

@@ -648,6 +648,26 @@ const JjPanel = (props: {
               <X />
             </Button>
           )}
+          {panel?.colocated === false && (
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    variant="outline"
+                    size="xs"
+                    disabled={blocked}
+                    onClick={() => run({ type: "colocate" }, "Workspace colocated with Git")}
+                  />
+                }
+              >
+                Colocate
+              </TooltipTrigger>
+              <TooltipPopup>
+                Add a Git worktree beside this workspace (jj git colocation enable), so Git tools
+                and T3 Code's Git features can see it.
+              </TooltipPopup>
+            </Tooltip>
+          )}
           <Button
             variant="ghost"
             size="icon-xs"

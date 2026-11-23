@@ -1,4 +1,3 @@
-// oxlint-disable t3code/no-untranslated-copy -- the fork UI is English-only.
 import { useAtomValue } from "@effect/atom-react";
 import { AuthOrchestrationReadScope } from "@t3tools/contracts";
 import type {
@@ -11,6 +10,7 @@ import type {
   ProjectId,
 } from "@t3tools/contracts";
 import { AsyncResult } from "effect/reactivity";
+import { T, useGT, useMessages, Var } from "gt-react";
 import { Ellipsis, Redo2, RefreshCw, Undo2, X } from "lucide-react";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { Button } from "~/components/ui/button";
@@ -79,6 +79,8 @@ const JjPanel = (props: {
   onOpenPullRequest?: JjForgeSectionProps["onOpenPullRequest"];
   onOpenDiff?: (input: JjOpenDiffInput) => void;
 }) => {
+  const gt = useGT();
+  const messages = useMessages();
   const commandOptions = { reportFailure: false, reportDefect: false };
   const getPanel = useAtomCommand(jjEnvironment.getPanel, commandOptions);
   const describe = useAtomCommand(jjEnvironment.describe, commandOptions);
@@ -271,7 +273,7 @@ const JjPanel = (props: {
           ...(result.value.receipt.undoAvailable && canRevert
             ? {
                 actionProps: {
-                  children: "Undo",
+                  children: gt("Undo"),
                   onClick: () => void revertReceipt(result.value.receipt),
                 },
               }
@@ -283,7 +285,11 @@ const JjPanel = (props: {
     const message = formatJjPanelError(result.cause);
     if (input.keepDialogOnError) setError(message);
     else if (active.current)
-      toastManager.add({ type: "error", title: "Jujutsu action failed", description: message });
+      toastManager.add({
+        type: "error",
+        title: gt("Jujutsu action failed"),
+        description: message,
+      });
     void refresh();
   };
   const context = () =>
@@ -309,14 +315,14 @@ const JjPanel = (props: {
     if (!current || !props.cwd || current.operationId !== target.operationId) {
       toastManager.add({
         type: "error",
-        title: "Nothing to undo",
-        description: "The workspace changed after that action. Use Undo in the panel header.",
+        title: gt("Nothing to undo"),
+        description: gt("The workspace changed after that action. Use Undo in the panel header."),
       });
       return;
     }
     const cwd = props.cwd;
     return mutate({
-      title: "Action undone",
+      title: gt("Action undone"),
       run: () =>
         revert({
           environmentId: props.environmentId,
@@ -337,7 +343,7 @@ const JjPanel = (props: {
     const savedDraft = drafts[row.changeId];
     const scopeKey = draftScopeKey;
     void mutate({
-      title: "Description saved",
+      title: gt("Description saved"),
       run: () =>
         describe({
           environmentId: props.environmentId,
@@ -410,7 +416,7 @@ const JjPanel = (props: {
   const selectFromSourceControl = (changeId: string) => {
     const row = byChange.get(changeId);
     if (!row) {
-      toastManager.add({ type: "info", title: "This revision is outside the log's revset" });
+      toastManager.add({ type: "info", title: gt("This revision is outside the log's revset") });
       return;
     }
     activate(row, "single");
@@ -443,8 +449,12 @@ const JjPanel = (props: {
   };
   const copy = (value: string, label: string) => {
     void writeTextToClipboard(value, namedClipboardTarget(label.toLowerCase())).then(
-      () => toastManager.add({ type: "success", title: `${label} copied` }),
-      () => toastManager.add({ type: "error", title: `Could not copy ${label.toLowerCase()}` }),
+      () => toastManager.add({ type: "success", title: gt("{label} copied", { label }) }),
+      () =>
+        toastManager.add({
+          type: "error",
+          title: gt("Could not copy {label}", { label: label.toLowerCase() }),
+        }),
     );
   };
   const perform = (intent: JjMenuIntent<JjLogRow>) => {
@@ -485,7 +495,7 @@ const JjPanel = (props: {
     targetCommitId: string;
     modifier: JjDragModifier;
   }) => {
-    const result = jjDropAction({ ...drop, rows });
+    const result = jjDropAction({ ...drop, rows }, messages);
     if (!result.ok) {
       toastManager.add({ type: "error", title: result.reason });
       return;
@@ -573,15 +583,22 @@ const JjPanel = (props: {
 
   const blocked = mutating || !canWrite;
   const status = (() => {
-    if (!serverConfig) return "Waiting for the environment…";
+    if (!serverConfig) return gt("Waiting for the environment…");
     if (!supportsPanel)
-      return "This environment's T3 Code server does not support the Jujutsu panel. Update that server to use it.";
-    if (!props.cwd) return "Choose a workspace to view Jujutsu.";
-    if (!canRead) return "This connection needs orchestration read permission to view Jujutsu.";
+      return gt(
+        "This environment's T3 Code server does not support the Jujutsu panel. Update that server to use it.",
+      );
+    if (!props.cwd) return gt("Choose a workspace to view Jujutsu.");
+    if (!canRead) return gt("This connection needs orchestration read permission to view Jujutsu.");
     if (unavailable === "missing-executable")
-      return "Jujutsu is not installed in this environment. Install jj on that server to use this panel.";
+      return gt(
+        "Jujutsu is not installed in this environment. Install jj on that server to use this panel.",
+      );
     if (unavailable === "not-jj-workspace")
-      return "This directory is not a Jujutsu workspace. Run `jj git init --colocate` in it, or open an existing jj workspace.";
+      return gt(
+        "This directory is not a Jujutsu workspace. Run {command} in it, or open an existing jj workspace.",
+        { command: "`jj git init --colocate`" },
+      );
     return null;
   })();
   const editRequested = Boolean(activeRow && describeRequest?.changeId === activeRow.changeId);
@@ -599,15 +616,15 @@ const JjPanel = (props: {
                 <Button
                   variant="ghost"
                   size="icon-xs"
-                  aria-label="Undo last operation"
+                  aria-label={gt("Undo last operation")}
                   disabled={!panel?.undo || blocked}
-                  onClick={() => run({ type: "undo" }, "Operation undone")}
+                  onClick={() => run({ type: "undo" }, gt("Operation undone"))}
                 />
               }
             >
               <Undo2 />
             </TooltipTrigger>
-            <TooltipPopup>{historyLabel("Undo", panel?.undo)}</TooltipPopup>
+            <TooltipPopup>{historyLabel("Undo", panel?.undo, messages)}</TooltipPopup>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger
@@ -615,35 +632,38 @@ const JjPanel = (props: {
                 <Button
                   variant="ghost"
                   size="icon-xs"
-                  aria-label="Redo operation"
+                  aria-label={gt("Redo operation")}
                   disabled={!panel?.redo || blocked}
-                  onClick={() => run({ type: "redo" }, "Operation redone")}
+                  onClick={() => run({ type: "redo" }, gt("Operation redone"))}
                 />
               }
             >
               <Redo2 />
             </TooltipTrigger>
-            <TooltipPopup>{historyLabel("Redo", panel?.redo)}</TooltipPopup>
+            <TooltipPopup>{historyLabel("Redo", panel?.redo, messages)}</TooltipPopup>
           </Tooltip>
           <span
             className="min-w-0 flex-1 truncate px-1 text-xs text-muted-foreground"
             aria-live="polite"
           >
             {selection.length > 1
-              ? `${selection.length} selected`
+              ? gt("{count} selected", { count: selection.length })
               : mutating
-                ? "Applying…"
+                ? gt("Applying…")
                 : loading && props.visible && canRead && supportsPanel
-                  ? "Refreshing…"
+                  ? gt("Refreshing…")
                   : panel
-                    ? `${panel.rows.length}${panel.hasMore ? "+" : ""} revisions`
+                    ? gt(
+                        "{count, plural, one {{count}{more} revision} other {{count}{more} revisions}}",
+                        { count: panel.rows.length, more: panel.hasMore ? "+" : "" },
+                      )
                     : ""}
           </span>
           {selection.length > 1 && (
             <Button
               variant="ghost"
               size="icon-xs"
-              aria-label="Clear selection"
+              aria-label={gt("Clear selection")}
               onClick={() => setSelection(activeChangeId ? [activeChangeId] : [])}
             >
               <X />
@@ -657,22 +677,24 @@ const JjPanel = (props: {
                     variant="outline"
                     size="xs"
                     disabled={blocked}
-                    onClick={() => run({ type: "colocate" }, "Workspace colocated with Git")}
+                    onClick={() => run({ type: "colocate" }, gt("Workspace colocated with Git"))}
                   />
                 }
               >
-                Colocate
+                <T context="verb, adds a Git worktree to a jj workspace">Colocate</T>
               </TooltipTrigger>
               <TooltipPopup>
-                Add a Git worktree beside this workspace (jj git colocation enable), so Git tools
-                and T3 Code's Git features can see it.
+                <T>
+                  Add a Git worktree beside this workspace (<Var>{"jj git colocation enable"}</Var>
+                  ), so Git tools and T3 Code's Git features can see it.
+                </T>
               </TooltipPopup>
             </Tooltip>
           )}
           <Button
             variant="ghost"
             size="icon-xs"
-            aria-label="Refresh Jujutsu"
+            aria-label={gt("Refresh Jujutsu")}
             disabled={mutating || loading || !canRead || !supportsPanel}
             onClick={() => void refresh({ reload: true })}
           >
@@ -684,7 +706,7 @@ const JjPanel = (props: {
                 <Button
                   variant="ghost"
                   size="icon-xs"
-                  aria-label="Jujutsu actions"
+                  aria-label={gt("Jujutsu actions")}
                   disabled={!panel}
                 />
               }
@@ -700,29 +722,30 @@ const JjPanel = (props: {
                 }
                 onClick={() => receipt && void revertReceipt(receipt)}
               >
-                Revert last panel action
+                <T>Revert last panel action</T>
               </MenuItem>
               <MenuItem
                 disabled={blocked || !activeRow}
                 onClick={() => activeRow && setDialog({ kind: "push", revision: activeRow })}
               >
-                Push bookmarks…
+                <T>Push bookmarks…</T>
               </MenuItem>
               <MenuItem
                 disabled={blocked}
                 onClick={() =>
                   setDialog({
                     kind: "confirm",
-                    title: "Abandon orphaned revisions?",
-                    description:
+                    title: gt("Abandon orphaned revisions?"),
+                    description: gt(
                       'Abandons mutable heads that have no description and no workspace, bookmark or tag, such as working copies left by removed worktrees. The "Orphaned revisions" revset preset lists them first. Undo restores them.',
-                    confirmLabel: "Abandon",
+                    ),
+                    confirmLabel: gt("Abandon", { $context: "verb, abandons revisions" }),
                     destructive: true,
                     action: { type: "abandon-orphans" },
                   })
                 }
               >
-                Abandon orphaned revisions…
+                <T>Abandon orphaned revisions…</T>
               </MenuItem>
               <MenuSeparator />
               <MenuItem
@@ -734,7 +757,7 @@ const JjPanel = (props: {
                   void refresh({ reload: true, view: nextView });
                 }}
               >
-                Reset revset to default
+                <T>Reset revset to default</T>
               </MenuItem>
             </MenuPopup>
           </Menu>
@@ -760,7 +783,7 @@ const JjPanel = (props: {
         <>
           {!canWrite && !mutating && (
             <p className="border-b px-3 py-1 text-xs text-muted-foreground">
-              Source control write permission is required to change revisions.
+              <T>Source control write permission is required to change revisions.</T>
             </p>
           )}
           <div
@@ -774,7 +797,7 @@ const JjPanel = (props: {
               expanded={sourceControlOpen}
               onClick={() => setSourceControlOpen((open) => !open)}
             >
-              Source control
+              <T>Source control</T>
             </CollapsibleSectionHeader>
             {sourceControlOpen && (
               <div className="min-h-0 overflow-y-auto">
@@ -799,14 +822,14 @@ const JjPanel = (props: {
             expanded={logOpen}
             onClick={() => setLogOpen((open) => !open)}
           >
-            Log
+            <T context="the Jujutsu revision log section">Log</T>
           </CollapsibleSectionHeader>
           {logOpen && (
             <div
               ref={attachList}
               role="listbox"
               tabIndex={0}
-              aria-label="Revision graph"
+              aria-label={gt("Revision graph")}
               aria-multiselectable="true"
               aria-activedescendant={activeRow ? rowDomId(activeRow.commitId) : undefined}
               className="relative min-h-0 flex-1 overflow-y-auto focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
@@ -848,7 +871,7 @@ const JjPanel = (props: {
               {panel.hasMore && (
                 <div className="p-2">
                   <Button size="xs" variant="outline" disabled={loading} onClick={loadMore}>
-                    Load {JJ_LOG_PAGE} more
+                    {gt("Load {count} more", { count: JJ_LOG_PAGE })}
                   </Button>
                 </div>
               )}

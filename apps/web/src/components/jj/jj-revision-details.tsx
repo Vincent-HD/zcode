@@ -1,4 +1,3 @@
-// oxlint-disable t3code/no-untranslated-copy -- the fork UI is English-only.
 import type {
   EnvironmentId,
   JjLogRow,
@@ -6,11 +5,13 @@ import type {
   JjRunAction,
   JjSignature,
 } from "@t3tools/contracts";
+import { msg, T, useGT, Var } from "gt-react";
 import { FileDiff } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Textarea } from "~/components/ui/textarea";
+import { m } from "~/i18n/messages";
 import { jjEnvironment } from "~/state/jj";
 import { useAtomCommand } from "~/state/use-atom-command";
 import type { JjDialogRequest } from "./jj-actions";
@@ -59,6 +60,7 @@ export interface JjRevisionDetailsProps {
 
 /** Details for one revision. Content is read lazily per commit id, which never changes. */
 export const JjRevisionDetailsPanel = (props: JjRevisionDetailsProps) => {
+  const gt = useGT();
   const { row } = props;
   const getRevision = useAtomCommand(jjEnvironment.getRevision, {
     reportFailure: false,
@@ -103,29 +105,29 @@ export const JjRevisionDetailsPanel = (props: JjRevisionDetailsProps) => {
   };
 
   return (
-    <section aria-label="Revision details" className="space-y-2 px-3 py-2 text-xs">
+    <section aria-label={gt("Revision details")} className="space-y-2 px-3 py-2 text-xs">
       <div className="flex min-w-0 flex-wrap items-center gap-1">
         <JjHint
-          label="Copy change ID"
+          label={gt("Copy change ID")}
           render={
             <button
               type="button"
-              aria-label="Copy change ID"
+              aria-label={gt("Copy change ID")}
               className="rounded-sm focus-visible:outline-2 focus-visible:outline-ring"
-              onClick={() => props.onCopy(row.changeId, "Change ID")}
+              onClick={() => props.onCopy(row.changeId, m(msg("Change ID")))}
             />
           }
         >
           <JjChangeId row={row} length={12} />
         </JjHint>
         <JjHint
-          label="Copy commit ID"
+          label={gt("Copy commit ID")}
           render={
             <button
               type="button"
-              aria-label="Copy commit ID"
+              aria-label={gt("Copy commit ID")}
               className="rounded-sm font-mono text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring"
-              onClick={() => props.onCopy(row.commitId, "Commit ID")}
+              onClick={() => props.onCopy(row.commitId, m(msg("Commit ID")))}
             />
           }
         >
@@ -133,32 +135,32 @@ export const JjRevisionDetailsPanel = (props: JjRevisionDetailsProps) => {
         </JjHint>
         {row.current && (
           <Badge size="sm" variant="info">
-            working copy
+            <T context="revision state">working copy</T>
           </Badge>
         )}
         {locked && (
           <Badge size="sm" variant="secondary">
-            immutable
+            <T context="revision state">immutable</T>
           </Badge>
         )}
         {row.empty && !row.root && (
           <Badge size="sm" variant="outline">
-            empty
+            <T context="revision state, no changes">empty</T>
           </Badge>
         )}
         {row.conflict && (
           <Badge size="sm" variant="error">
-            conflicted
+            <T context="revision state">conflicted</T>
           </Badge>
         )}
         {row.divergent && (
           <Badge size="sm" variant="warning">
-            divergent
+            <T context="revision state">divergent</T>
           </Badge>
         )}
         {row.hidden && (
           <Badge size="sm" variant="outline">
-            hidden
+            <T context="revision state">hidden</T>
           </Badge>
         )}
         <JjRefPills row={row} />
@@ -168,14 +170,18 @@ export const JjRevisionDetailsPanel = (props: JjRevisionDetailsProps) => {
           {current.error}
         </p>
       )}
-      {!current && <p className="text-muted-foreground">Loading revision…</p>}
+      {!current && (
+        <p className="text-muted-foreground">
+          <T>Loading revision…</T>
+        </p>
+      )}
       {details && (
         <>
           <div className="space-y-0.5">
-            <Signature label="Author" signature={details.author} />
+            <Signature label={gt("Author")} signature={details.author} />
             {(details.committer.email !== details.author.email ||
               details.committer.timestamp !== details.author.timestamp) && (
-              <Signature label="Committer" signature={details.committer} />
+              <Signature label={gt("Committer")} signature={details.committer} />
             )}
           </div>
           {editing && !locked ? (
@@ -183,7 +189,9 @@ export const JjRevisionDetailsPanel = (props: JjRevisionDetailsProps) => {
               <Textarea
                 size="sm"
                 autoFocus
-                aria-label={`Description for ${row.changeId.slice(0, 8)}`}
+                aria-label={gt("Description for {revision}", {
+                  revision: row.changeId.slice(0, 8),
+                })}
                 value={text}
                 disabled={props.busy}
                 onChange={(event) =>
@@ -211,8 +219,10 @@ export const JjRevisionDetailsPanel = (props: JjRevisionDetailsProps) => {
               />
               {stale && (
                 <p className="text-warning-foreground">
-                  This revision changed after you started editing. Discard to load its current
-                  description.
+                  <T>
+                    This revision changed after you started editing. Discard to load its current
+                    description.
+                  </T>
                 </p>
               )}
               <div className="flex gap-1">
@@ -221,7 +231,7 @@ export const JjRevisionDetailsPanel = (props: JjRevisionDetailsProps) => {
                   disabled={props.busy || !props.canDescribe || stale || !dirty}
                   onClick={save}
                 >
-                  Save description
+                  <T>Save description</T>
                 </Button>
                 <Button
                   size="xs"
@@ -232,7 +242,7 @@ export const JjRevisionDetailsPanel = (props: JjRevisionDetailsProps) => {
                     setEditing(false);
                   }}
                 >
-                  Discard
+                  <T context="verb, drops a draft">Discard</T>
                 </Button>
               </div>
             </div>
@@ -245,7 +255,7 @@ export const JjRevisionDetailsPanel = (props: JjRevisionDetailsProps) => {
                     : "min-w-0 flex-1 text-muted-foreground italic"
                 }
               >
-                {details.description.trimEnd() || "(no description)"}
+                {details.description.trimEnd() || gt("(no description)")}
               </p>
               {!locked && (
                 <Button
@@ -254,16 +264,19 @@ export const JjRevisionDetailsPanel = (props: JjRevisionDetailsProps) => {
                   disabled={props.busy || !props.canDescribe}
                   onClick={() => setEditing(true)}
                 >
-                  {dirty ? "Resume draft" : "Describe"}
+                  {dirty
+                    ? gt("Resume draft")
+                    : gt("Describe", { $context: "verb, edits a description" })}
                 </Button>
               )}
             </div>
           )}
           <div className="flex items-center justify-between">
             <span className="font-medium text-muted-foreground">
-              {details.files.length}
-              {details.filesTruncated ? "+" : ""} changed file
-              {details.files.length === 1 ? "" : "s"}
+              {gt(
+                "{count, plural, one {{count}{more} changed file} other {{count}{more} changed files}}",
+                { count: details.files.length, more: details.filesTruncated ? "+" : "" },
+              )}
             </span>
             <Button
               size="xs"
@@ -272,7 +285,7 @@ export const JjRevisionDetailsPanel = (props: JjRevisionDetailsProps) => {
               onClick={() => props.onOpenDiff({ commitId: row.commitId })}
             >
               <FileDiff />
-              Show diff
+              <T>Show diff</T>
             </Button>
           </div>
           <ul className="space-y-0.5">
@@ -317,7 +330,9 @@ export const JjRevisionDetailsPanel = (props: JjRevisionDetailsProps) => {
             .filter((path) => !details.files.some((file) => file.path === path))
             .map((path) => (
               <p key={path} className="break-all text-destructive">
-                Conflict · {path}
+                <T>
+                  Conflict · <Var>{path}</Var>
+                </T>
               </p>
             ))}
         </>

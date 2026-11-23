@@ -1,4 +1,3 @@
-// oxlint-disable t3code/no-untranslated-copy -- the fork UI is English-only.
 import type {
   OrchestrationV2ProviderTurn,
   ProviderInstanceId,
@@ -6,6 +5,9 @@ import type {
 } from "@t3tools/contracts";
 import * as DateTime from "effect/DateTime";
 import { remainingPercent } from "@t3tools/shared/usageLimits";
+import { msg } from "gt-react";
+
+import { m, type MessageResolver } from "../../i18n/messages";
 
 const compactCountFormatter = new Intl.NumberFormat("en-US", {
   notation: "compact",
@@ -134,7 +136,10 @@ const accountSummaryNames = (accounts: UsageLimitsReport["accounts"]) => {
   );
 };
 
-export const composerQuotaSummary = (accounts: UsageLimitsReport["accounts"]) => {
+export const composerQuotaSummary = (
+  accounts: UsageLimitsReport["accounts"],
+  resolve: MessageResolver = m,
+) => {
   const accountNames = accountSummaryNames(accounts);
   const includeAccountName = accounts.length > 1;
   const rows = accounts.flatMap((account, accountIndex) => {
@@ -156,7 +161,7 @@ export const composerQuotaSummary = (accounts: UsageLimitsReport["accounts"]) =>
     });
   });
 
-  return rows.join(" · ") || "Quota unavailable";
+  return rows.join(" · ") || resolve(msg("Quota unavailable"));
 };
 
 export type CompletedUsageTurn = Pick<

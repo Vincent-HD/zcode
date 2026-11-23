@@ -6,6 +6,7 @@ import type {
   UsageLimitSourceSnapshots,
 } from "@t3tools/contracts";
 import { collectProviderUsageLimits } from "@t3tools/shared/usageLimits";
+import { useMessages } from "gt-react";
 
 import { selectComposerUsageAccounts } from "../components/chat/composer-usage.logic";
 import { ComposerUsageFooter } from "../components/chat/ComposerUsageFooter";
@@ -23,6 +24,7 @@ export const useZcodeChatView = (input: {
   readonly isServerThread: boolean;
 }) => {
   const isJjDiffSelected = useIsJjDiffSelected(input.activeThreadRef);
+  const messages = useMessages();
   const rightPanel: ZcodeRightPanelContext = {
     threadRef: input.activeThreadRef,
     cwd: input.gitCwd,
@@ -31,7 +33,7 @@ export const useZcodeChatView = (input: {
   };
   return {
     isJjDiffSelected,
-    launchers: zcodeSurfaceLaunchers(rightPanel),
+    launchers: zcodeSurfaceLaunchers(rightPanel, messages),
     rightPanel,
   };
 };

@@ -1,10 +1,12 @@
-// oxlint-disable t3code/no-untranslated-copy -- the fork UI is English-only.
 import {
   estimateModelsDevCost,
   resolveModelsDevPrice,
   type ModelsDevCatalog,
 } from "./models-dev-pricing";
 import type { UsageTurn } from "./turn-usage.logic";
+import { msg } from "gt-react";
+
+import { m, type MessageResolver } from "../../i18n/messages";
 
 const dollarFormatter = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -64,19 +66,17 @@ export const sessionPricing = (input: {
   };
 };
 
-export const pricingAssumption = (value: string) => {
-  switch (value) {
-    case "cache-read-tokens-unknown":
-      return "Unreported cached tokens are priced as normal input.";
-    case "cache-write-tokens-unknown":
-      return "Cache writes are unreported; the estimate assumes none.";
-    case "cache-read-rate-assumed-input":
-      return "No cache-read rate is listed; the normal input rate is used.";
-    case "cache-write-rate-assumed-input":
-      return "No cache-write rate is listed; the normal input rate is used.";
-    case "context-tokens-unknown":
-      return "Context size is unavailable; standard context rates are used.";
-    default:
-      return "Some pricing details are unavailable.";
-  }
+const PRICING_ASSUMPTIONS: Readonly<Record<string, string>> = {
+  "cache-read-tokens-unknown": msg("Unreported cached tokens are priced as normal input."),
+  "cache-write-tokens-unknown": msg("Cache writes are unreported; the estimate assumes none."),
+  "cache-read-rate-assumed-input": msg(
+    "No cache-read rate is listed; the normal input rate is used.",
+  ),
+  "cache-write-rate-assumed-input": msg(
+    "No cache-write rate is listed; the normal input rate is used.",
+  ),
+  "context-tokens-unknown": msg("Context size is unavailable; standard context rates are used."),
 };
+
+export const pricingAssumption = (value: string, resolve: MessageResolver = m) =>
+  resolve(PRICING_ASSUMPTIONS[value] ?? msg("Some pricing details are unavailable."));

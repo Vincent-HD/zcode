@@ -1,5 +1,7 @@
-// oxlint-disable t3code/no-untranslated-copy -- the fork UI is English-only.
+import { msg } from "gt-react";
 import { useSyncExternalStore } from "react";
+
+import { m } from "../../i18n/messages";
 import { parseModelsDevPricing, type ModelsDevCatalog } from "./models-dev-pricing";
 
 export type ModelsDevPricingState = {
@@ -41,19 +43,20 @@ const refresh = async () => {
       signal: controller.signal,
       credentials: "omit",
     });
-    if (!response.ok) throw new Error(`models.dev returned HTTP ${response.status}`);
+    if (!response.ok)
+      throw new Error(m(msg("models.dev returned HTTP {status}", { status: response.status })));
     const document: unknown = await response.json();
     const catalog = parseModelsDevPricing(document);
-    if (!catalog) throw new Error("models.dev returned an invalid pricing catalog");
+    if (!catalog) throw new Error(m(msg("models.dev returned an invalid pricing catalog")));
     publish({ catalog, error: null, loading: false });
   } catch (error) {
     publish({
       catalog: state.catalog,
       error: controller.signal.aborted
-        ? "models.dev request timed out"
+        ? m(msg("models.dev request timed out"))
         : error instanceof Error
           ? error.message
-          : "models.dev request failed",
+          : m(msg("models.dev request failed")),
       loading: false,
     });
   } finally {

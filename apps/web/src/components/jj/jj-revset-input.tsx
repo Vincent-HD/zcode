@@ -1,5 +1,5 @@
-// oxlint-disable t3code/no-untranslated-copy -- the fork UI is English-only.
 import type { JjLogRow, JjRevsetAlias } from "@t3tools/contracts";
+import { useGT } from "gt-react";
 import { type KeyboardEvent, type SyntheticEvent, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import {
@@ -26,6 +26,7 @@ export const JjRevsetInput = (props: {
   onApply: () => void;
   onCancel: () => void;
 }) => {
+  const gt = useGT();
   const inputRef = useRef<HTMLInputElement>(null);
   const [caret, setCaret] = useState(props.value.length);
   const [open, setOpen] = useState(false);
@@ -96,7 +97,7 @@ export const JjRevsetInput = (props: {
       <AutocompleteInput
         ref={inputRef}
         size="sm"
-        aria-label="Revset"
+        aria-label={gt("Revset", { $context: "a Jujutsu revision query field" })}
         spellCheck={false}
         placeholder={props.placeholder}
         onSelect={syncCaret}

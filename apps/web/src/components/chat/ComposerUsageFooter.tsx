@@ -1,6 +1,7 @@
-// oxlint-disable t3code/no-untranslated-copy -- the fork UI is English-only.
-import type { ServerProviderUsageLimits, UsageLimitsReport } from "@t3tools/contracts";
+import type { UsageLimitsReport } from "@t3tools/contracts";
 import { remainingPercent } from "@t3tools/shared/usageLimits";
+import { limitsNotice } from "@t3tools/shared/usageLimitsCopy";
+import { T, useGT, useMessages, Var } from "gt-react";
 import { CircleGauge, Database, Gauge, Wallet } from "lucide-react";
 import type * as DateTime from "effect/DateTime";
 import type { ContextWindowSnapshot } from "@t3tools/client-runtime/state/context-window";
@@ -20,16 +21,6 @@ import {
   type CompletedUsageTurn,
 } from "./composer-usage.logic";
 
-const limitsNotice = (limits: ServerProviderUsageLimits): string | null => {
-  if (limits.unavailable?.reason === "unsupported") {
-    return limits.unavailable.message ?? "This account has no subscription limits.";
-  }
-  if (limits.unavailable?.reason === "probeFailed") {
-    return limits.unavailable.message ?? "Could not read limits.";
-  }
-  return limits.windows.length === 0 ? "No limits reported." : null;
-};
-
 const count = (value: number | null | undefined) =>
   value == null ? "N/A" : value.toLocaleString();
 const percent = (value: number | null) => (value === null ? "N/A" : `${value.toFixed(0)}%`);
@@ -46,6 +37,8 @@ export const ComposerUsageFooter = (props: {
   }>;
   readonly onOpenLimits: () => void;
 }) => {
+  const gt = useGT();
+  const messages = useMessages();
   const pricing = useModelsDevPricing();
   const costs = sessionPricing({ catalog: pricing.catalog, turns: props.usageTurns });
   const usage = lastResponseUsage(props.lastTurn);
@@ -54,43 +47,53 @@ export const ComposerUsageFooter = (props: {
   const context = props.context;
   const speed =
     usage?.tokensPerSecond == null ? "N/A tok/s" : `${usage.tokensPerSecond.toFixed(1)} tok/s`;
-  const accountSummary = composerQuotaSummary(props.accounts);
+  const accountSummary = composerQuotaSummary(props.accounts, messages);
+  const notReported = gt("Not reported");
   return (
     <div
       data-composer-usage-footer="true"
       className="flex flex-wrap items-center gap-x-1 gap-y-0.5 border-t border-border/40 px-3 py-1 text-2xs text-muted-foreground tabular-nums sm:px-4"
     >
       <UsagePopover
-        label="Session statistics"
+        label={gt("Session statistics")}
         icon={<Gauge className="size-3.5 shrink-0" />}
-        summary={`${session.turns} turns · ${props.toolCalls.length} tools · ${speed}`}
+        summary={gt("{turns} turns · {tools} tools · {speed}", {
+          turns: session.turns,
+          tools: props.toolCalls.length,
+          speed,
+        })}
       >
         <dl>
-          <UsageRow label="Completed turns" value={session.turns} />
-          <UsageRow label="Tool calls" value={props.toolCalls.length} />
-          <UsageRow label="Turn time" value={formatUsageDuration(session.durationMs)} />
-          <UsageRow label="Tool time" value={formatUsageDuration(toolTime)} />
+          <UsageRow label={gt("Completed turns")} value={session.turns} />
+          <UsageRow label={gt("Tool calls")} value={props.toolCalls.length} />
+          <UsageRow label={gt("Turn time")} value={formatUsageDuration(session.durationMs)} />
+          <UsageRow label={gt("Tool time")} value={formatUsageDuration(toolTime)} />
           <UsageRow
-            label="Last response time"
+            label={gt("Last response time")}
             value={formatUsageDuration(completedTurnDuration(props.lastTurn))}
           />
-          <UsageRow label="Time to first token" value="Not reported" />
-          <UsageRow label="Last response throughput" value={speed} />
+          <UsageRow label={gt("Time to first token")} value={notReported} />
+          <UsageRow label={gt("Last response throughput")} value={speed} />
         </dl>
         <p className="mt-2 text-2xs text-muted-foreground">
-          Totals cover available completed turns in the active provider session.
+          <T>Totals cover available completed turns in the active provider session.</T>
         </p>
         <p className="mt-2 text-2xs text-muted-foreground">
-          Throughput averages output over the full turn, including reasoning, tools and waits.
-          Overlapping tool calls count once in tool time.
+          <T>
+            Throughput averages output over the full turn, including reasoning, tools and waits.
+            Overlapping tool calls count once in tool time.
+          </T>
         </p>
       </UsagePopover>
       <UsagePopover
-        label="Token usage"
+        label={gt("Token usage")}
         icon={<Database className="size-3.5 shrink-0" />}
         summary={
           <>
-            {compactTokenCount(session.totalTokens)} tok · Cache {percent(session.cacheHitPercent)}
+            {gt("{tokens} tok · Cache {percent}", {
+              tokens: compactTokenCount(session.totalTokens),
+              percent: percent(session.cacheHitPercent),
+            })}
             {costs.totalUsd !== null
               ? ` · ${usageDollars(costs.totalUsd)}${costs.partial ? "+" : ""}`
               : ""}
@@ -98,10 +101,10 @@ export const ComposerUsageFooter = (props: {
         }
       >
         <dl>
-          <UsageRow label="Session total" value={`${count(session.totalTokens)} tok`} />
-          <UsageRow label="Cache hit" value={percent(session.cacheHitPercent)} />
+          <UsageRow label={gt("Session total")} value={`${count(session.totalTokens)} tok`} />
+          <UsageRow label={gt("Cache hit")} value={percent(session.cacheHitPercent)} />
           <UsageRow
-            label="Non-cached input"
+            label={gt("Non-cached input")}
             value={
               <span>
                 {count(session.uncachedInputTokens)} tok
@@ -112,7 +115,7 @@ export const ComposerUsageFooter = (props: {
             }
           />
           <UsageRow
-            label="Cached input"
+            label={gt("Cached input")}
             value={
               <span>
                 {count(session.cachedInputTokens)} tok
@@ -124,12 +127,12 @@ export const ComposerUsageFooter = (props: {
           />
           {session.cacheCreationTokens !== null && (
             <UsageRow
-              label="Cache writes (input subset)"
+              label={gt("Cache writes (input subset)")}
               value={`${count(session.cacheCreationTokens)} tok`}
             />
           )}
           <UsageRow
-            label="Output"
+            label={gt("Output", { $context: "output tokens" })}
             value={
               <span>
                 {count(session.outputTokens)} tok
@@ -140,73 +143,90 @@ export const ComposerUsageFooter = (props: {
             }
           />
           <UsageRow
-            label="Estimated API cost"
+            label={gt("Estimated API cost")}
             value={
               costs.totalUsd !== null
                 ? `${usageDollars(costs.totalUsd)}${costs.partial ? "+" : ""}`
                 : pricing.loading
-                  ? "Loading rates…"
-                  : "Unavailable"
+                  ? gt("Loading rates…")
+                  : gt("Unavailable", { $context: "estimated cost is unavailable" })
             }
           />
           {context?.cost && (
             <UsageRow
-              label="Provider-reported cost"
+              label={gt("Provider-reported cost")}
               value={`${context.cost.currency} ${context.cost.amount.toFixed(1)}`}
             />
           )}
         </dl>
         <div className="mt-2 border-t border-border/60 pt-2">
-          <p className="mb-1 font-medium text-foreground">Last response</p>
+          <p className="mb-1 font-medium text-foreground">
+            <T>Last response</T>
+          </p>
           <dl>
-            <UsageRow label="Input" value={`${count(usage?.inputTokens)} tok`} />
-            <UsageRow label="Output" value={`${count(usage?.outputTokens)} tok`} />
             <UsageRow
-              label="Reasoning (output subset)"
+              label={gt("Input", { $context: "input tokens" })}
+              value={`${count(usage?.inputTokens)} tok`}
+            />
+            <UsageRow
+              label={gt("Output", { $context: "output tokens" })}
+              value={`${count(usage?.outputTokens)} tok`}
+            />
+            <UsageRow
+              label={gt("Reasoning (output subset)")}
               value={`${count(usage?.reasoningTokens)} tok`}
             />
           </dl>
         </div>
         <p className="mt-2 text-2xs text-muted-foreground">
-          Available completed main-agent turns in the active provider session; excludes subagents.
+          <T>
+            Available completed main-agent turns in the active provider session; excludes subagents.
+          </T>
           {session.partial
-            ? ` Partial totals: ${session.reportedTurns}/${session.turns} turns reported usage.`
+            ? ` ${gt("Partial totals: {reported}/{turns} turns reported usage.", {
+                reported: session.reportedTurns,
+                turns: session.turns,
+              })}`
             : ""}
         </p>
         <p className="mt-2 text-2xs text-muted-foreground">
-          Current{" "}
-          <a className="underline" href="https://models.dev" target="_blank" rel="noreferrer">
-            models.dev
-          </a>{" "}
-          API-equivalent estimates; subscription charges are separate. {costs.pricedTurns}/
-          {costs.completedTurns} turns priced.
+          <T>
+            Current{" "}
+            <a className="underline" href="https://models.dev" target="_blank" rel="noreferrer">
+              models.dev
+            </a>{" "}
+            API-equivalent estimates; subscription charges are separate.{" "}
+            <Var>{costs.pricedTurns}</Var>/<Var>{costs.completedTurns}</Var> turns priced.
+          </T>
           {costs.canonicalFallback
-            ? " Some models use canonical list prices; custom provider charges may differ."
+            ? ` ${gt("Some models use canonical list prices; custom provider charges may differ.")}`
             : ""}
         </p>
         {costs.assumptions.map((assumption) => (
           <p key={assumption} className="mt-1 text-2xs text-muted-foreground">
-            {pricingAssumption(assumption)}
+            {pricingAssumption(assumption, messages)}
           </p>
         ))}
         {pricing.error && (
           <p className="mt-1 text-2xs text-muted-foreground">
             {pricing.error}
-            {pricing.catalog ? " · Using the last fetched rates." : ""}
+            {pricing.catalog ? ` · ${gt("Using the last fetched rates.")}` : ""}
           </p>
         )}
       </UsagePopover>
       <UsagePopover
-        label="Context usage"
+        label={gt("Context usage")}
         icon={<CircleGauge className="size-3.5 shrink-0" />}
         summary={percent(context?.usedPercentage ?? null)}
       >
         <div className="mb-2 flex items-center justify-between gap-3">
           <span>
-            <strong className="font-medium text-foreground">
-              {percent(context?.usedPercentage ?? null)}
-            </strong>{" "}
-            of context used
+            <T>
+              <strong className="font-medium text-foreground">
+                <Var>{percent(context?.usedPercentage ?? null)}</Var>
+              </strong>{" "}
+              of context used
+            </T>
           </span>
           <span className="text-foreground">
             {compactTokenCount(context?.usedTokens)} / {compactTokenCount(context?.maxTokens)}
@@ -214,7 +234,7 @@ export const ComposerUsageFooter = (props: {
         </div>
         <div
           role="progressbar"
-          aria-label="Context window used"
+          aria-label={gt("Context window used")}
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={context?.usedPercentage ?? undefined}
@@ -226,57 +246,75 @@ export const ComposerUsageFooter = (props: {
           />
         </div>
         <dl>
-          <UsageRow label="Used context" value={`${count(context?.usedTokens)} tok`} />
-          <UsageRow label="Remaining" value={`${count(context?.remainingTokens)} tok`} />
-          <UsageRow label="System prompt" value="Not reported" />
-          <UsageRow label="Tool definitions" value="Not reported" />
-          <UsageRow label="Messages" value="Not reported" />
+          <UsageRow label={gt("Used context")} value={`${count(context?.usedTokens)} tok`} />
+          <UsageRow
+            label={gt("Remaining", { $context: "remaining context tokens" })}
+            value={`${count(context?.remainingTokens)} tok`}
+          />
+          <UsageRow label={gt("System prompt")} value={notReported} />
+          <UsageRow label={gt("Tool definitions")} value={notReported} />
+          <UsageRow
+            label={gt("Messages", { $context: "context taken by conversation messages" })}
+            value={notReported}
+          />
         </dl>
         <p className="mt-2 text-2xs text-muted-foreground">
           {context
-            ? `Provider report: ${context.updatedAt}. Component breakdown is unavailable.`
-            : "Provider has not reported context usage."}
+            ? gt("Provider report: {updatedAt}. Component breakdown is unavailable.", {
+                updatedAt: context.updatedAt,
+              })
+            : gt("Provider has not reported context usage.")}
         </p>
       </UsagePopover>
       <UsagePopover
-        label="Account usage"
+        label={gt("Account usage")}
         icon={<Wallet className="size-3.5 shrink-0" />}
         summary={accountSummary}
       >
-        {props.accounts.length === 0 && <p>No account usage reported for this provider.</p>}
-        {props.accounts.map((account) => (
-          <div key={account.id} className="mb-2 last:mb-0">
-            <p className="mb-1 font-medium text-foreground">
-              {account.displayName ?? account.sourceLabel ?? account.driver}
-            </p>
-            <dl>
-              {account.limits.windows.map((window) => (
-                <UsageRow
-                  key={window.id}
-                  label={window.label}
-                  value={`${remainingPercent(window)}% left`}
-                />
-              ))}
-            </dl>
-            {account.limits.windows.map(
-              (window) =>
-                window.resetsAt && (
-                  <p key={window.id} className="mt-1 text-2xs text-muted-foreground">
-                    {window.label} resets {window.resetsAt}
-                  </p>
-                ),
-            )}
-            <p className="mt-1 text-2xs text-muted-foreground">
-              Checked {account.limits.checkedAt}
-              {limitsNotice(account.limits) ? ` · ${limitsNotice(account.limits)}` : ""}
-            </p>
-          </div>
-        ))}
+        {props.accounts.length === 0 && (
+          <p>
+            <T>No account usage reported for this provider.</T>
+          </p>
+        )}
+        {props.accounts.map((account) => {
+          const notice = limitsNotice(account.limits, messages);
+          return (
+            <div key={account.id} className="mb-2 last:mb-0">
+              <p className="mb-1 font-medium text-foreground">
+                {account.displayName ?? account.sourceLabel ?? account.driver}
+              </p>
+              <dl>
+                {account.limits.windows.map((window) => (
+                  <UsageRow
+                    key={window.id}
+                    label={window.label}
+                    value={gt("{percent}% left", { percent: remainingPercent(window) })}
+                  />
+                ))}
+              </dl>
+              {account.limits.windows.map(
+                (window) =>
+                  window.resetsAt && (
+                    <p key={window.id} className="mt-1 text-2xs text-muted-foreground">
+                      {gt("{label} resets {resetsAt}", {
+                        label: window.label,
+                        resetsAt: window.resetsAt,
+                      })}
+                    </p>
+                  ),
+              )}
+              <p className="mt-1 text-2xs text-muted-foreground">
+                {gt("Checked {checkedAt}", { checkedAt: account.limits.checkedAt })}
+                {notice ? ` · ${notice}` : ""}
+              </p>
+            </div>
+          );
+        })}
         <Button variant="outline" size="xs" onClick={props.onOpenLimits}>
-          Open account limits
+          <T>Open account limits</T>
         </Button>
         <p className="mt-2 text-2xs text-muted-foreground">
-          Account quota is separate from the API-equivalent token cost.
+          <T>Account quota is separate from the API-equivalent token cost.</T>
         </p>
       </UsagePopover>
     </div>

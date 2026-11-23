@@ -1,4 +1,3 @@
-// oxlint-disable t3code/no-untranslated-copy -- the fork UI is English-only.
 import {
   JjBookmarkName,
   type EnvironmentId,
@@ -6,6 +5,7 @@ import {
   type JjRunAction,
 } from "@t3tools/contracts";
 import * as Schema from "effect/Schema";
+import { msg, T, useGT, useMessages } from "gt-react";
 import { useEffect, useState } from "react";
 import {
   AlertDialog,
@@ -19,14 +19,15 @@ import { Button } from "~/components/ui/button";
 import { Checkbox } from "~/components/ui/checkbox";
 import { Input } from "~/components/ui/input";
 import { Textarea } from "~/components/ui/textarea";
+import type { MessageResolver } from "~/i18n/messages";
 import { jjEnvironment } from "~/state/jj";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { jjSquashTargets, type JjDialogRequest } from "./jj-actions";
 
 const isBookmarkName = Schema.is(JjBookmarkName);
 
-const revisionLabel = (row: JjLogRow) =>
-  `${row.changeId.slice(0, 8)} · ${row.summary || "(no description)"}`;
+const revisionLabel = (row: JjLogRow, resolve: MessageResolver) =>
+  `${row.changeId.slice(0, 8)} · ${row.summary || resolve(msg("(no description)"))}`;
 
 const ancestorBookmarks = (input: { revision: JjLogRow; rows: ReadonlyArray<JjLogRow> }) => {
   const byId = new Map(input.rows.map((row) => [row.commitId, row]));
@@ -52,6 +53,7 @@ const CommitMessage = (props: {
   value: string | null;
   onChange: (value: string) => void;
 }) => {
+  const gt = useGT();
   const getRevision = useAtomCommand(jjEnvironment.getRevision, {
     reportFailure: false,
     reportDefect: false,
@@ -72,11 +74,13 @@ const CommitMessage = (props: {
   }, [getRevision, environmentId, cwd, commitId, prefilled, onChange]);
   return (
     <label className="block space-y-1 text-xs">
-      <span>Description for the working copy</span>
+      <span>
+        <T>Description for the working copy</T>
+      </span>
       <Textarea
         autoFocus
         value={props.value ?? ""}
-        placeholder={props.value === null ? "Loading description…" : "Describe this change"}
+        placeholder={props.value === null ? gt("Loading description…") : gt("Describe this change")}
         disabled={props.disabled || props.value === null}
         onChange={(event) => onChange(event.target.value)}
       />
@@ -95,6 +99,8 @@ export const JjActionDialog = (props: {
   onCancel: () => void;
   onConfirm: (action: JjRunAction, title: string) => void;
 }) => {
+  const gt = useGT();
+  const messages = useMessages();
   const { request } = props;
   const [targetCommitId, setTargetCommitId] = useState<string | null>(null);
   const [bookmarkName, setBookmarkName] = useState(() =>
@@ -125,10 +131,13 @@ export const JjActionDialog = (props: {
       case "squash-ancestor": {
         const target = targetCommitId;
         return {
-          title: request.paths?.length ? "Squash file into ancestor" : "Squash into ancestor",
-          description:
+          title: request.paths?.length
+            ? gt("Squash file into ancestor")
+            : gt("Squash into ancestor"),
+          description: gt(
             "Moves the changes into the chosen mutable ancestor and keeps its description. An emptied source is abandoned.",
-          confirmLabel: "Squash",
+          ),
+          confirmLabel: gt("Squash", { $context: "verb, confirms a squash" }),
           destructive: false,
           action: target
             ? {
@@ -146,18 +155,23 @@ export const JjActionDialog = (props: {
         const valid = isBookmarkName(name);
         return request.mode === "set"
           ? {
-              title: "Set bookmark",
-              description: `Creates the local bookmark on ${revisionLabel(request.revision)}, or moves an existing one there.`,
-              confirmLabel: "Set bookmark",
+              title: gt("Set bookmark"),
+              description: gt(
+                "Creates the local bookmark on {revision}, or moves an existing one there.",
+                { revision: revisionLabel(request.revision, messages) },
+              ),
+              confirmLabel: gt("Set bookmark"),
               destructive: false,
               action: valid
                 ? { type: "bookmark-set", name, revisionCommitId: request.revision.commitId }
                 : null,
             }
           : {
-              title: "Advance bookmark",
-              description: `Moves a bookmark forward from an ancestor to ${revisionLabel(request.revision)}.`,
-              confirmLabel: "Advance bookmark",
+              title: gt("Advance bookmark"),
+              description: gt("Moves a bookmark forward from an ancestor to {revision}.", {
+                revision: revisionLabel(request.revision, messages),
+              }),
+              confirmLabel: gt("Advance bookmark"),
               destructive: false,
               action: valid
                 ? { type: "bookmark-advance", name, revisionCommitId: request.revision.commitId }
@@ -166,10 +180,11 @@ export const JjActionDialog = (props: {
       }
       case "push":
         return {
-          title: "Push bookmarks",
-          description:
+          title: gt("Push bookmarks"),
+          description: gt(
             "Publishes only the chosen bookmarks to the remote. Undo cannot reverse a push.",
-          confirmLabel: "Push",
+          ),
+          confirmLabel: gt("Push", { $context: "verb, pushes bookmarks to a remote" }),
           destructive: false,
           action:
             pushNames.length && isBookmarkName(remote)
@@ -178,10 +193,11 @@ export const JjActionDialog = (props: {
         };
       case "commit":
         return {
-          title: "Commit working copy",
-          description:
+          title: gt("Commit working copy"),
+          description: gt(
             "Saves the description on the working copy and starts a new empty change on top.",
-          confirmLabel: "Commit",
+          ),
+          confirmLabel: gt("Commit", { $context: "verb" }),
           destructive: false,
           action: message === null ? null : { type: "commit", description: message },
         };
@@ -216,7 +232,9 @@ export const JjActionDialog = (props: {
           {request.kind === "squash-ancestor" && (
             <fieldset disabled={props.busy} className="space-y-1">
               <legend className="mb-1 text-xs font-medium">
-                Destination{request.paths?.length ? ` for ${request.paths.join(", ")}` : ""}
+                {request.paths?.length
+                  ? gt("Destination for {paths}", { paths: request.paths.join(", ") })
+                  : gt("Destination")}
               </legend>
               {squashTargets.map((row) => (
                 <Button
@@ -226,13 +244,15 @@ export const JjActionDialog = (props: {
                   aria-pressed={targetCommitId === row.commitId}
                   onClick={() => setTargetCommitId(row.commitId)}
                 >
-                  <span className="truncate">{revisionLabel(row)}</span>
+                  <span className="truncate">{revisionLabel(row, messages)}</span>
                 </Button>
               ))}
               {squashTargets.length === 0 && (
                 <p className="text-xs text-muted-foreground">
-                  No mutable, conflict-free ancestor is loaded. Load more revisions or widen the
-                  revset.
+                  <T>
+                    No mutable, conflict-free ancestor is loaded. Load more revisions or widen the
+                    revset.
+                  </T>
                 </p>
               )}
             </fieldset>
@@ -240,7 +260,9 @@ export const JjActionDialog = (props: {
           {request.kind === "bookmark" && (
             <div className="space-y-2 text-xs">
               <label className="block space-y-1">
-                <span>Bookmark name</span>
+                <span>
+                  <T>Bookmark name</T>
+                </span>
                 <Input
                   autoFocus
                   value={bookmarkName}
@@ -255,7 +277,9 @@ export const JjActionDialog = (props: {
                 />
               </label>
               {bookmarkName.trim() && !isBookmarkName(bookmarkName.trim()) && (
-                <p className="text-destructive">Use letters, digits, “.”, “_”, “-” and “/”.</p>
+                <p className="text-destructive">
+                  <T>Use letters, digits, “.”, “_”, “-” and “/”.</T>
+                </p>
               )}
               {suggestions.length > 0 && (
                 <div className="flex flex-wrap gap-1">
@@ -276,7 +300,9 @@ export const JjActionDialog = (props: {
           {request.kind === "push" && (
             <div className="space-y-2 text-xs">
               <fieldset className="space-y-1">
-                <legend className="mb-1 font-medium">Bookmarks</legend>
+                <legend className="mb-1 font-medium">
+                  <T>Bookmarks</T>
+                </legend>
                 {allBookmarks.map((name) => (
                   <label key={name} className="flex items-center gap-2">
                     <Checkbox
@@ -293,7 +319,9 @@ export const JjActionDialog = (props: {
                 ))}
               </fieldset>
               <fieldset className="space-y-1">
-                <legend className="mb-1 font-medium">Remote</legend>
+                <legend className="mb-1 font-medium">
+                  <T context="a Git remote">Remote</T>
+                </legend>
                 {props.remotes.length > 0 ? (
                   <div className="flex flex-wrap gap-1">
                     {props.remotes.map((name) => (
@@ -310,7 +338,9 @@ export const JjActionDialog = (props: {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-muted-foreground">This repository has no Git remotes.</p>
+                  <p className="text-muted-foreground">
+                    <T>This repository has no Git remotes.</T>
+                  </p>
                 )}
               </fieldset>
             </div>
@@ -333,7 +363,7 @@ export const JjActionDialog = (props: {
         </div>
         <AlertDialogFooter>
           <Button variant="outline" disabled={props.busy} onClick={props.onCancel}>
-            Cancel
+            <T>Cancel</T>
           </Button>
           <Button
             variant={plan.destructive ? "destructive" : "default"}
@@ -342,7 +372,7 @@ export const JjActionDialog = (props: {
               if (plan.action) props.onConfirm(plan.action, plan.confirmLabel);
             }}
           >
-            {props.busy ? "Applying…" : plan.confirmLabel}
+            {props.busy ? gt("Applying…") : plan.confirmLabel}
           </Button>
         </AlertDialogFooter>
       </AlertDialogPopup>

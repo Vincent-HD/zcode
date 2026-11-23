@@ -1,13 +1,14 @@
-// oxlint-disable t3code/no-untranslated-copy -- the fork UI is English-only.
 import {
   AuthFilesystemReadScope,
   type EnvironmentId,
   type JjDiffResult,
   type ScopedThreadRef,
 } from "@t3tools/contracts";
+import { msg, useMessages } from "gt-react";
 import { useEffect, useState } from "react";
 
 import { DropdownMenuRadioItem } from "../components/ui/menu";
+import { m } from "../i18n/messages";
 import { selectThreadDiffPanelSelection, useDiffPanelStore } from "../diffPanelStore";
 import { jjEnvironment } from "../state/jj";
 import { formatEnvironmentQueryError } from "../state/query";
@@ -22,10 +23,9 @@ interface JjDiffState {
   readonly error: string | null;
 }
 
-const STALE_DIFF_ERROR =
-  "The Jujutsu diff no longer matches the selected revision or operation. Refresh the Jujutsu panel and open the file again.";
-const ERROR_SUFFIX =
-  " Refresh the Jujutsu panel and open the file again if its operation has changed.";
+const STALE_DIFF_ERROR = msg(
+  "The Jujutsu diff no longer matches the selected revision or operation. Refresh the Jujutsu panel and open the file again.",
+);
 
 /** The selected Jujutsu revision diff for DiffPanel, or null when the selection is not Jujutsu. */
 export const useJjDiff = (input: {
@@ -36,6 +36,7 @@ export const useJjDiff = (input: {
   readonly serverConfigLoaded: boolean;
 }) => {
   const { routeThreadRef, activeCwd } = input;
+  const messages = useMessages();
   const getJjPanel = useAtomCommand(jjEnvironment.getPanel, {
     reportFailure: false,
     reportDefect: false,
@@ -86,8 +87,8 @@ export const useJjDiff = (input: {
                 ? formatEnvironmentQueryError(result.cause)
                 : result.value.status === "unavailable" &&
                     result.value.reason === "missing-executable"
-                  ? "Jujutsu is not installed in this environment."
-                  : "This directory is not a Jujutsu workspace.",
+                  ? m(msg("Jujutsu is not installed in this environment."))
+                  : m(msg("This directory is not a Jujutsu workspace.")),
           });
           return;
         }
@@ -132,7 +133,7 @@ export const useJjDiff = (input: {
             ? formatEnvironmentQueryError(result.cause)
             : matchesSelection
               ? null
-              : STALE_DIFF_ERROR,
+              : m(STALE_DIFF_ERROR),
       });
     };
     queueMicrotask(() => {
@@ -160,7 +161,7 @@ export const useJjDiff = (input: {
   return {
     label,
     scopeValue: "jj",
-    loadingLabel: "Loading Jujutsu diff...",
+    loadingLabel: messages(msg("Loading Jujutsu diff...")),
     filePath: selection.filePath,
     revealRequestId: selection.revealRequestId,
     sectionId: `jj:${JSON.stringify([activeCwd, selection.context, selection.fromCommitId, selection.revisionCommitId, selection.filePath])}`,
@@ -168,15 +169,26 @@ export const useJjDiff = (input: {
     truncated: current?.data?.truncated === true,
     isPending: !current || current.pending,
     data: current?.data ?? null,
-    error: current?.error ? `${current.error}${ERROR_SUFFIX}` : null,
+    error: current?.error
+      ? messages(
+          msg(
+            "{error} Refresh the Jujutsu panel and open the file again if its operation has changed.",
+            { error: current.error },
+          ),
+        )
+      : null,
     canRefresh: canReadJj && supportsJj,
     refresh: () => setRefreshId((value) => value + 1),
     blockedMessage: !supportsJj
       ? input.serverConfigLoaded
-        ? "This environment's T3 Code server does not support Jujutsu diffs. Update that server to use them."
-        : "Waiting for the environment…"
+        ? messages(
+            msg(
+              "This environment's T3 Code server does not support Jujutsu diffs. Update that server to use them.",
+            ),
+          )
+        : messages(msg("Waiting for the environment…"))
       : !canReadJj
-        ? "This connection needs filesystem read permission to view Jujutsu diffs."
+        ? messages(msg("This connection needs filesystem read permission to view Jujutsu diffs."))
         : null,
   };
 };

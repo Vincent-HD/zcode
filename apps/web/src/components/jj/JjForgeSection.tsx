@@ -1,4 +1,3 @@
-// oxlint-disable t3code/no-untranslated-copy -- the fork UI is English-only.
 import type { EnvironmentId, ProjectId, PullRequestRef } from "@t3tools/contracts";
 import {
   JjForgePreviewInput,
@@ -9,6 +8,7 @@ import {
   type JjForgeStatusResult,
 } from "@t3tools/contracts";
 import * as Schema from "effect/Schema";
+import { T, useGT, useMessages, Var } from "gt-react";
 import { useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
@@ -49,6 +49,8 @@ export interface JjForgeSectionProps {
 }
 
 export const JjForgeSection = (props: JjForgeSectionProps) => {
+  const gt = useGT();
+  const messages = useMessages();
   const [expanded, setExpanded] = useState(false);
   const [remote, setRemote] = useState(props.initialRemote ?? "origin");
   const [baseBookmark, setBaseBookmark] = useState(props.initialBaseBookmark ?? "");
@@ -95,12 +97,15 @@ export const JjForgeSection = (props: JjForgeSectionProps) => {
     ? targetCommitId
     : (revisions.find((revision) => !revision.immutable && Boolean(revision.bookmarks?.length))
         ?.commitId ?? props.panel.workingCopyCommitId);
-  const chain = selectJjForgeChain({
-    panel: props.panel,
-    targetCommitId: effectiveTargetCommitId,
-    mode,
-    bookmarks,
-  });
+  const chain = selectJjForgeChain(
+    {
+      panel: props.panel,
+      targetCommitId: effectiveTargetCommitId,
+      mode,
+      bookmarks,
+    },
+    messages,
+  );
   const blocked = pending || Boolean(props.disabled);
   const previewStale = Boolean(
     preview &&
@@ -144,7 +149,7 @@ export const JjForgeSection = (props: JjForgeSectionProps) => {
           className="min-w-0 py-1 text-left font-medium focus-visible:outline-2 focus-visible:outline-ring"
           onClick={() => setExpanded(!expanded)}
         >
-          {expanded ? "▾" : "▸"} PR / review
+          {expanded ? "▾" : "▸"} <T>PR / review</T>
           {statusCurrent &&
             status &&
             status.value.revisions.length > 0 &&
@@ -182,7 +187,7 @@ export const JjForgeSection = (props: JjForgeSectionProps) => {
               });
             }}
           >
-            {pending ? "Loading…" : "Refresh reviews"}
+            {pending ? gt("Loading…") : gt("Refresh reviews")}
           </Button>
         )}
       </div>
@@ -216,42 +221,53 @@ export const JjForgeSection = (props: JjForgeSectionProps) => {
                       }
                     >
                       <span className="block truncate">
-                        {revision.bookmark} · #{revision.reference.number} · {presentation.label}
+                        {revision.bookmark} · #{revision.reference.number} ·{" "}
+                        {messages(presentation.label)}
                       </span>
                       <span className="block text-muted-foreground">
                         {revision.commitId.slice(0, 8)}
                         {revision.summary.reviewDecision &&
                           ` · ${revision.summary.reviewDecision.replaceAll("-", " ")}`}
                         {revision.unresolvedThreadCount !== null &&
-                          ` · ${revision.unresolvedThreadCount}${revision.reviewThreadsTruncated ? "+" : ""} unresolved`}
-                        {revision.headMatches === false && " · remote head differs"}
-                        {revision.headMatches === null && " · head not reported"}
+                          ` · ${gt("{count}{more} unresolved", {
+                            count: revision.unresolvedThreadCount,
+                            more: revision.reviewThreadsTruncated ? "+" : "",
+                          })}`}
+                        {revision.headMatches === false && ` · ${gt("remote head differs")}`}
+                        {revision.headMatches === null && ` · ${gt("head not reported")}`}
                       </span>
                     </button>
                   </div>
                 );
               })}
               {status.value.revisions.length === 0 && (
-                <p className="text-muted-foreground">No PR/MR loaded for these local bookmarks.</p>
+                <p className="text-muted-foreground">
+                  <T>No PR/MR loaded for these local bookmarks.</T>
+                </p>
               )}
               {status.value.unavailableBookmarks.length > 0 && (
                 <p role="status" className="text-warning-foreground">
-                  Some review reads failed: {status.value.unavailableBookmarks.join(", ")}. Open the
-                  existing PR panel to retry.
+                  <T>
+                    Some review reads failed:{" "}
+                    <Var>{status.value.unavailableBookmarks.join(", ")}</Var>. Open the existing PR
+                    panel to retry.
+                  </T>
                 </p>
               )}
               {status.value.truncated && (
-                <p className="text-muted-foreground">Review results are truncated.</p>
+                <p className="text-muted-foreground">
+                  <T>Review results are truncated.</T>
+                </p>
               )}
             </>
           ) : (
             <p className="text-muted-foreground">
-              Refresh to load PR/MR status for these revisions.
+              <T>Refresh to load PR/MR status for these revisions.</T>
             </p>
           )}
           <div className="grid grid-cols-2 gap-2">
             <label>
-              Remote
+              <T context="a Git remote">Remote</T>
               <Input
                 size="sm"
                 value={remote}
@@ -260,18 +276,18 @@ export const JjForgeSection = (props: JjForgeSectionProps) => {
               />
             </label>
             <label>
-              Base bookmark
+              <T>Base bookmark</T>
               <Input
                 size="sm"
                 value={baseBookmark}
-                placeholder="Choose base"
+                placeholder={gt("Choose base")}
                 disabled={blocked}
                 onChange={(event) => setBaseBookmark(event.target.value)}
               />
             </label>
           </div>
           <label className="block">
-            Publish
+            <T context="publication mode field">Publish</T>
             <select
               className="mt-1 block w-full rounded border border-input bg-background p-1"
               value={mode}
@@ -280,12 +296,12 @@ export const JjForgeSection = (props: JjForgeSectionProps) => {
                 setMode(event.target.value === "linear-stack" ? "linear-stack" : "single")
               }
             >
-              <option value="single">One revision + PR/MR</option>
-              <option value="linear-stack">Linear stack + PR/MR chain</option>
+              <option value="single">{gt("One revision + PR/MR")}</option>
+              <option value="linear-stack">{gt("Linear stack + PR/MR chain")}</option>
             </select>
           </label>
           <label className="block">
-            {mode === "single" ? "Revision" : "Top revision"}
+            {mode === "single" ? gt("Revision") : gt("Top revision")}
             <select
               className="mt-1 block w-full rounded border border-input bg-background p-1"
               value={effectiveTargetCommitId}
@@ -296,14 +312,14 @@ export const JjForgeSection = (props: JjForgeSectionProps) => {
                 .filter((revision) => !revision.immutable)
                 .map((revision) => (
                   <option key={revision.commitId} value={revision.commitId}>
-                    {revision.changeId.slice(0, 8)} · {revision.summary || "(no description)"}
+                    {revision.changeId.slice(0, 8)} · {revision.summary || gt("(no description)")}
                   </option>
                 ))}
             </select>
           </label>
           {chain.selections.map((selection) => (
             <label className="block" key={selection.commitId}>
-              Bookmark for {selection.commitId.slice(0, 8)}
+              {gt("Bookmark for {revision}", { revision: selection.commitId.slice(0, 8) })}
               <select
                 className="mt-1 block w-full rounded border border-input bg-background p-1"
                 value={selection.bookmark}
@@ -328,7 +344,7 @@ export const JjForgeSection = (props: JjForgeSectionProps) => {
           {chain.issue && <p className="text-muted-foreground">{chain.issue}</p>}
           {!props.canPublish && (
             <p className="text-muted-foreground">
-              Source control write permission is required to publish.
+              <T>Source control write permission is required to publish.</T>
             </p>
           )}
           <Button
@@ -360,7 +376,7 @@ export const JjForgeSection = (props: JjForgeSectionProps) => {
               });
             }}
           >
-            Preview publication…
+            <T>Preview publication…</T>
           </Button>
           {result && (
             <p
@@ -369,10 +385,15 @@ export const JjForgeSection = (props: JjForgeSectionProps) => {
                 result.failedBookmark ? "text-warning-foreground" : "text-muted-foreground"
               }
             >
-              Bookmarks pushed. {result.layers.length} PR/MR{result.layers.length === 1 ? "" : "s"}{" "}
-              connected.
+              {gt(
+                "{count, plural, one {Bookmarks pushed. {count} PR/MR connected.} other {Bookmarks pushed. {count} PR/MRs connected.}}",
+                { count: result.layers.length },
+              )}
               {result.failedBookmark &&
-                ` Synchronization stopped at ${result.failedBookmark}. Check the forge before retrying; remote writes cannot be undone locally.`}
+                ` ${gt(
+                  "Synchronization stopped at {bookmark}. Check the forge before retrying; remote writes cannot be undone locally.",
+                  { bookmark: result.failedBookmark },
+                )}`}
             </p>
           )}
           {result?.layers.map((layer) => (
@@ -388,7 +409,10 @@ export const JjForgeSection = (props: JjForgeSectionProps) => {
                 })
               }
             >
-              Open {layer.bookmark} · #{layer.reference.number}
+              {gt("Open {bookmark} · #{number}", {
+                bookmark: layer.bookmark,
+                number: layer.reference.number,
+              })}
             </Button>
           ))}
           {failure && (
@@ -407,11 +431,15 @@ export const JjForgeSection = (props: JjForgeSectionProps) => {
         <DialogPopup showCloseButton={!pending}>
           <DialogHeader>
             <DialogTitle>
-              Publish {preview?.plan.layers.length === 1 ? "revision" : "linear stack"}
+              {preview?.plan.layers.length === 1
+                ? gt("Publish revision")
+                : gt("Publish linear stack")}
             </DialogTitle>
             <DialogDescription>
-              Push the listed bookmarks and create or reuse their connected PR/MR chain. Remote
-              writes cannot be undone by JJ undo.
+              <T>
+                Push the listed bookmarks and create or reuse their connected PR/MR chain. Remote
+                writes cannot be undone by JJ undo.
+              </T>
             </DialogDescription>
           </DialogHeader>
           {preview && (
@@ -420,7 +448,12 @@ export const JjForgeSection = (props: JjForgeSectionProps) => {
                 {preview.plan.destination.provider} · {preview.plan.destination.host}/
                 {preview.plan.destination.repository}
                 <br />
-                Remote: <strong>{preview.plan.destination.remote}</strong>
+                <T>
+                  Remote:{" "}
+                  <strong>
+                    <Var>{preview.plan.destination.remote}</Var>
+                  </strong>
+                </T>
               </p>
               <ol className="space-y-2">
                 {preview.plan.layers.map((layer) => (
@@ -431,18 +464,22 @@ export const JjForgeSection = (props: JjForgeSectionProps) => {
                     <p className="break-words">{layer.title}</p>
                     <p className="text-xs text-muted-foreground">
                       {layer.commitId.slice(0, 8)} ·{" "}
-                      {layer.existing ? `Reuse #${layer.existing.number}` : "Create PR/MR"}
+                      {layer.existing
+                        ? gt("Reuse #{number}", { number: layer.existing.number })
+                        : gt("Create PR/MR")}
                     </p>
                   </li>
                 ))}
               </ol>
               <p className="text-xs text-muted-foreground">
-                Each selected revision's saved description supplies its new PR/MR title and body.
-                Existing titles, descriptions, and review conversations are preserved.
+                <T>
+                  Each selected revision's saved description supplies its new PR/MR title and body.
+                  Existing titles, descriptions, and review conversations are preserved.
+                </T>
               </p>
               {previewStale && (
                 <p role="alert" className="text-destructive">
-                  The workspace or environment changed. Cancel and preview again.
+                  <T>The workspace or environment changed. Cancel and preview again.</T>
                 </p>
               )}
               {failure && (
@@ -454,7 +491,7 @@ export const JjForgeSection = (props: JjForgeSectionProps) => {
           )}
           <DialogFooter>
             <Button variant="outline" disabled={pending} onClick={() => setPreview(null)}>
-              Cancel
+              <T>Cancel</T>
             </Button>
             <Button
               disabled={blocked || !props.canPublish || previewStale || !preview}
@@ -481,7 +518,7 @@ export const JjForgeSection = (props: JjForgeSectionProps) => {
                 });
               }}
             >
-              Push bookmarks & connect PR/MRs
+              <T>Push bookmarks & connect PR/MRs</T>
             </Button>
           </DialogFooter>
         </DialogPopup>

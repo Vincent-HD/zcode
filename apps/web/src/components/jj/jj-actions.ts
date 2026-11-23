@@ -1,5 +1,7 @@
-// oxlint-disable t3code/no-untranslated-copy -- the fork UI is English-only.
 import type { ContextMenuItem, JjLogRow, JjRunAction } from "@t3tools/contracts";
+import { msg } from "gt-react";
+
+import { m, type MessageResolver } from "~/i18n/messages";
 
 type Row = Pick<
   JjLogRow,
@@ -101,64 +103,77 @@ export const jjRevisionMenu = <R extends Row>(
   const anyConflict = targets.some((item) => item.conflict);
   const parent = context.rows.find((item) => item.commitId === row.parentIds[0]);
   const items: ContextMenuItem<JjMenuId>[] = [
-    { id: "show-diff", label: "Show diff", disabled: !context.canDiff },
+    { id: "show-diff", label: m(msg("Show diff")), disabled: !context.canDiff },
     ...(row.current
       ? []
       : [
           {
             id: "compare-working-copy" as const,
-            label: "Compare with working copy",
+            label: m(msg("Compare with working copy")),
             disabled: !context.canDiff,
           },
         ]),
     {
       id: "new",
-      label: bulk ? `New merge change (${targets.length})` : "New child",
+      label: bulk
+        ? m(msg("New merge change ({count})", { count: targets.length }))
+        : m(msg("New child")),
       separatorBefore: true,
       disabled: !canWrite || (bulk && anyConflict),
     },
     {
       id: "new-before",
-      label: bulk ? `New before ${targets.length} revisions` : "New before",
+      label: bulk
+        ? m(
+            msg(
+              "{count, plural, one {New before {count} revision} other {New before {count} revisions}}",
+              { count: targets.length },
+            ),
+          )
+        : m(msg("New before")),
       disabled: !canWrite || anyLocked || anyConflict,
     },
-    { id: "new-after", label: "New after", disabled: !canWrite || bulk || Boolean(row.conflict) },
+    {
+      id: "new-after",
+      label: m(msg("New after")),
+      disabled: !canWrite || bulk || Boolean(row.conflict),
+    },
     {
       id: "edit",
-      label: "Edit",
+      label: m(msg("Edit", { $context: "verb, makes a revision the working copy" })),
       disabled: !canWrite || bulk || locked(row) || Boolean(row.current),
     },
-    { id: "describe", label: "Describe…", disabled: !canWrite || bulk || locked(row) },
+    { id: "describe", label: m(msg("Describe…")), disabled: !canWrite || bulk || locked(row) },
     ...(row.current
       ? [
           {
             id: "commit" as const,
-            label: "Commit…",
+            label: m(msg("Commit…", { $context: "verb" })),
             disabled: !canWrite || Boolean(row.conflict),
           },
         ]
       : []),
     {
       id: "bookmark-set",
-      label: "Set bookmark…",
+      label: m(msg("Set bookmark…")),
       separatorBefore: true,
       disabled: !canWrite || bulk || Boolean(row.root) || Boolean(row.conflict),
     },
     {
       id: "bookmark-advance",
-      label: "Advance bookmark here…",
+      label: m(msg("Advance bookmark here…")),
       disabled: !canWrite || bulk || Boolean(row.root) || Boolean(row.conflict),
     },
     ...(row.bookmarks?.length
       ? [
           {
             id: "push" as const,
-            label: "Push bookmarks…",
+            label: m(msg("Push bookmarks…")),
             disabled: !canWrite,
           },
           {
             id: "bookmark-delete:" as const,
-            label: "Delete bookmark",
+            label: m(msg("Delete bookmark")),
             disabled: !canWrite,
             children: row.bookmarks.map((name) => ({
               id: `bookmark-delete:${name}` as const,
@@ -170,29 +185,36 @@ export const jjRevisionMenu = <R extends Row>(
       : []),
     {
       id: "publish",
-      label: "Publish (PR/MR)…",
+      label: m(msg("Publish (PR/MR)…")),
       disabled: !context.canPublish || bulk || locked(row) || Boolean(row.conflict),
     },
     {
       id: "duplicate",
-      label: "Duplicate",
+      label: m(msg("Duplicate", { $context: "verb" })),
       separatorBefore: true,
       disabled: !canWrite || bulk || Boolean(row.conflict) || Boolean(row.root),
     },
     {
       id: "abandon",
-      label: bulk ? `Abandon ${targets.length} revisions…` : "Abandon…",
+      label: bulk
+        ? m(
+            msg(
+              "{count, plural, one {Abandon {count} revision…} other {Abandon {count} revisions…}}",
+              { count: targets.length },
+            ),
+          )
+        : m(msg("Abandon…")),
       destructive: true,
       disabled: !canWrite || anyLocked,
     },
     {
       id: "absorb",
-      label: "Absorb into ancestors",
+      label: m(msg("Absorb into ancestors")),
       disabled: !canWrite || bulk || locked(row) || Boolean(row.conflict) || Boolean(row.empty),
     },
     {
       id: "squash-parent",
-      label: "Squash into parent",
+      label: m(msg("Squash into parent")),
       disabled:
         !canWrite ||
         bulk ||
@@ -203,7 +225,7 @@ export const jjRevisionMenu = <R extends Row>(
     },
     {
       id: "squash-ancestor",
-      label: "Squash into ancestor…",
+      label: m(msg("Squash into ancestor…")),
       disabled:
         !canWrite ||
         bulk ||
@@ -213,7 +235,10 @@ export const jjRevisionMenu = <R extends Row>(
     },
     {
       id: "rebase-onto-selected",
-      label: others.length > 1 ? `Rebase onto ${others.length} selected` : "Rebase onto selected",
+      label:
+        others.length > 1
+          ? m(msg("Rebase onto {count} selected", { count: others.length }))
+          : m(msg("Rebase onto selected")),
       separatorBefore: true,
       disabled:
         !canWrite ||
@@ -233,10 +258,10 @@ export const jjRevisionMenu = <R extends Row>(
     },
     {
       id: "copy-change-id",
-      label: "Copy change ID",
+      label: m(msg("Copy change ID")),
       separatorBefore: true,
     },
-    { id: "copy-commit-id", label: "Copy commit ID" },
+    { id: "copy-commit-id", label: m(msg("Copy commit ID")) },
   ];
   return items;
 };
@@ -280,10 +305,11 @@ export const jjMenuIntent = <R extends Row>(
       type: "dialog",
       request: {
         kind: "confirm",
-        title: `Delete bookmark ${name}?`,
-        description:
-          "Deletes the local bookmark. Publishing the deletion to a remote requires a push.",
-        confirmLabel: "Delete bookmark",
+        title: m(msg("Delete bookmark {name}?", { name })),
+        description: m(
+          msg("Deletes the local bookmark. Publishing the deletion to a remote requires a push."),
+        ),
+        confirmLabel: m(msg("Delete bookmark")),
         destructive: true,
         action: { type: "bookmark-delete", name },
       },
@@ -299,12 +325,12 @@ export const jjMenuIntent = <R extends Row>(
         ? {
             type: "run",
             action: { type: "merge", parentCommitIds: ids },
-            title: "Merge change created",
+            title: m(msg("Merge change created")),
           }
         : {
             type: "run",
             action: { type: "new", parentCommitIds: ids },
-            title: "New change created",
+            title: m(msg("New change created")),
           };
     case "new-before":
     case "new-after":
@@ -315,13 +341,13 @@ export const jjMenuIntent = <R extends Row>(
           revisionCommitIds: id === "new-before" ? ids : [row.commitId],
           position: id === "new-before" ? "before" : "after",
         },
-        title: "New change inserted",
+        title: m(msg("New change inserted")),
       };
     case "edit":
       return {
         type: "run",
         action: { type: "edit", revisionCommitId: row.commitId },
-        title: `Editing ${short(row)}`,
+        title: m(msg("Editing {revision}", { revision: short(row) })),
       };
     case "describe":
       return { type: "describe", row };
@@ -331,17 +357,28 @@ export const jjMenuIntent = <R extends Row>(
       return {
         type: "run",
         action: { type: "duplicate", revisionCommitId: row.commitId },
-        title: "Revision duplicated",
+        title: m(msg("Revision duplicated")),
       };
     case "abandon":
       return {
         type: "dialog",
         request: {
           kind: "confirm",
-          title: ids.length > 1 ? `Abandon ${ids.length} revisions?` : `Abandon ${short(row)}?`,
-          description:
-            "Abandoned revisions leave history and their descendants are rebased onto their parents. Undo restores them.",
-          confirmLabel: "Abandon",
+          title:
+            ids.length > 1
+              ? m(
+                  msg(
+                    "{count, plural, one {Abandon {count} revision?} other {Abandon {count} revisions?}}",
+                    { count: ids.length },
+                  ),
+                )
+              : m(msg("Abandon {revision}?", { revision: short(row) })),
+          description: m(
+            msg(
+              "Abandoned revisions leave history and their descendants are rebased onto their parents. Undo restores them.",
+            ),
+          ),
+          confirmLabel: m(msg("Abandon", { $context: "verb, abandons revisions" })),
           destructive: true,
           action: { type: "abandon", revisionCommitIds: ids },
         },
@@ -350,7 +387,7 @@ export const jjMenuIntent = <R extends Row>(
       return {
         type: "run",
         action: { type: "absorb", revisionCommitId: row.commitId },
-        title: "Changes absorbed",
+        title: m(msg("Changes absorbed")),
       };
     case "squash-parent": {
       const parent = row.parentIds[0];
@@ -363,7 +400,7 @@ export const jjMenuIntent = <R extends Row>(
               destinationCommitId: parent,
               mode: "into",
             },
-            title: "Squashed into parent",
+            title: m(msg("Squashed into parent")),
           }
         : null;
     }
@@ -382,7 +419,7 @@ export const jjMenuIntent = <R extends Row>(
               destinationCommitIds: destinations,
               mode: "branch",
             },
-            title: "Rebased onto selection",
+            title: m(msg("Rebased onto selection")),
           }
         : null;
     }
@@ -401,9 +438,9 @@ export const jjMenuIntent = <R extends Row>(
     case "publish":
       return { type: "publish", row };
     case "copy-change-id":
-      return { type: "copy", value: row.changeId, label: "Change ID" };
+      return { type: "copy", value: row.changeId, label: m(msg("Change ID")) };
     case "copy-commit-id":
-      return { type: "copy", value: row.commitId, label: "Commit ID" };
+      return { type: "copy", value: row.commitId, label: m(msg("Commit ID")) };
   }
   return null;
 };
@@ -441,12 +478,21 @@ export const jjDragModifier = (keys: JjDragKeys): JjDragModifier =>
             : "rebase-branch";
 
 export const JJ_DRAG_LABELS: Record<JjDragModifier, string> = {
-  "rebase-branch": "Rebase branch",
-  "rebase-revision": "Rebase revision only",
-  "squash-into": "Squash into",
-  "squash-onto": "Squash onto",
-  duplicate: "Duplicate onto",
-  merge: "Merge with",
+  "rebase-branch": msg("Rebase branch"),
+  "rebase-revision": msg("Rebase revision only"),
+  "squash-into": msg("Squash into"),
+  "squash-onto": msg("Squash onto"),
+  duplicate: msg("Duplicate onto"),
+  merge: msg("Merge with"),
+};
+
+const JJ_DROP_LABELS: Record<JjDragModifier, string> = {
+  "rebase-branch": msg("Rebase branch {revision}"),
+  "rebase-revision": msg("Rebase revision only {revision}"),
+  "squash-into": msg("Squash into {revision}"),
+  "squash-onto": msg("Squash onto {revision}"),
+  duplicate: msg("Duplicate onto {revision}"),
+  merge: msg("Merge with {revision}"),
 };
 
 export type JjDragSource =
@@ -457,33 +503,43 @@ export type JjDropResult =
   | { readonly ok: true; readonly action: JjRunAction; readonly label: string }
   | { readonly ok: false; readonly reason: string };
 
-export const jjDropAction = (input: {
-  source: JjDragSource;
-  targetCommitId: string;
-  modifier: JjDragModifier;
-  rows: ReadonlyArray<Row>;
-}): JjDropResult => {
+export const jjDropAction = (
+  input: {
+    source: JjDragSource;
+    targetCommitId: string;
+    modifier: JjDragModifier;
+    rows: ReadonlyArray<Row>;
+  },
+  resolve: MessageResolver = m,
+): JjDropResult => {
   const source = input.rows.find((row) => row.commitId === input.source.commitId);
   const target = input.rows.find((row) => row.commitId === input.targetCommitId);
-  if (!source || !target) return { ok: false, reason: "Drop on a listed revision" };
+  if (!source || !target) return { ok: false, reason: resolve(msg("Drop on a listed revision")) };
   if (input.source.kind === "bookmark") {
-    if (target.commitId === source.commitId) return { ok: false, reason: "Already here" };
+    if (target.commitId === source.commitId)
+      return { ok: false, reason: resolve(msg("Already here")) };
     if (target.root || target.conflict)
-      return { ok: false, reason: "Bookmarks need a conflict-free, non-root revision" };
+      return {
+        ok: false,
+        reason: resolve(msg("Bookmarks need a conflict-free, non-root revision")),
+      };
     return {
       ok: true,
       action: { type: "bookmark-set", name: input.source.name, revisionCommitId: target.commitId },
-      label: `Move ${input.source.name} to ${short(target)}`,
+      label: resolve(
+        msg("Move {name} to {revision}", { name: input.source.name, revision: short(target) }),
+      ),
     };
   }
-  if (target.commitId === source.commitId) return { ok: false, reason: "Drop on another revision" };
+  if (target.commitId === source.commitId)
+    return { ok: false, reason: resolve(msg("Drop on another revision")) };
   if (target.conflict || (source.conflict && input.modifier !== "rebase-branch"))
-    return { ok: false, reason: "Resolve conflicts first" };
+    return { ok: false, reason: resolve(msg("Resolve conflicts first")) };
   const moves = ["rebase-branch", "rebase-revision", "squash-into", "squash-onto"];
   if (locked(source) && moves.includes(input.modifier))
-    return { ok: false, reason: "Immutable revisions can't be rewritten" };
-  if (source.conflict) return { ok: false, reason: "Resolve conflicts first" };
-  const label = `${JJ_DRAG_LABELS[input.modifier]} ${short(target)}`;
+    return { ok: false, reason: resolve(msg("Immutable revisions can't be rewritten")) };
+  if (source.conflict) return { ok: false, reason: resolve(msg("Resolve conflicts first")) };
+  const label = resolve(JJ_DROP_LABELS[input.modifier], { revision: short(target) });
   switch (input.modifier) {
     case "rebase-branch":
     case "rebase-revision":
@@ -491,7 +547,7 @@ export const jjDropAction = (input: {
         input.modifier === "rebase-branch" &&
         jjIsDescendant({ ancestor: source.commitId, descendant: target.commitId, rows: input.rows })
       )
-        return { ok: false, reason: "Can't rebase a branch onto its own descendant" };
+        return { ok: false, reason: resolve(msg("Can't rebase a branch onto its own descendant")) };
       return {
         ok: true,
         action: {
@@ -505,7 +561,7 @@ export const jjDropAction = (input: {
     case "squash-into":
     case "squash-onto":
       if (input.modifier === "squash-into" && locked(target))
-        return { ok: false, reason: "Can't squash into an immutable revision" };
+        return { ok: false, reason: resolve(msg("Can't squash into an immutable revision")) };
       return {
         ok: true,
         action: {

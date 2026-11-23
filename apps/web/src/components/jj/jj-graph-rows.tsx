@@ -1,5 +1,5 @@
-// oxlint-disable t3code/no-untranslated-copy -- the fork UI is English-only.
 import type { JjLogRow } from "@t3tools/contracts";
+import { msg, T, useGT, useMessages } from "gt-react";
 import { Bookmark, Laptop, Tag } from "lucide-react";
 import type { ReactElement, ReactNode } from "react";
 import { Badge } from "~/components/ui/badge";
@@ -238,58 +238,61 @@ const Pill = (props: {
 export const JjRefPills = (props: {
   row: JjLogRow;
   onBookmarkPointerDown?: (event: React.PointerEvent, source: JjDragSource) => void;
-}) => (
-  <>
-    {props.row.workingCopies?.map((name) => (
-      <Pill
-        key={`w:${name}`}
-        variant="warning"
-        icon={<Laptop />}
-        label={`${name}@`}
-        tooltip={`Working copy of workspace ${name}`}
-      />
-    ))}
-    {props.row.bookmarks?.map((name) => (
-      <Pill
-        key={`b:${name}`}
-        variant="info"
-        icon={<Bookmark />}
-        label={name}
-        tooltip={props.onBookmarkPointerDown ? `${name} · drag to move` : name}
-        {...(props.onBookmarkPointerDown
-          ? {
-              onPointerDown: (event: React.PointerEvent) => {
-                event.stopPropagation();
-                props.onBookmarkPointerDown?.(event, {
-                  kind: "bookmark",
-                  name,
-                  commitId: props.row.commitId,
-                });
-              },
-            }
-          : {})}
-      />
-    ))}
-    {props.row.remoteBookmarks?.map((name) => (
-      <Pill
-        key={`r:${name}`}
-        variant="secondary"
-        icon={<Bookmark />}
-        label={name}
-        tooltip={`Remote bookmark ${name}`}
-      />
-    ))}
-    {props.row.tags?.map((name) => (
-      <Pill
-        key={`t:${name}`}
-        variant="success"
-        icon={<Tag />}
-        label={name}
-        tooltip={`Tag ${name}`}
-      />
-    ))}
-  </>
-);
+}) => {
+  const gt = useGT();
+  return (
+    <>
+      {props.row.workingCopies?.map((name) => (
+        <Pill
+          key={`w:${name}`}
+          variant="warning"
+          icon={<Laptop />}
+          label={`${name}@`}
+          tooltip={gt("Working copy of workspace {name}", { name })}
+        />
+      ))}
+      {props.row.bookmarks?.map((name) => (
+        <Pill
+          key={`b:${name}`}
+          variant="info"
+          icon={<Bookmark />}
+          label={name}
+          tooltip={props.onBookmarkPointerDown ? gt("{name} · drag to move", { name }) : name}
+          {...(props.onBookmarkPointerDown
+            ? {
+                onPointerDown: (event: React.PointerEvent) => {
+                  event.stopPropagation();
+                  props.onBookmarkPointerDown?.(event, {
+                    kind: "bookmark",
+                    name,
+                    commitId: props.row.commitId,
+                  });
+                },
+              }
+            : {})}
+        />
+      ))}
+      {props.row.remoteBookmarks?.map((name) => (
+        <Pill
+          key={`r:${name}`}
+          variant="secondary"
+          icon={<Bookmark />}
+          label={name}
+          tooltip={gt("Remote bookmark {name}", { name })}
+        />
+      ))}
+      {props.row.tags?.map((name) => (
+        <Pill
+          key={`t:${name}`}
+          variant="success"
+          icon={<Tag />}
+          label={name}
+          tooltip={gt("Tag {name}", { name })}
+        />
+      ))}
+    </>
+  );
+};
 
 export const JjRevisionRow = (props: {
   id: string;
@@ -303,6 +306,7 @@ export const JjRevisionRow = (props: {
   onClick: (event: React.MouseEvent, row: JjLogRow) => void;
   onContextMenu: (event: React.MouseEvent, row: JjLogRow) => void;
 }) => {
+  const gt = useGT();
   const { row } = props;
   const dropTarget = useJjDropTarget(row.commitId);
   const dragging = useJjDragging(row.commitId);
@@ -340,12 +344,18 @@ export const JjRevisionRow = (props: {
         <div className="flex h-5 min-w-0 items-center gap-1.5">
           <JjChangeId row={row} />
           <span className={cn("truncate", !row.summary && "text-muted-foreground italic")}>
-            {row.summary || (row.root ? "root()" : "(no description)")}
+            {row.summary || (row.root ? "root()" : gt("(no description)"))}
           </span>
           {row.empty && !row.root && (
-            <span className="shrink-0 text-2xs text-muted-foreground">empty</span>
+            <span className="shrink-0 text-2xs text-muted-foreground">
+              <T context="a revision with no changes">empty</T>
+            </span>
           )}
-          {row.conflict && <span className="shrink-0 text-2xs text-destructive">conflict</span>}
+          {row.conflict && (
+            <span className="shrink-0 text-2xs text-destructive">
+              <T>conflict</T>
+            </span>
+          )}
         </div>
         <div className="flex h-4 min-w-0 items-center gap-1 overflow-hidden text-2xs text-muted-foreground">
           <JjRefPills
@@ -367,44 +377,53 @@ export const JjRevisionRow = (props: {
   );
 };
 
-export const JjElidedRow = (props: { cell: JjGraphCell; width: number; top: number }) => (
-  <div
-    aria-hidden="true"
-    className="absolute inset-x-0 flex items-center gap-1 text-2xs text-muted-foreground italic"
-    style={{ top: props.top, height: JJ_ELIDED_ROW_HEIGHT }}
-  >
-    <JjGraphCellSvg
-      cell={props.cell}
-      width={props.width}
-      height={JJ_ELIDED_ROW_HEIGHT}
-      nodeY={JJ_ELIDED_ROW_HEIGHT / 2}
-      kind="elided"
-    />
-    {props.cell.outgoing.length ? "elided revisions" : "history continues outside the revset"}
-  </div>
-);
+export const JjElidedRow = (props: { cell: JjGraphCell; width: number; top: number }) => {
+  const gt = useGT();
+  return (
+    <div
+      aria-hidden="true"
+      className="absolute inset-x-0 flex items-center gap-1 text-2xs text-muted-foreground italic"
+      style={{ top: props.top, height: JJ_ELIDED_ROW_HEIGHT }}
+    >
+      <JjGraphCellSvg
+        cell={props.cell}
+        width={props.width}
+        height={JJ_ELIDED_ROW_HEIGHT}
+        nodeY={JJ_ELIDED_ROW_HEIGHT / 2}
+        kind="elided"
+      />
+      {props.cell.outgoing.length
+        ? gt("elided revisions")
+        : gt("history continues outside the revset")}
+    </div>
+  );
+};
 
 /** Follows the pointer during a drag; the only component subscribed to pointer movement. */
 export const JjDragHint = (props: { rows: ReadonlyArray<JjLogRow> }) => {
   const state = useJjDragStore();
+  const messages = useMessages();
   if (!state.source) return null;
   const modifier = jjDragModifier(state.keys);
   const result = state.targetCommitId
-    ? jjDropAction({
-        source: state.source,
-        targetCommitId: state.targetCommitId,
-        modifier,
-        rows: props.rows,
-      })
+    ? jjDropAction(
+        {
+          source: state.source,
+          targetCommitId: state.targetCommitId,
+          modifier,
+          rows: props.rows,
+        },
+        messages,
+      )
     : null;
   const label =
     state.source.kind === "bookmark"
       ? result?.ok
         ? result.label
-        : `Move ${state.source.name}`
+        : messages(msg("Move {name}", { name: state.source.name }))
       : result?.ok
         ? result.label
-        : JJ_DRAG_LABELS[modifier];
+        : messages(JJ_DRAG_LABELS[modifier]);
   return (
     <div
       role="status"
@@ -416,7 +435,9 @@ export const JjDragHint = (props: { rows: ReadonlyArray<JjLogRow> }) => {
       </div>
       {state.source.kind === "revision" && (
         <div className="text-2xs text-muted-foreground">
-          Hold R revision only · S squash · ⇧S squash onto · D duplicate · M merge · Esc cancel
+          <T>
+            Hold R revision only · S squash · ⇧S squash onto · D duplicate · M merge · Esc cancel
+          </T>
         </div>
       )}
     </div>

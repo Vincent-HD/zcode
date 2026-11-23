@@ -1,5 +1,5 @@
-// oxlint-disable t3code/no-untranslated-copy -- the fork UI is English-only.
 import type { JjLogRow, JjRunAction, JjSourceControlGroup } from "@t3tools/contracts";
+import { T, useGT } from "gt-react";
 import { ChevronDown, FileDiff } from "lucide-react";
 import { useState } from "react";
 import { Button } from "~/components/ui/button";
@@ -17,8 +17,9 @@ const GroupHeader = (props: {
   onSelect: () => void;
   onOpenDiff: () => void;
 }) => {
+  const gt = useGT();
   const { group } = props;
-  const label = group.position === "@" ? "Working copy" : group.position;
+  const label = group.position === "@" ? gt("Working copy") : group.position;
   return (
     <div
       className={cn(
@@ -28,7 +29,9 @@ const GroupHeader = (props: {
     >
       <button
         type="button"
-        aria-label={`${props.expanded ? "Collapse" : "Expand"} ${label}`}
+        aria-label={
+          props.expanded ? gt("Collapse {label}", { label }) : gt("Expand {label}", { label })
+        }
         aria-expanded={props.expanded}
         className="flex size-5 shrink-0 items-center justify-center rounded-sm text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring"
         onClick={props.onToggle}
@@ -36,7 +39,7 @@ const GroupHeader = (props: {
         <ChevronDown className={cn("size-3", !props.expanded && "-rotate-90")} />
       </button>
       <JjHint
-        label={group.summary || "(no description)"}
+        label={group.summary || gt("(no description)")}
         render={
           <button
             type="button"
@@ -48,15 +51,19 @@ const GroupHeader = (props: {
         <span className="shrink-0 font-medium">{label}</span>
         <JjChangeId row={group} />
         <span className={cn("truncate", !group.summary && "text-muted-foreground italic")}>
-          {group.summary || "(no description)"}
+          {group.summary || gt("(no description)")}
         </span>
-        {group.conflict && <span className="shrink-0 text-destructive">conflict</span>}
+        {group.conflict && (
+          <span className="shrink-0 text-destructive">
+            <T>conflict</T>
+          </span>
+        )}
       </JjHint>
       <span className="flex shrink-0 opacity-0 group-hover/header:opacity-100 group-focus-within/header:opacity-100">
         <Button
           variant="ghost"
           size="icon-xs"
-          aria-label={`Show diff of ${label}`}
+          aria-label={gt("Show diff of {label}", { label })}
           disabled={!props.canDiff || group.files.length === 0}
           onClick={props.onOpenDiff}
         >
@@ -82,6 +89,7 @@ export const JjSourceControl = (props: {
   onRun: (action: JjRunAction, title: string) => void;
   onDialog: (request: JjDialogRequest<JjLogRow>) => void;
 }) => {
+  const gt = useGT();
   // Keyed by change id so a group stays collapsed while its commit is rewritten.
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
   const workingCopy = props.groups[0];
@@ -94,20 +102,26 @@ export const JjSourceControl = (props: {
     });
 
   return (
-    <ul aria-label="Source control" className="space-y-0.5 px-1 py-1 text-xs">
+    <ul aria-label={gt("Source control")} className="space-y-0.5 px-1 py-1 text-xs">
       {workingCopy && conflicts.length > 0 && (
         <li>
           <div className="flex h-7 items-center gap-1 px-1 font-medium text-destructive">
             <button
               type="button"
-              aria-label={`${collapsed.has("conflicts") ? "Expand" : "Collapse"} merge conflicts`}
+              aria-label={
+                collapsed.has("conflicts")
+                  ? gt("Expand merge conflicts")
+                  : gt("Collapse merge conflicts")
+              }
               aria-expanded={!collapsed.has("conflicts")}
               className="flex size-5 shrink-0 items-center justify-center rounded-sm focus-visible:outline-2 focus-visible:outline-ring"
               onClick={() => toggle("conflicts")}
             >
               <ChevronDown className={cn("size-3", collapsed.has("conflicts") && "-rotate-90")} />
             </button>
-            <span className="flex-1">Merge conflicts</span>
+            <span className="flex-1">
+              <T>Merge conflicts</T>
+            </span>
             <span className="tabular-nums">{conflicts.length}</span>
           </div>
           {!collapsed.has("conflicts") && (
@@ -170,11 +184,13 @@ export const JjSourceControl = (props: {
                   />
                 ))}
                 {group.files.length === 0 && (
-                  <li className="flex h-6 items-center ps-1 text-muted-foreground">No changes</li>
+                  <li className="flex h-6 items-center ps-1 text-muted-foreground">
+                    <T>No changes</T>
+                  </li>
                 )}
                 {group.filesTruncated && (
                   <li className="flex h-6 items-center ps-1 text-muted-foreground">
-                    More files not shown. Open the diff to see all of them.
+                    <T>More files not shown. Open the diff to see all of them.</T>
                   </li>
                 )}
               </ul>

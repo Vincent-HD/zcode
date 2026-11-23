@@ -1,4 +1,4 @@
-// oxlint-disable t3code/no-untranslated-copy -- the fork UI is English-only.
+import { T, useGT, useMessages } from "gt-react";
 import { useModelsDevPricing } from "./use-models-dev-pricing";
 import { priceUsageTurn, usageDollars, pricingAssumption } from "./usage-pricing";
 import { Database } from "lucide-react";
@@ -12,6 +12,8 @@ import type { UsageTurn } from "./turn-usage.logic";
 import { UsagePopover, UsageRow } from "./usage-popover";
 
 export const TurnUsage = (props: { readonly data: UsageTurn }) => {
+  const gt = useGT();
+  const messages = useMessages();
   const pricing = useModelsDevPricing();
   const priced = priceUsageTurn({ catalog: pricing.catalog, data: props.data });
   const usage = lastResponseUsage(props.data.turn);
@@ -27,26 +29,34 @@ export const TurnUsage = (props: { readonly data: UsageTurn }) => {
   const uncached = input != null && cached != null && input >= cached ? input - cached : null;
   const tokens = (value: number | null | undefined) =>
     value == null ? "N/A tok" : `${value.toLocaleString()} tok`;
+  const totalTokens = compactTokenCount(total);
   return (
     <UsagePopover
-      label="Turn usage"
+      label={gt("Turn usage")}
       icon={<Database className="size-3.5 shrink-0" />}
-      summary={`Usage ${compactTokenCount(total)} tok${usage?.partial ? " · partial" : ""}`}
+      summary={
+        usage?.partial
+          ? gt("Usage {tokens} tok · partial", { tokens: totalTokens })
+          : gt("Usage {tokens} tok", { tokens: totalTokens })
+      }
     >
       <dl>
         <UsageRow
-          label="Provider / model"
+          label={gt("Provider / model")}
           value={
             <span className="break-all">
-              {props.data.providerLabel ?? "Unknown"} /{" "}
-              {props.data.selection?.model ?? "Not recorded"}
+              {props.data.providerLabel ?? gt("Unknown", { $context: "provider name" })} /{" "}
+              {props.data.selection?.model ?? gt("Not recorded")}
             </span>
           }
         />
-        <UsageRow label="Total tokens" value={tokens(total)} />
-        <UsageRow label="Cache hit" value={cacheHit === null ? "N/A" : `${cacheHit.toFixed(1)}%`} />
+        <UsageRow label={gt("Total tokens")} value={tokens(total)} />
         <UsageRow
-          label="Non-cached input"
+          label={gt("Cache hit")}
+          value={cacheHit === null ? "N/A" : `${cacheHit.toFixed(1)}%`}
+        />
+        <UsageRow
+          label={gt("Non-cached input")}
           value={
             <span>
               {tokens(uncached)}
@@ -57,7 +67,7 @@ export const TurnUsage = (props: { readonly data: UsageTurn }) => {
           }
         />
         <UsageRow
-          label="Cached input"
+          label={gt("Cached input")}
           value={
             <span>
               {tokens(cached)}
@@ -68,7 +78,7 @@ export const TurnUsage = (props: { readonly data: UsageTurn }) => {
           }
         />
         <UsageRow
-          label="Output"
+          label={gt("Output", { $context: "output tokens" })}
           value={
             <span>
               {tokens(usage?.outputTokens)}
@@ -77,24 +87,24 @@ export const TurnUsage = (props: { readonly data: UsageTurn }) => {
           }
         />
         {usage?.reasoningTokens != null && (
-          <UsageRow label="Reasoning (output subset)" value={tokens(usage.reasoningTokens)} />
+          <UsageRow label={gt("Reasoning (output subset)")} value={tokens(usage.reasoningTokens)} />
         )}
         <UsageRow
-          label="Estimated API cost"
+          label={gt("Estimated API cost")}
           value={
             priced.cost?.estimatedUsd != null
               ? usageDollars(priced.cost.estimatedUsd)
               : pricing.loading
-                ? "Loading rates…"
-                : "Unavailable"
+                ? gt("Loading rates…")
+                : gt("Unavailable", { $context: "estimated cost is unavailable" })
           }
         />
         <UsageRow
-          label="Turn time"
+          label={gt("Turn time")}
           value={formatUsageDuration(completedTurnDuration(props.data.turn))}
         />
         <UsageRow
-          label="Average throughput"
+          label={gt("Average throughput")}
           value={
             usage?.tokensPerSecond == null
               ? "N/A tok/s"
@@ -104,31 +114,35 @@ export const TurnUsage = (props: { readonly data: UsageTurn }) => {
       </dl>
       <p className="mt-2 text-2xs text-muted-foreground">
         {usage
-          ? "This provider turn only; excludes subagents. Throughput includes reasoning, tools and waits."
-          : "This provider did not report token usage for this turn."}
+          ? gt(
+              "This provider turn only; excludes subagents. Throughput includes reasoning, tools and waits.",
+            )
+          : gt("This provider did not report token usage for this turn.")}
       </p>
       <p className="mt-2 text-2xs text-muted-foreground">
-        Current{" "}
-        <a className="underline" href="https://models.dev" target="_blank" rel="noreferrer">
-          models.dev
-        </a>{" "}
-        rates, not subscription charges.
+        <T>
+          Current{" "}
+          <a className="underline" href="https://models.dev" target="_blank" rel="noreferrer">
+            models.dev
+          </a>{" "}
+          rates, not subscription charges.
+        </T>
         {priced.price
           ? ` ${priced.price.provider}/${priced.price.model} · ${priced.price.mode}.`
-          : " No matching rate is available."}
+          : ` ${gt("No matching rate is available.")}`}
         {priced.price?.fallback
-          ? " Canonical model list price; your custom provider may charge differently."
+          ? ` ${gt("Canonical model list price; your custom provider may charge differently.")}`
           : ""}
       </p>
       {priced.cost?.assumptions.map((assumption) => (
         <p key={assumption} className="mt-1 text-2xs text-muted-foreground">
-          {pricingAssumption(assumption)}
+          {pricingAssumption(assumption, messages)}
         </p>
       ))}
       {pricing.error && (
         <p className="mt-1 text-2xs text-muted-foreground">
           {pricing.error}
-          {pricing.catalog ? " · Using the last fetched rates." : ""}
+          {pricing.catalog ? ` · ${gt("Using the last fetched rates.")}` : ""}
         </p>
       )}
     </UsagePopover>

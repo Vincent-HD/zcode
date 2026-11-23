@@ -1,8 +1,9 @@
-// oxlint-disable t3code/no-untranslated-copy -- the fork UI is English-only.
 import type { EnvironmentId, ProjectId, ScopedThreadRef } from "@t3tools/contracts";
+import { msg } from "gt-react";
 import { GitBranch } from "lucide-react";
 import { lazy, Suspense } from "react";
 
+import { m, type MessageResolver } from "../i18n/messages";
 import { useRightPanelStore } from "../rightPanelStore";
 import type { JjOpenDiffInput } from "../components/jj/JjPanel";
 import { selectJjRevision } from "./jj-diff-selection";
@@ -18,6 +19,7 @@ export interface ZcodeRightPanelContext {
 }
 
 const ZCODE_SURFACES = {
+  // oxlint-disable-next-line t3code/no-untranslated-copy -- product name
   jj: { title: "Jujutsu", Icon: GitBranch },
 } satisfies Record<ZcodeRightPanelKind, { title: string; Icon: typeof GitBranch }>;
 
@@ -29,16 +31,20 @@ export const ZcodeSurfaceIcon = (props: { readonly surface: ZcodeRightPanelSurfa
   return <Icon className="size-3 shrink-0" />;
 };
 
-export const zcodeSurfaceLaunchers = (context: ZcodeRightPanelContext) => {
+export const zcodeSurfaceLaunchers = (
+  context: ZcodeRightPanelContext,
+  resolve: MessageResolver = m,
+) => {
   const threadRef = context.threadRef;
   const available = Boolean(context.cwd && threadRef);
   return [
     {
+      // oxlint-disable-next-line t3code/no-untranslated-copy -- product name
       label: "Jujutsu",
       icon: GitBranch,
       shortcut: "J",
       available,
-      disabledReason: "Available from a project thread.",
+      disabledReason: resolve(msg("Available from a project thread.")),
       onClick: () => {
         if (available && threadRef) useRightPanelStore.getState().open(threadRef, "jj");
       },

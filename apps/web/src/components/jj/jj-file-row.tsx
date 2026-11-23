@@ -1,11 +1,12 @@
-// oxlint-disable t3code/no-untranslated-copy -- the fork UI is English-only.
 import type { JjChangedFile, JjLogRow, JjRunAction } from "@t3tools/contracts";
+import { msg, T, useGT } from "gt-react";
 import { ArrowDown, ChevronsDown, Undo2 } from "lucide-react";
 import type { ReactNode } from "react";
 import { PierreEntryIcon } from "~/components/chat/PierreEntryIcon";
 import { Button } from "~/components/ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
 import { useTheme } from "~/hooks/useTheme";
+import { m } from "~/i18n/messages";
 import type { JjDialogRequest } from "./jj-actions";
 import { JjHint } from "./jj-graph-rows";
 
@@ -67,7 +68,11 @@ export const JjFileRow = (props: {
       >
         <PierreEntryIcon pathValue={file.path} kind="file" theme={resolvedTheme} />
         <span className="truncate">{file.path}</span>
-        {props.conflict && <span className="shrink-0 text-destructive">conflict</span>}
+        {props.conflict && (
+          <span className="shrink-0 text-destructive">
+            <T>conflict</T>
+          </span>
+        )}
       </JjHint>
       {props.actions && (
         <div className="flex shrink-0 opacity-0 group-hover/file:opacity-100 group-focus-within/file:opacity-100">
@@ -95,49 +100,55 @@ export const JjFileActions = (props: {
   squashAncestor?: { enabled: boolean; onClick: () => void };
   onRun: (action: JjRunAction, title: string) => void;
   onDialog: (request: JjDialogRequest<JjLogRow>) => void;
-}) => (
-  <>
-    <IconAction
-      label="Restore file"
-      icon={<Undo2 />}
-      disabled={props.disabled}
-      onClick={() =>
-        props.onDialog({
-          kind: "confirm",
-          title: `Restore ${props.path}?`,
-          description:
-            "Discards this revision's changes to the file, restoring it from the parent. Undo brings them back.",
-          confirmLabel: "Restore",
-          destructive: true,
-          action: { type: "restore", revisionCommitId: props.commitId, paths: [props.path] },
-        })
-      }
-    />
-    {props.squashAncestor && (
+}) => {
+  const gt = useGT();
+  return (
+    <>
       <IconAction
-        label="Squash file into ancestor"
-        icon={<ChevronsDown />}
-        disabled={props.disabled || !props.squashAncestor.enabled}
-        onClick={props.squashAncestor.onClick}
+        label={gt("Restore file")}
+        icon={<Undo2 />}
+        disabled={props.disabled}
+        onClick={() =>
+          props.onDialog({
+            kind: "confirm",
+            title: m(msg("Restore {path}?", { path: props.path })),
+            description: m(
+              msg(
+                "Discards this revision's changes to the file, restoring it from the parent. Undo brings them back.",
+              ),
+            ),
+            confirmLabel: m(msg("Restore", { $context: "verb, restores a file" })),
+            destructive: true,
+            action: { type: "restore", revisionCommitId: props.commitId, paths: [props.path] },
+          })
+        }
       />
-    )}
-    <IconAction
-      label="Squash file into parent"
-      icon={<ArrowDown />}
-      disabled={props.disabled || props.squashParentId === undefined}
-      onClick={() =>
-        props.squashParentId &&
-        props.onRun(
-          {
-            type: "squash",
-            sourceCommitId: props.commitId,
-            destinationCommitId: props.squashParentId,
-            mode: "into",
-            paths: [props.path],
-          },
-          "File squashed into parent",
-        )
-      }
-    />
-  </>
-);
+      {props.squashAncestor && (
+        <IconAction
+          label={gt("Squash file into ancestor")}
+          icon={<ChevronsDown />}
+          disabled={props.disabled || !props.squashAncestor.enabled}
+          onClick={props.squashAncestor.onClick}
+        />
+      )}
+      <IconAction
+        label={gt("Squash file into parent")}
+        icon={<ArrowDown />}
+        disabled={props.disabled || props.squashParentId === undefined}
+        onClick={() =>
+          props.squashParentId &&
+          props.onRun(
+            {
+              type: "squash",
+              sourceCommitId: props.commitId,
+              destinationCommitId: props.squashParentId,
+              mode: "into",
+              paths: [props.path],
+            },
+            m(msg("File squashed into parent")),
+          )
+        }
+      />
+    </>
+  );
+};

@@ -25,6 +25,9 @@ Every line changed in an upstream file is a future rebase conflict. Before touch
 6. Upstream workflows stay byte-identical. They are disabled in the GitHub repository; rerun
    `scripts/zcode-disable-upstream-workflows.sh` after every rebase push, because workflows added
    upstream arrive enabled. Fork CI lives in `.github/workflows/zcode-custom-tests.yml`.
+7. Fork UI copy is translated like upstream (`docs/internals/i18n.md`). Fork translations live in
+   `apps/web/src/zcode/translations.json`; after `vp run i18n:generate`, run
+   `scripts/zcode-i18n-merge.sh` to write them into the catalogs.
 
 When a feature cannot follow these rules, say so and get sign-off before patching upstream logic.
 
@@ -59,3 +62,4 @@ to re-check.
 | Usage                | `apps/web/src/components/chat/TimelineAssistantRows.tsx`    | `AssistantTurnUsage` in `AssistantMessageMeta`                                                                                                |
 | Fork rules           | `AGENTS.md`                                                 | pointer to this file                                                                                                                          |
 | Fork docs            | `README.md`                                                 | fork section above the original README                                                                                                        |
+| Fork translations    | `apps/web/src/i18n/translations/*.json`                     | fork keys; on conflict take upstream, then `vp run i18n:generate` in `apps/web` and `scripts/zcode-i18n-merge.sh`                             |

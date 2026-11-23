@@ -86,7 +86,9 @@ else
   exit 1
 fi
 
-app_image_url="https://github.com/pingdotgg/t3code/releases/download/v${version}/T3-Code-${version}-x86_64.AppImage"
+app_image_name="T3-Code-${version}-x86_64.AppImage"
+[[ "$version" == *-nightly.* ]] && app_image_name="T3-Code-Nightly-x86_64.AppImage"
+app_image_url="https://github.com/pingdotgg/t3code/releases/download/v${version}/${app_image_name}"
 mac_zip_url="https://github.com/pingdotgg/t3code/releases/download/v${version}/T3-Code-${version}-arm64.zip"
 upstream_source_url="https://github.com/pingdotgg/t3code/archive/refs/tags/v${version}.tar.gz"
 

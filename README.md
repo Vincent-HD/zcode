@@ -83,9 +83,9 @@ listed in [`ZCODE.md`](./ZCODE.md), push, and rerun
 `scripts/zcode-disable-upstream-workflows.sh`. Then run the updater with that release version:
 
 ```bash
-./scripts/update-z-code-nix.sh 0.1.9-nightly.20261110.4478
+./scripts/update-z-code-nix.sh 0.1.12-nightly.20261123.5124
 # Preview the candidate pins, then restore nix/default.nix:
-./scripts/update-z-code-nix.sh --dry-run 0.1.9-nightly.20261110.4478
+./scripts/update-z-code-nix.sh --dry-run 0.1.12-nightly.20261123.5124
 ```
 
 The updater proves that the selected upstream tag commit is an ancestor of the fork's current `HEAD`

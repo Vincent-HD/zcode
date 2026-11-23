@@ -13,7 +13,10 @@
 
 let
   appImage = fetchurl {
-    url = "https://github.com/pingdotgg/t3code/releases/download/v${version}/T3-Code-${version}-x86_64.AppImage";
+    # Nightly releases name the AppImage after the channel rather than the version.
+    url = "https://github.com/pingdotgg/t3code/releases/download/v${version}/${
+      if lib.hasInfix "-nightly." version then "T3-Code-Nightly" else "T3-Code-${version}"
+    }-x86_64.AppImage";
     hash = appImageHash;
   };
 

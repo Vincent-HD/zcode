@@ -44,7 +44,7 @@ export const selectJjRevision = (
     };
   });
 
-export const isJjDiffSelection = (ref: ScopedThreadRef | null | undefined) =>
+const isJjDiffSelection = (ref: ScopedThreadRef | null | undefined) =>
   selectThreadDiffPanelSelection(useDiffPanelStore.getState().byThreadKey, ref).kind === "jj";
 
 export const useIsJjDiffSelected = (ref: ScopedThreadRef | null | undefined) =>

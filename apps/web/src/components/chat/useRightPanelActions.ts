@@ -143,6 +143,7 @@ export function useRightPanelActions(input: RightPanelActionsInput) {
   const duplicateBrowserSurfaceStable = useStableCallback(duplicateBrowserSurface);
   const createBrowserSurfaceStable = useStableCallback(createBrowserSurface);
   const addDiffSurface = () => {
+    if (!diffAvailable && openSelectedJjDiff(activeThreadRef, isServerThread)) return;
     if (!activeThreadRef || !isServerThread || !diffAvailable) return;
     useDiffPanelStore.getState().selectGitScope(activeThreadRef, "branch");
     useRightPanelStore.getState().open(activeThreadRef, "diff");

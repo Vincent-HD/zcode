@@ -408,7 +408,8 @@ export default function DiffPanel({
     diffSelection.kind === "branch" || diffSelection.kind === "commit"
       ? diffSelection.baseRef
       : null;
-  const selectedFilePath = diffSelection.kind === "turn" ? (diffSelection.filePath ?? null) : null;
+  const selectedFilePath =
+    diffSelection.kind === "turn" ? (diffSelection.filePath ?? null) : (jjDiff?.filePath ?? null);
   const selectedFileRevealRequestId =
     diffSelection.kind === "turn" ? diffSelection.revealRequestId : (jjDiff?.revealRequestId ?? 0);
   const selectedTurn =
@@ -522,7 +523,7 @@ export default function DiffPanel({
       ? (selectedCommitSubject ?? gt("Commit {sha}", { sha: selectedCommitSha.slice(0, 7) }))
       : selectedGitScope === "unstaged"
         ? gt("Uncommitted")
-        : gt("Changes");
+        : (jjDiff?.label ?? gt("Changes"));
   const selectedTurnLabel = gt("Turn {count}", { count: selectedCheckpointTurnCount ?? "?" });
   const selectedScopeLabel = toolCallSelection
     ? gt("Tool call")
@@ -588,7 +589,8 @@ export default function DiffPanel({
     (isGitSelection && selectedGitSource?.truncated === true) ||
     (!toolCallSelection &&
       selectedTurn !== undefined &&
-      selectedPatch?.endsWith(CHECKPOINT_DIFF_TRUNCATED_MARKER) === true);
+      selectedPatch?.endsWith(CHECKPOINT_DIFF_TRUNCATED_MARKER) === true) ||
+    jjDiff?.truncated === true;
   const selectedPatchQuery = toolCallSelection
     ? toolCallDetail
     : selectedTurn
@@ -622,8 +624,8 @@ export default function DiffPanel({
           lazySource ? undefined : selectedPatch,
           `diff-panel:${resolvedTheme}`,
           {
-            compactPartialHunkOffsets: isGitSelection,
-            ...(toolCallSelection ? { ignoreWhitespace: diffIgnoreWhitespace } : {}),
+            compactPartialHunkOffsets: isGitSelection || jjDiff !== null,
+            ...(toolCallSelection || jjDiff ? { ignoreWhitespace: diffIgnoreWhitespace } : {}),
           },
           messages,
         );
@@ -1031,6 +1033,7 @@ export default function DiffPanel({
           ) : null}
           <DropdownMenuContent align="start">
             <DropdownMenuRadioGroup value={selectedScopeValue} onValueChange={selectScopeValue}>
+              {jjDiff && <JjDiffScopeItem label={jjDiff.label} />}
               {turnDiffsOnly ? null : (
                 <>
                   <DropdownMenuRadioItem value="branch" closeOnClick>
@@ -1680,7 +1683,7 @@ export default function DiffPanel({
                           ? gt("Loading uncommitted changes...")
                           : selectedGitScope === "commit"
                             ? gt("Loading commit...")
-                            : gt("Loading changes...")
+                            : (jjDiff?.loadingLabel ?? gt("Loading changes..."))
                   }
                 />
               ) : (

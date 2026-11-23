@@ -1,3 +1,4 @@
+// oxlint-disable t3code/no-untranslated-copy -- the fork UI is English-only.
 import type { JjLogRow, JjRunAction, JjSourceControlGroup } from "@t3tools/contracts";
 import { ChevronDown, FileDiff } from "lucide-react";
 import { useState } from "react";

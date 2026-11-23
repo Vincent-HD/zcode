@@ -1,3 +1,4 @@
+// oxlint-disable t3code/no-untranslated-copy -- the fork UI is English-only.
 import { useAtomValue } from "@effect/atom-react";
 import { AuthOrchestrationReadScope } from "@t3tools/contracts";
 import type {
@@ -17,7 +18,7 @@ import { CollapsibleSectionHeader } from "~/components/ui/collapsible-section-he
 import { Menu, MenuItem, MenuPopup, MenuSeparator, MenuTrigger } from "~/components/ui/menu";
 import { toastManager } from "~/components/ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
-import { writeTextToClipboard } from "~/hooks/useCopyToClipboard";
+import { namedClipboardTarget, writeTextToClipboard } from "~/hooks/useCopyToClipboard";
 import { observeResize } from "~/lib/observeResize";
 import { readLocalApi } from "~/localApi";
 import { useServerConfigs } from "~/state/entities";
@@ -441,7 +442,7 @@ const JjPanel = (props: {
     });
   };
   const copy = (value: string, label: string) => {
-    void writeTextToClipboard(value, label).then(
+    void writeTextToClipboard(value, namedClipboardTarget(label.toLowerCase())).then(
       () => toastManager.add({ type: "success", title: `${label} copied` }),
       () => toastManager.add({ type: "error", title: `Could not copy ${label.toLowerCase()}` }),
     );

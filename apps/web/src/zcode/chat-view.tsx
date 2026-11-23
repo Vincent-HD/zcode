@@ -15,8 +15,6 @@ import type { useQuietThreadProjection } from "../state/entities";
 import { useIsJjDiffSelected } from "./jj-diff-selection";
 import { zcodeSurfaceLaunchers, type ZcodeRightPanelContext } from "./right-panel-surfaces";
 
-export { isJjDiffSelection } from "./jj-diff-selection";
-
 /** Everything ChatView hands to fork surfaces, derived once per render. */
 export const useZcodeChatView = (input: {
   readonly activeThreadRef: ScopedThreadRef | null;

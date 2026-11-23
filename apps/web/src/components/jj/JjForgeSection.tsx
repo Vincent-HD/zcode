@@ -1,3 +1,4 @@
+// oxlint-disable t3code/no-untranslated-copy -- the fork UI is English-only.
 import type { EnvironmentId, ProjectId, PullRequestRef } from "@t3tools/contracts";
 import {
   JjForgePreviewInput,

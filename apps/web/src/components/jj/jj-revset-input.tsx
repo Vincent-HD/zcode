@@ -1,3 +1,4 @@
+// oxlint-disable t3code/no-untranslated-copy -- the fork UI is English-only.
 import type { JjLogRow, JjRevsetAlias } from "@t3tools/contracts";
 import { type KeyboardEvent, type SyntheticEvent, useRef, useState } from "react";
 import { flushSync } from "react-dom";

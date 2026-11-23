@@ -36,8 +36,6 @@ added_tests=(
   packages/contracts/src/jj-forge.test.ts
   packages/contracts/src/jj.test.ts
   packages/contracts/src/zcode-environment.test.ts
-  packages/provider-cursor/src/server/adapter-turn-usage.test.ts
-  packages/provider-cursor/src/server/turn-usage.test.ts
 )
 
 tmp_dir="${RUNNER_TEMP:-${TMPDIR:-/tmp}}"

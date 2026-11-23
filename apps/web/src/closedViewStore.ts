@@ -13,6 +13,7 @@ import { decodeLinkedThreadSurface } from "./linkedThreadSurface";
 import { resolveStorage } from "./lib/storage";
 import { randomUUID } from "./lib/utils";
 import { decodeThreadSurface, type RightPanelSurface } from "./rightPanelStore";
+import { isZcodeRightPanelSurface } from "./zcode/right-panel-kinds";
 
 export type ClosedView =
   | {

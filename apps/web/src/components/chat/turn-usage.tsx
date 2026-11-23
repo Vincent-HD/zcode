@@ -1,3 +1,4 @@
+// oxlint-disable t3code/no-untranslated-copy -- the fork UI is English-only.
 import { useModelsDevPricing } from "./use-models-dev-pricing";
 import { priceUsageTurn, usageDollars, pricingAssumption } from "./usage-pricing";
 import { Database } from "lucide-react";

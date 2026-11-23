@@ -1,5 +1,6 @@
-import type { UsageLimitsReport } from "@t3tools/contracts";
-import { limitsNotice, remainingPercent } from "@t3tools/shared/usageLimits";
+// oxlint-disable t3code/no-untranslated-copy -- the fork UI is English-only.
+import type { ServerProviderUsageLimits, UsageLimitsReport } from "@t3tools/contracts";
+import { remainingPercent } from "@t3tools/shared/usageLimits";
 import { CircleGauge, Database, Gauge, Wallet } from "lucide-react";
 import type * as DateTime from "effect/DateTime";
 import type { ContextWindowSnapshot } from "@t3tools/client-runtime/state/context-window";
@@ -18,6 +19,16 @@ import {
   toolUsageDuration,
   type CompletedUsageTurn,
 } from "./composer-usage.logic";
+
+const limitsNotice = (limits: ServerProviderUsageLimits): string | null => {
+  if (limits.unavailable?.reason === "unsupported") {
+    return limits.unavailable.message ?? "This account has no subscription limits.";
+  }
+  if (limits.unavailable?.reason === "probeFailed") {
+    return limits.unavailable.message ?? "Could not read limits.";
+  }
+  return limits.windows.length === 0 ? "No limits reported." : null;
+};
 
 const count = (value: number | null | undefined) =>
   value == null ? "N/A" : value.toLocaleString();

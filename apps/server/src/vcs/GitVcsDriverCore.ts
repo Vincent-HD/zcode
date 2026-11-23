@@ -1062,6 +1062,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
       fiber: Fiber.Fiber<void, GitCommandError>;
     }
   >();
+  const jjWorktrees = yield* makeJjWorktrees;
   const statusFetchProcesses = yield* Semaphore.make(4);
 
   const executeRaw: GitVcsDriver.GitVcsDriver["Service"]["execute"] = Effect.fnUntraced(
@@ -5930,9 +5931,16 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
       { concurrency: "unbounded" },
     );
     const checkoutWorkers = configuredCheckoutWorkers ?? "0";
+    const jjCheckout =
+      sparsePatterns === null
+        ? yield* jjWorktrees.checkout({ cwd: input.cwd, worktreePath, refName: checkoutRef })
+        : null;
     // The cache clones a full checkout, so a sparse worktree uses Git's own checkout.
     const fastCheckout =
-      checkoutCache !== undefined && options?.fastCheckout === true && sparsePatterns === null;
+      jjCheckout === null &&
+      checkoutCache !== undefined &&
+      options?.fastCheckout === true &&
+      sparsePatterns === null;
     const cacheGeneration = fastCheckout ? yield* checkoutCache.currentGeneration : 0;
     const stockCheckout = executeGitWithStableDiagnostics(
       "GitVcsDriver.createWorktree",

@@ -27,7 +27,8 @@ export type DiffPanelSelection =
       revealRequestId: number;
       /** A turn diff section key to narrow to; absent shows every repository. */
       repository?: string;
-    };
+    }
+  | JjDiffPanelSelection;
 
 const DEFAULT_SELECTION: DiffPanelSelection = { kind: "branch", baseRef: null };
 

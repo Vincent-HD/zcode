@@ -73,6 +73,12 @@ import type { RightPanelSurface } from "~/rightPanelStore";
 import { cn } from "~/lib/utils";
 import { issueStatePresentation } from "~/components/issue/issuePresentation";
 import { issueEnvironment } from "~/state/issues";
+import { isZcodeRightPanelSurface } from "~/zcode/right-panel-kinds";
+import {
+  ZcodeSurfaceIcon,
+  zcodeSurfaceTitle,
+  type ZcodeSurfaceLaunchers,
+} from "~/zcode/right-panel-surfaces";
 import { resolveShortcutCommand, type ShortcutMatchContext } from "~/keybindings";
 import { readLocalApi } from "~/localApi";
 import { useStableCallback } from "~/hooks/useStableCallback";
@@ -386,6 +392,7 @@ function RightPanelEmptyState(props: {
       disabledReason: messages(SURFACE_UNAVAILABLE_HINTS.files),
       onClick: props.onAddFiles,
     },
+    ...(props.zcodeLaunchers ?? []),
     {
       label: msg("Diff"),
       icon: FileDiff,
@@ -1231,6 +1238,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
       disabledReason: messages(SURFACE_DISABLED_REASONS.files),
       onClick: props.onAddFiles,
     },
+    ...(props.zcodeLaunchers ?? []),
     {
       label: msg("Diff"),
       icon: FileDiff,

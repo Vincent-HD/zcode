@@ -1,3 +1,4 @@
+// oxlint-disable t3code/no-untranslated-copy -- the fork UI is English-only.
 import { useSyncExternalStore } from "react";
 import { parseModelsDevPricing, type ModelsDevCatalog } from "./models-dev-pricing";
 

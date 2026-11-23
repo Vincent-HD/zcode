@@ -1,3 +1,4 @@
+// oxlint-disable t3code/no-untranslated-copy -- the fork UI is English-only.
 import type { JjHistoryStep } from "@t3tools/contracts";
 import * as Cause from "effect/Cause";
 

@@ -63,15 +63,15 @@ jobs:
         run: |
           set -euo pipefail
 
-          archive="$RUNNER_TEMP/jj-v0.46.0-x86_64-unknown-linux-musl.tar.gz"
+          archive="$RUNNER_TEMP/jj-v0.47.1-x86_64-unknown-linux-musl.tar.gz"
           install_dir="$RUNNER_TEMP/jj/bin"
           mkdir -p "$install_dir"
           curl --fail --location --silent --show-error \
             --proto '=https' --tlsv1.2 \
-            https://github.com/jj-vcs/jj/releases/download/v0.46.0/jj-v0.46.0-x86_64-unknown-linux-musl.tar.gz \
+            https://github.com/jj-vcs/jj/releases/download/v0.47.1/jj-v0.47.1-x86_64-unknown-linux-musl.tar.gz \
             --output "$archive"
           printf '%s  %s\n' \
-            fce0271158e665ceb82dc66c5eb95b1728649094e9133074f3b5baece345fc08 \
+            d4b657f622ee50929c8916466dfa3d6a6c17a0a32b50e7b2c793707ec9ebcad7 \
             "$archive" | sha256sum --check --strict
           tar --extract --gzip --file "$archive" --directory "$install_dir"
           mkdir -p "$RUNNER_TEMP/bin"

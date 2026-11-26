@@ -4,7 +4,7 @@ set -euo pipefail
 repo_root="$(git rev-parse --show-toplevel)"
 cd "$repo_root"
 
-expected_jj_version="jj 0.46.0"
+expected_jj_version="jj 0.47.1"
 actual_jj_version="$(jj --version)"
 if [[
   "$actual_jj_version" != "$expected_jj_version" &&

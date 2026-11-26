@@ -390,7 +390,8 @@
     "924df6263c603a06": "Merge-Konflikte einklappen",
     "9f331280de6d2fa3": "Merge-Konflikte",
     "57bff33017d55079": "Keine Änderungen",
-    "842ac2f6d6fa7e58": "Weitere Dateien werden nicht angezeigt. Öffne den Diff, um alle zu sehen."
+    "842ac2f6d6fa7e58": "Weitere Dateien werden nicht angezeigt. Öffne den Diff, um alle zu sehen.",
+    "8a8fcf7a07301f9f": "Diese Aufgabe stammt aus .vscode/tasks.json. Entferne sie dort."
   },
   "es": {
     "570dce16bab8e386": "Disponible desde un hilo de proyecto.",
@@ -781,7 +782,8 @@
     "924df6263c603a06": "Contraer conflictos de merge",
     "9f331280de6d2fa3": "Conflictos de merge",
     "57bff33017d55079": "Sin cambios",
-    "842ac2f6d6fa7e58": "Hay más archivos sin mostrar. Abre el diff para verlos todos."
+    "842ac2f6d6fa7e58": "Hay más archivos sin mostrar. Abre el diff para verlos todos.",
+    "8a8fcf7a07301f9f": "Esta tarea viene de .vscode/tasks.json. Elimínala allí."
   },
   "fr": {
     "570dce16bab8e386": "Disponible depuis un fil de projet.",
@@ -1174,7 +1176,8 @@
     "924df6263c603a06": "Réduire les conflits de merge",
     "9f331280de6d2fa3": "Conflits de merge",
     "57bff33017d55079": "Aucune modification",
-    "842ac2f6d6fa7e58": "D’autres fichiers ne sont pas affichés. Ouvrez le diff pour tous les voir."
+    "842ac2f6d6fa7e58": "D’autres fichiers ne sont pas affichés. Ouvrez le diff pour tous les voir.",
+    "8a8fcf7a07301f9f": "Cette tâche vient de .vscode/tasks.json. Supprimez-la à cet endroit."
   },
   "ja": {
     "570dce16bab8e386": "プロジェクトのスレッドから利用できます。",
@@ -1567,7 +1570,8 @@
     "924df6263c603a06": "マージの競合を折りたたむ",
     "9f331280de6d2fa3": "マージの競合",
     "57bff33017d55079": "変更なし",
-    "842ac2f6d6fa7e58": "表示されていないファイルがあります。すべて表示するには差分を開いてください。"
+    "842ac2f6d6fa7e58": "表示されていないファイルがあります。すべて表示するには差分を開いてください。",
+    "8a8fcf7a07301f9f": "このタスクは .vscode/tasks.json で定義されています。そちらで削除してください。"
   },
   "ko": {
     "570dce16bab8e386": "프로젝트 스레드에서 사용할 수 있습니다.",
@@ -1960,7 +1964,8 @@
     "924df6263c603a06": "병합 충돌 접기",
     "9f331280de6d2fa3": "병합 충돌",
     "57bff33017d55079": "변경 사항 없음",
-    "842ac2f6d6fa7e58": "표시되지 않은 파일이 더 있습니다. 모두 보려면 변경 사항을 여세요."
+    "842ac2f6d6fa7e58": "표시되지 않은 파일이 더 있습니다. 모두 보려면 변경 사항을 여세요.",
+    "8a8fcf7a07301f9f": "이 작업은 .vscode/tasks.json에 정의되어 있습니다. 그곳에서 삭제하세요."
   },
   "pt-BR": {
     "570dce16bab8e386": "Disponível a partir de uma thread de projeto.",
@@ -2351,7 +2356,8 @@
     "924df6263c603a06": "Recolher conflitos de merge",
     "9f331280de6d2fa3": "Conflitos de merge",
     "57bff33017d55079": "Nenhuma alteração",
-    "842ac2f6d6fa7e58": "Há mais arquivos não exibidos. Abra o diff para ver todos."
+    "842ac2f6d6fa7e58": "Há mais arquivos não exibidos. Abra o diff para ver todos.",
+    "8a8fcf7a07301f9f": "Esta tarefa vem de .vscode/tasks.json. Remova-a lá."
   },
   "ru": {
     "570dce16bab8e386": "Доступно из треда проекта.",
@@ -2745,7 +2751,8 @@
     "924df6263c603a06": "Свернуть конфликты слияния",
     "9f331280de6d2fa3": "Конфликты слияния",
     "57bff33017d55079": "Нет изменений",
-    "842ac2f6d6fa7e58": "Показаны не все файлы. Откройте diff, чтобы увидеть их все."
+    "842ac2f6d6fa7e58": "Показаны не все файлы. Откройте diff, чтобы увидеть их все.",
+    "8a8fcf7a07301f9f": "Эта задача задана в .vscode/tasks.json. Удалите её там."
   },
   "sv": {
     "570dce16bab8e386": "Tillgängligt från en projekttråd.",
@@ -3138,7 +3145,8 @@
     "924df6263c603a06": "Fäll ihop merge-konflikter",
     "9f331280de6d2fa3": "Merge-konflikter",
     "57bff33017d55079": "Inga ändringar",
-    "842ac2f6d6fa7e58": "Fler filer visas inte. Öppna diffen för att se alla."
+    "842ac2f6d6fa7e58": "Fler filer visas inte. Öppna diffen för att se alla.",
+    "8a8fcf7a07301f9f": "Den här uppgiften kommer från .vscode/tasks.json. Ta bort den där."
   },
   "zh": {
     "570dce16bab8e386": "可在项目会话中使用。",
@@ -3531,6 +3539,7 @@
     "924df6263c603a06": "折叠合并冲突",
     "9f331280de6d2fa3": "合并冲突",
     "57bff33017d55079": "无改动",
-    "842ac2f6d6fa7e58": "还有更多文件未显示。打开差异以查看全部文件。"
+    "842ac2f6d6fa7e58": "还有更多文件未显示。打开差异以查看全部文件。",
+    "8a8fcf7a07301f9f": "此任务来自 .vscode/tasks.json，请在那里删除。"
   }
 }

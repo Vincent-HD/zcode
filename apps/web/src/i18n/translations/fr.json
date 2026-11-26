@@ -3126,6 +3126,7 @@
   "a27aa243efed1c1a": "Le serveur T3 Code de cet environnement ne prend pas en charge les diffs Jujutsu. Mettez ce serveur à jour pour les utiliser.",
   "55d98a3fe21f0926": "En attente de l’environnement…",
   "3496d89067edfe6a": "Cette connexion nécessite l’autorisation de lecture du système de fichiers pour afficher les diffs Jujutsu.",
+  "8a8fcf7a07301f9f": "Cette tâche vient de .vscode/tasks.json. Supprimez-la à cet endroit.",
   "87e3e1be8d076ca6": "Impossible de joindre cet environnement. Réessayez.",
   "74a8fc3d3e10acaf": "Ce lien de connexion est incomplet",
   "820397d04d4ea2df": "Fermez cette page et relancez la connexion depuis votre agent.",

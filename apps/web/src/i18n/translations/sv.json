@@ -3126,6 +3126,7 @@
   "a27aa243efed1c1a": "T3 Code-servern i den här miljön stöder inte Jujutsu-diffar. Uppdatera servern för att använda dem.",
   "55d98a3fe21f0926": "Väntar på miljön…",
   "3496d89067edfe6a": "Den här anslutningen behöver läsbehörighet till filsystemet för att visa Jujutsu-diffar.",
+  "8a8fcf7a07301f9f": "Den här uppgiften kommer från .vscode/tasks.json. Ta bort den där.",
   "87e3e1be8d076ca6": "Kunde inte nå den här miljön. Försök igen.",
   "74a8fc3d3e10acaf": "Den här inloggningslänken är ofullständig",
   "820397d04d4ea2df": "Stäng den här sidan och starta inloggningen igen från din agent.",

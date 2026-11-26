@@ -3126,6 +3126,7 @@
   "a27aa243efed1c1a": "This environment's T3 Code server does not support Jujutsu diffs. Update that server to use them.",
   "55d98a3fe21f0926": "Waiting for the environment…",
   "3496d89067edfe6a": "This connection needs filesystem read permission to view Jujutsu diffs.",
+  "8a8fcf7a07301f9f": "This task comes from .vscode/tasks.json. Remove it there.",
   "87e3e1be8d076ca6": "Could not reach this environment. Try again.",
   "74a8fc3d3e10acaf": "This sign-in link is incomplete",
   "820397d04d4ea2df": "Close this page and start the sign-in again from your agent.",

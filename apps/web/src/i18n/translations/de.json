@@ -3127,6 +3127,7 @@
   "a27aa243efed1c1a": "Der T3 Code-Server dieser Umgebung unterstützt keine Jujutsu-Diffs. Aktualisiere den Server, um sie zu nutzen.",
   "55d98a3fe21f0926": "Warte auf die Umgebung…",
   "3496d89067edfe6a": "Diese Verbindung benötigt Leserechte für das Dateisystem, um Jujutsu-Diffs anzuzeigen.",
+  "8a8fcf7a07301f9f": "Diese Aufgabe stammt aus .vscode/tasks.json. Entferne sie dort.",
   "87e3e1be8d076ca6": "Diese Umgebung ist nicht erreichbar. Versuche es erneut.",
   "74a8fc3d3e10acaf": "Dieser Anmeldelink ist unvollständig",
   "820397d04d4ea2df": "Schließe diese Seite und starte die Anmeldung erneut über deinen Agenten.",

@@ -3126,6 +3126,7 @@
   "a27aa243efed1c1a": "O servidor do T3 Code deste ambiente não oferece suporte a diffs do Jujutsu. Atualize esse servidor para usá-los.",
   "55d98a3fe21f0926": "Aguardando o ambiente…",
   "3496d89067edfe6a": "Esta conexão precisa de permissão de leitura do sistema de arquivos para ver diffs do Jujutsu.",
+  "8a8fcf7a07301f9f": "Esta tarefa vem de .vscode/tasks.json. Remova-a lá.",
   "87e3e1be8d076ca6": "Não foi possível acessar este ambiente. Tente novamente.",
   "74a8fc3d3e10acaf": "Este link de login está incompleto",
   "820397d04d4ea2df": "Feche esta página e inicie o login novamente pelo seu agente.",

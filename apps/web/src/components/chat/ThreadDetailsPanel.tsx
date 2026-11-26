@@ -48,6 +48,7 @@ import {
   THREAD_DETAILS_PANEL_LABEL_CLASS,
 } from "./threadDetailsPanelStyles";
 import { Menu, MenuPopup } from "../ui/menu";
+import { useVscodeTaskScripts } from "../../zcode/use-vscode-task-scripts";
 
 interface ThreadDetailsPanelProps extends Pick<
   ComponentProps<typeof ThreadDetailsCard>,
@@ -103,6 +104,14 @@ export function ThreadDetailsPanel(props: ThreadDetailsPanelProps) {
     props.environmentId,
     props.activeProjectScripts && visible.scripts ? props.gitCwd : null,
   );
+  const vscodeTasks = useVscodeTaskScripts({
+    environmentId: props.environmentId,
+    cwd: props.activeProjectScripts && visible.scripts ? props.gitCwd : null,
+    scripts: props.activeProjectScripts,
+    onAddScript: props.onAddProjectScript,
+    onUpdateScript: props.onUpdateProjectScript,
+    onDeleteScript: props.onDeleteProjectScript,
+  });
   const activeThreadRef = { environmentId: props.environmentId, threadId: props.threadId };
   const project = useProject(scopeProjectRef(props.environmentId, props.projectId));
   const serverConfig = useServerConfigs().get(props.environmentId);
@@ -238,13 +247,13 @@ export function ThreadDetailsPanel(props: ThreadDetailsPanelProps) {
                       <ProjectScriptsControl
                         environmentId={props.environmentId}
                         displayMode="panel"
-                        scripts={props.activeProjectScripts}
+                        scripts={vscodeTasks.scripts}
                         fileScripts={fileScripts}
                         preferredScriptId={props.preferredScriptId}
                         onRunScript={props.onRunProjectScript}
                         onAddScript={props.onAddProjectScript}
-                        onUpdateScript={props.onUpdateProjectScript}
-                        onDeleteScript={props.onDeleteProjectScript}
+                        onUpdateScript={vscodeTasks.onUpdateScript}
+                        onDeleteScript={vscodeTasks.onDeleteScript}
                       />
                     ) : null}
                   </div>

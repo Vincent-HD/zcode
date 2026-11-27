@@ -42,7 +42,8 @@ upstream entry points to re-check after a rebase are in [`ZCODE.md`](./ZCODE.md)
   (the **Orphaned revisions** revset preset lists them first).
 - **Jujutsu Git actions:** In a jj workspace, the thread details panel's Commit / Push / Create PR
   button runs through jj instead of Git, which only sees a detached HEAD there. Commit describes
-  the working copy and starts a new change. Push moves the work's bookmark (the worktree's
+  the working copy and starts a new change; **Generate** writes the message with the same AI
+  writer model and writing style as Git's commits, from the working copy's `jj diff`. Push moves the work's bookmark (the worktree's
   `t3/…` bookmark, even when it was left on trunk) up to the newest described change and pushes
   it. Create PR does the same, then opens or updates the GitHub/GitLab pull request against
   trunk's bookmark.

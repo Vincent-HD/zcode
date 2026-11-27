@@ -6,6 +6,7 @@ import {
 } from "@t3tools/contracts";
 import * as Schema from "effect/Schema";
 import { msg, T, useGT, useMessages } from "gt-react";
+import { PenLineIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
   AlertDialog,
@@ -52,8 +53,12 @@ const CommitMessage = (props: {
   disabled: boolean;
   value: string | null;
   onChange: (value: string) => void;
+  /** Writes the message with T3's text generation; absent where it is unavailable. */
+  onGenerate?: (() => Promise<string>) | undefined;
 }) => {
   const gt = useGT();
+  const [generating, setGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState<string | null>(null);
   const getRevision = useAtomCommand(jjEnvironment.getRevision, {
     reportFailure: false,
     reportDefect: false,
@@ -73,18 +78,44 @@ const CommitMessage = (props: {
     };
   }, [getRevision, environmentId, cwd, commitId, prefilled, onChange]);
   return (
-    <label className="block space-y-1 text-xs">
-      <span>
-        <T>Description for the working copy</T>
-      </span>
+    <div className="space-y-1 text-xs">
+      <div className="flex items-center justify-between gap-2">
+        <label htmlFor={`jj-commit-message-${commitId}`}>
+          <T>Description for the working copy</T>
+        </label>
+        {props.onGenerate ? (
+          <Button
+            variant="ghost"
+            size="xs"
+            disabled={props.disabled || generating}
+            onClick={() => {
+              const generate = props.onGenerate;
+              if (!generate) return;
+              setGenerating(true);
+              setGenerateError(null);
+              generate()
+                .then(onChange)
+                .catch((error: unknown) =>
+                  setGenerateError(error instanceof Error ? error.message : String(error)),
+                )
+                .finally(() => setGenerating(false));
+            }}
+          >
+            <PenLineIcon aria-hidden />
+            {generating ? gt("Generating…") : gt("Generate")}
+          </Button>
+        ) : null}
+      </div>
       <Textarea
+        id={`jj-commit-message-${commitId}`}
         autoFocus
         value={props.value ?? ""}
         placeholder={props.value === null ? gt("Loading description…") : gt("Describe this change")}
-        disabled={props.disabled || props.value === null}
+        disabled={props.disabled || props.value === null || generating}
         onChange={(event) => onChange(event.target.value)}
       />
-    </label>
+      {generateError ? <p className="text-destructive">{generateError}</p> : null}
+    </div>
   );
 };
 
@@ -98,6 +129,7 @@ export const JjActionDialog = (props: {
   error: string | null;
   onCancel: () => void;
   onConfirm: (action: JjRunAction, title: string) => void;
+  onGenerateCommitMessage?: (() => Promise<string>) | undefined;
 }) => {
   const gt = useGT();
   const messages = useMessages();
@@ -353,6 +385,7 @@ export const JjActionDialog = (props: {
               disabled={props.busy}
               value={message}
               onChange={setMessage}
+              onGenerate={props.onGenerateCommitMessage}
             />
           )}
           {props.error && (

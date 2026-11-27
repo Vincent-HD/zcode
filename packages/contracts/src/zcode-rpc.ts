@@ -8,6 +8,8 @@ import {
 import {
   JjDescribeInput,
   JjDiffResult,
+  JjGenerateCommitMessageInput,
+  JjGenerateCommitMessageResult,
   JjGetDiffInput,
   JjGetPanelInput,
   JjGetRevisionInput,
@@ -38,6 +40,7 @@ export const ZCODE_WS_METHODS = {
   jjForgeStatus: "jj.forgeStatus",
   jjDescribe: "jj.describe",
   jjRevertOperation: "jj.revertOperation",
+  jjGenerateCommitMessage: "jj.generateCommitMessage",
 } as const;
 
 const JjPanelRpcError = Schema.Union([JjPanelError, EnvironmentAuthorizationError]);
@@ -89,6 +92,11 @@ export const ZCODE_WS_RPCS = [
     success: JjMutationResult,
     error: JjPanelRpcError,
   }),
+  Rpc.make(ZCODE_WS_METHODS.jjGenerateCommitMessage, {
+    payload: JjGenerateCommitMessageInput,
+    success: JjGenerateCommitMessageResult,
+    error: JjPanelRpcError,
+  }),
 ] as const;
 
 export const ZCODE_CLIENT_GUARDED_RPC_SCOPES = {
@@ -97,4 +105,6 @@ export const ZCODE_CLIENT_GUARDED_RPC_SCOPES = {
   [ZCODE_WS_METHODS.jjGetDiff]: AuthFilesystemReadScope,
   [ZCODE_WS_METHODS.jjDescribe]: AuthSourceControlWriteScope,
   [ZCODE_WS_METHODS.jjRevertOperation]: AuthSourceControlWriteScope,
+  // Generation runs the writer model, which spends the user's provider quota.
+  [ZCODE_WS_METHODS.jjGenerateCommitMessage]: AuthSourceControlWriteScope,
 } as const;

@@ -35,6 +35,10 @@ export const jjEnvironment = {
     label: "environment-data:jj:describe",
     tag: WS_METHODS.jjDescribe,
   }),
+  generateCommitMessage: createEnvironmentRpcCommand(connectionAtomRuntime, {
+    label: "environment-data:jj:generate-commit-message",
+    tag: WS_METHODS.jjGenerateCommitMessage,
+  }),
   revertOperation: createEnvironmentRpcCommand(connectionAtomRuntime, {
     label: "environment-data:jj:revert-operation",
     tag: WS_METHODS.jjRevertOperation,

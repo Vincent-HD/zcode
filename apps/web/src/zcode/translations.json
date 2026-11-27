@@ -411,7 +411,10 @@
     "55136f57bfd8e7b6": "{action}…",
     "ee80ca3afb9044e5": "Optionen für Jujutsu-Aktionen",
     "848289623c9cd470": "Verschiebt {bookmark} vor dem Veröffentlichen auf die neueste beschriebene Änderung.",
-    "f27b469dfb3debaa": "Veröffentlicht das Bookmark {bookmark}."
+    "f27b469dfb3debaa": "Veröffentlicht das Bookmark {bookmark}.",
+    "3e010214ffbca162": "Committe zuerst die Arbeitskopie; Push verschiebt {bookmark} dann dorthin.",
+    "d632fa90d3c01cc8": "Wird generiert…",
+    "9b27f7cfe5a1602d": "Generieren"
   },
   "es": {
     "570dce16bab8e386": "Disponible desde un hilo de proyecto.",
@@ -823,7 +826,10 @@
     "55136f57bfd8e7b6": "{action}…",
     "ee80ca3afb9044e5": "Opciones de acciones de Jujutsu",
     "848289623c9cd470": "Mueve {bookmark} al último cambio descrito antes de publicar.",
-    "f27b469dfb3debaa": "Publica el bookmark {bookmark}."
+    "f27b469dfb3debaa": "Publica el bookmark {bookmark}.",
+    "3e010214ffbca162": "Haz commit de la copia de trabajo primero; luego Push moverá {bookmark} a ella.",
+    "d632fa90d3c01cc8": "Generando…",
+    "9b27f7cfe5a1602d": "Generar"
   },
   "fr": {
     "570dce16bab8e386": "Disponible depuis un fil de projet.",
@@ -1237,7 +1243,10 @@
     "55136f57bfd8e7b6": "{action}…",
     "ee80ca3afb9044e5": "Options des actions Jujutsu",
     "848289623c9cd470": "Déplace {bookmark} sur le dernier changement décrit avant de publier.",
-    "f27b469dfb3debaa": "Publie le bookmark {bookmark}."
+    "f27b469dfb3debaa": "Publie le bookmark {bookmark}.",
+    "3e010214ffbca162": "Commitez d’abord la copie de travail ; Push y déplacera ensuite {bookmark}.",
+    "d632fa90d3c01cc8": "Génération…",
+    "9b27f7cfe5a1602d": "Générer"
   },
   "ja": {
     "570dce16bab8e386": "プロジェクトのスレッドから利用できます。",
@@ -1651,7 +1660,10 @@
     "55136f57bfd8e7b6": "{action}…",
     "ee80ca3afb9044e5": "Jujutsu 操作のオプション",
     "848289623c9cd470": "公開前に {bookmark} を最新の説明付き変更へ移動します。",
-    "f27b469dfb3debaa": "ブックマーク {bookmark} を公開します。"
+    "f27b469dfb3debaa": "ブックマーク {bookmark} を公開します。",
+    "3e010214ffbca162": "まず作業コピーをコミットしてください。その後プッシュで {bookmark} をそこへ移動します。",
+    "d632fa90d3c01cc8": "生成中…",
+    "9b27f7cfe5a1602d": "生成"
   },
   "ko": {
     "570dce16bab8e386": "프로젝트 스레드에서 사용할 수 있습니다.",
@@ -2065,7 +2077,10 @@
     "55136f57bfd8e7b6": "{action}…",
     "ee80ca3afb9044e5": "Jujutsu 작업 옵션",
     "848289623c9cd470": "게시 전에 {bookmark}을(를) 설명이 있는 최신 변경으로 옮깁니다.",
-    "f27b469dfb3debaa": "북마크 {bookmark}을(를) 게시합니다."
+    "f27b469dfb3debaa": "북마크 {bookmark}을(를) 게시합니다.",
+    "3e010214ffbca162": "먼저 작업 사본을 커밋하세요. 그러면 푸시가 {bookmark}을(를) 그곳으로 옮깁니다.",
+    "d632fa90d3c01cc8": "생성 중…",
+    "9b27f7cfe5a1602d": "생성"
   },
   "pt-BR": {
     "570dce16bab8e386": "Disponível a partir de uma thread de projeto.",
@@ -2477,7 +2492,10 @@
     "55136f57bfd8e7b6": "{action}…",
     "ee80ca3afb9044e5": "Opções de ações do Jujutsu",
     "848289623c9cd470": "Move {bookmark} para a alteração descrita mais recente antes de publicar.",
-    "f27b469dfb3debaa": "Publica o bookmark {bookmark}."
+    "f27b469dfb3debaa": "Publica o bookmark {bookmark}.",
+    "3e010214ffbca162": "Faça commit da cópia de trabalho primeiro; depois o Push move {bookmark} para ela.",
+    "d632fa90d3c01cc8": "Gerando…",
+    "9b27f7cfe5a1602d": "Gerar"
   },
   "ru": {
     "570dce16bab8e386": "Доступно из треда проекта.",
@@ -2892,7 +2910,10 @@
     "55136f57bfd8e7b6": "{action}…",
     "ee80ca3afb9044e5": "Параметры действий Jujutsu",
     "848289623c9cd470": "Перед публикацией перемещает {bookmark} на последнее описанное изменение.",
-    "f27b469dfb3debaa": "Публикует закладку {bookmark}."
+    "f27b469dfb3debaa": "Публикует закладку {bookmark}.",
+    "3e010214ffbca162": "Сначала закоммитьте рабочую копию; затем Push переместит туда {bookmark}.",
+    "d632fa90d3c01cc8": "Генерация…",
+    "9b27f7cfe5a1602d": "Сгенерировать"
   },
   "sv": {
     "570dce16bab8e386": "Tillgängligt från en projekttråd.",
@@ -3306,7 +3327,10 @@
     "55136f57bfd8e7b6": "{action}…",
     "ee80ca3afb9044e5": "Alternativ för Jujutsu-åtgärder",
     "848289623c9cd470": "Flyttar {bookmark} till den senaste beskrivna ändringen innan publicering.",
-    "f27b469dfb3debaa": "Publicerar bokmärket {bookmark}."
+    "f27b469dfb3debaa": "Publicerar bokmärket {bookmark}.",
+    "3e010214ffbca162": "Committa arbetskopian först; sedan flyttar Push {bookmark} dit.",
+    "d632fa90d3c01cc8": "Genererar…",
+    "9b27f7cfe5a1602d": "Generera"
   },
   "zh": {
     "570dce16bab8e386": "可在项目会话中使用。",
@@ -3720,6 +3744,9 @@
     "55136f57bfd8e7b6": "{action}…",
     "ee80ca3afb9044e5": "Jujutsu 操作选项",
     "848289623c9cd470": "发布前将 {bookmark} 移到最新的已描述更改。",
-    "f27b469dfb3debaa": "发布书签 {bookmark}。"
+    "f27b469dfb3debaa": "发布书签 {bookmark}。",
+    "3e010214ffbca162": "请先提交工作副本；之后推送会将 {bookmark} 移到其上。",
+    "d632fa90d3c01cc8": "正在生成…",
+    "9b27f7cfe5a1602d": "生成"
   }
 }

@@ -4,6 +4,7 @@ import {
   type JjForgePreviewInput,
   type JjForgePublishInput,
   type JjForgeStatusInput,
+  type JjGenerateCommitMessageInput,
   type JjGetDiffInput,
   type JjGetPanelInput,
   type JjGetRevisionInput,
@@ -14,6 +15,7 @@ import type * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 
+import * as JjCommitMessageService from "../jj/JjCommitMessageService.ts";
 import * as JjForgeService from "../jj/JjForgeService.ts";
 import * as JjPanelService from "../jj/JjPanelService.ts";
 
@@ -31,6 +33,7 @@ const resolveOptional = Effect.fnUntraced(function* <I, S>(key: Context.Key<I, S
 export const makeZcodeWsHandlers = Effect.gen(function* () {
   const jjPanel = yield* resolveOptional(JjPanelService.JjPanelService);
   const jjForge = yield* resolveOptional(JjForgeService.JjForgeService);
+  const jjCommitMessage = yield* resolveOptional(JjCommitMessageService.JjCommitMessageService);
   return {
     [ZCODE_WS_METHODS.jjGetPanel]: (input: JjGetPanelInput) =>
       jjPanel((service) => service.getPanel(input)),
@@ -50,5 +53,7 @@ export const makeZcodeWsHandlers = Effect.gen(function* () {
       jjForge((service) => service.publish(input)),
     [ZCODE_WS_METHODS.jjForgeStatus]: (input: JjForgeStatusInput) =>
       jjForge((service) => service.getStatus(input)),
+    [ZCODE_WS_METHODS.jjGenerateCommitMessage]: (input: JjGenerateCommitMessageInput) =>
+      jjCommitMessage((service) => service.generate(input)),
   };
 });

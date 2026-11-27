@@ -1,4 +1,5 @@
 import * as Schema from "effect/Schema";
+import { ProjectId } from "./baseSchemas.ts";
 
 export const JjCommitId = Schema.String.check(Schema.isPattern(/^[0-9a-f]{40}$/));
 export const JjChangeId = Schema.String.check(Schema.isPattern(/^[k-z]{32}$/));
@@ -302,6 +303,14 @@ export const JjActionReceipt = Schema.Struct({
 export type JjActionReceipt = typeof JjActionReceipt.Type;
 export const JjMutationResult = Schema.Struct({ panel: JjPanelReady, receipt: JjActionReceipt });
 export type JjMutationResult = typeof JjMutationResult.Type;
+export const JjGenerateCommitMessageInput = Schema.Struct({
+  cwd: Schema.String,
+  /** Picks the project's writer model and writing style, as Git's generated commits do. */
+  projectId: Schema.optionalKey(ProjectId),
+});
+export type JjGenerateCommitMessageInput = typeof JjGenerateCommitMessageInput.Type;
+export const JjGenerateCommitMessageResult = Schema.Struct({ message: Schema.String });
+export type JjGenerateCommitMessageResult = typeof JjGenerateCommitMessageResult.Type;
 export class JjPanelError extends Schema.TaggedError<JjPanelError>()("JjPanelError", {
   reason: Schema.Literals([
     "unavailable",

@@ -93,6 +93,13 @@ const WorkspaceJjGitActions = (
   const runAction = useAtomCommand(jjEnvironment.runAction, COMMAND_OPTIONS);
   const forgePreview = useAtomCommand(jjEnvironment.forgePreview, COMMAND_OPTIONS);
   const forgePublish = useAtomCommand(jjEnvironment.forgePublish, COMMAND_OPTIONS);
+  const generateCommitMessage = useAtomCommand(
+    jjEnvironment.generateCommitMessage,
+    COMMAND_OPTIONS,
+  );
+  const canGenerate = useAtomValue(
+    jjEnvironment.generateCommitMessage.permissionAtom(environmentId),
+  );
   const openLink = useOpenLink(props.threadRef);
   // Git's control holds this subscription too; its updates say the checkout moved.
   const { data: gitStatus } = useEnvironmentQuery(
@@ -368,11 +375,15 @@ const WorkspaceJjGitActions = (
               })}
               {state.bookmark ? (
                 <p className="px-2 py-1.5 text-muted-foreground text-xs">
-                  {state.needsMove
-                    ? gt("Moves {bookmark} to the latest described change before publishing.", {
+                  {state.target === null
+                    ? gt("Commit the working copy first; Push then moves {bookmark} onto it.", {
                         bookmark: state.bookmark,
                       })
-                    : gt("Publishes bookmark {bookmark}.", { bookmark: state.bookmark })}
+                    : state.needsMove
+                      ? gt("Moves {bookmark} to the latest described change before publishing.", {
+                          bookmark: state.bookmark,
+                        })
+                      : gt("Publishes bookmark {bookmark}.", { bookmark: state.bookmark })}
                 </p>
               ) : null}
             </MenuPopup>
@@ -389,6 +400,18 @@ const WorkspaceJjGitActions = (
           busy={running !== null}
           error={commitError}
           onCancel={() => setCommitting(false)}
+          onGenerateCommitMessage={
+            canGenerate
+              ? async () => {
+                  const result = await generateCommitMessage({
+                    environmentId,
+                    input: { cwd, ...(projectId !== null ? { projectId } : {}) },
+                  });
+                  if (result._tag !== "Success") throw new Error(formatJjPanelError(result.cause));
+                  return result.value.message;
+                }
+              : undefined
+          }
           onConfirm={(action) => {
             setRunning("commit");
             void run(action, panel)

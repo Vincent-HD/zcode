@@ -15,6 +15,7 @@ if [[
 fi
 
 added_tests=(
+  apps/server/src/jj/JjCommitMessageService.test.ts
   apps/server/src/jj/JjForgeService.test.ts
   apps/server/src/jj/JjPanelService.test.ts
   apps/server/src/jj/JjWorktrees.test.ts

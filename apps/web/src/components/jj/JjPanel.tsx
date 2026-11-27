@@ -86,6 +86,10 @@ const JjPanel = (props: {
   const describe = useAtomCommand(jjEnvironment.describe, commandOptions);
   const runAction = useAtomCommand(jjEnvironment.runAction, commandOptions);
   const revert = useAtomCommand(jjEnvironment.revertOperation, commandOptions);
+  const generateCommitMessage = useAtomCommand(jjEnvironment.generateCommitMessage, commandOptions);
+  const canGenerate = useAtomValue(
+    jjEnvironment.generateCommitMessage.permissionAtom(props.environmentId),
+  );
   const canRead = useEnvironmentScope(props.environmentId, AuthOrchestrationReadScope);
   const serverConfig = useServerConfigs().get(props.environmentId);
   const capabilities = serverConfig?.environment.capabilities;
@@ -950,6 +954,21 @@ const JjPanel = (props: {
             setError(null);
           }}
           onConfirm={(action, title) => run(action, title, { keepDialogOnError: true })}
+          onGenerateCommitMessage={
+            canGenerate && props.cwd
+              ? async () => {
+                  const result = await generateCommitMessage({
+                    environmentId: props.environmentId,
+                    input: {
+                      cwd: props.cwd ?? "",
+                      ...(props.projectId ? { projectId: props.projectId } : {}),
+                    },
+                  });
+                  if (result._tag !== "Success") throw new Error(formatJjPanelError(result.cause));
+                  return result.value.message;
+                }
+              : undefined
+          }
         />
       )}
     </div>

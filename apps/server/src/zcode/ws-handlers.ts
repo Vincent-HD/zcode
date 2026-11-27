@@ -10,6 +10,7 @@ import {
   type JjGetRevisionInput,
   type JjRevertOperationInput,
   type JjRunActionInput,
+  type JjStackLinkInput,
 } from "@t3tools/contracts";
 import type * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -18,6 +19,7 @@ import * as Option from "effect/Option";
 import * as JjCommitMessageService from "../jj/JjCommitMessageService.ts";
 import * as JjForgeService from "../jj/JjForgeService.ts";
 import * as JjPanelService from "../jj/JjPanelService.ts";
+import * as JjStackService from "../jj/JjStackService.ts";
 
 // Optional lookup keeps the fork services out of layerWsRpc's requirements, so upstream ws tests
 // need no fork mocks; server.ts always provides them through the fork layer.
@@ -34,6 +36,7 @@ export const makeZcodeWsHandlers = Effect.gen(function* () {
   const jjPanel = yield* resolveOptional(JjPanelService.JjPanelService);
   const jjForge = yield* resolveOptional(JjForgeService.JjForgeService);
   const jjCommitMessage = yield* resolveOptional(JjCommitMessageService.JjCommitMessageService);
+  const jjStack = yield* resolveOptional(JjStackService.JjStackService);
   return {
     [ZCODE_WS_METHODS.jjGetPanel]: (input: JjGetPanelInput) =>
       jjPanel((service) => service.getPanel(input)),
@@ -55,5 +58,7 @@ export const makeZcodeWsHandlers = Effect.gen(function* () {
       jjForge((service) => service.getStatus(input)),
     [ZCODE_WS_METHODS.jjGenerateCommitMessage]: (input: JjGenerateCommitMessageInput) =>
       jjCommitMessage((service) => service.generate(input)),
+    [ZCODE_WS_METHODS.jjStackLink]: (input: JjStackLinkInput) =>
+      jjStack((service) => service.link(input)),
   };
 });

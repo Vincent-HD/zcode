@@ -1,7 +1,12 @@
 import type { JjLogRow } from "@t3tools/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
-import { jjGitActionBlocker, jjGitActionsState, jjQuickAction } from "./jj-git-actions";
+import {
+  jjGitActionBlocker,
+  jjGitActionsState,
+  jjNextBookmarkName,
+  jjQuickAction,
+} from "./jj-git-actions";
 
 const row = (id: string, fields: Partial<JjLogRow> = {}): JjLogRow => ({
   commitId: id.repeat(40).slice(0, 40),
@@ -101,5 +106,45 @@ describe("jjGitActionsState", () => {
     const result = state([row("a", { empty: true }), row("b", { summary: "fix" }), trunk([])]);
     expect(result.bookmark).toBeNull();
     expect(jjGitActionBlocker(result, "push")).toBe("no-bookmark");
+  });
+
+  it("keeps a stack's lower bookmarks and moves the worktree's onto the newest layer", () => {
+    const top = row("c", { summary: "feat: ui" });
+    const middle = row("b", { summary: "feat: api", bookmarks: ["t3/x-2"] });
+    const bottom = row("d", { summary: "feat: model", bookmarks: ["t3/x-3"] });
+    const result = state([row("a", { empty: true }), top, middle, bottom, trunk(["t3/x"])]);
+    expect(result).toMatchObject({ bookmark: "t3/x", needsMove: true, target: top });
+    expect(result.stack.map((entry) => [entry.row.summary, entry.bookmark])).toEqual([
+      ["feat: model", "t3/x-3"],
+      ["feat: api", "t3/x-2"],
+      ["feat: ui", "t3/x"],
+    ]);
+    expect(result.stackBookmarks).toEqual(["t3/x-3", "t3/x-2", "t3/x"]);
+    const quick = (stackPublished: boolean) =>
+      jjQuickAction({
+        state: result,
+        canCreatePullRequest: true,
+        hasPullRequest: false,
+        stackPublished,
+      });
+    expect(quick(false)).toBe("publish-stack");
+    expect(quick(true)).toBe("push");
+  });
+
+  it("extends a single bookmark over new commits instead of stacking", () => {
+    const result = state([
+      row("a", { summary: "fix: second" }),
+      row("b", { summary: "fix: first", bookmarks: ["t3/x"] }),
+      trunk([]),
+    ]);
+    expect(result).toMatchObject({ bookmark: "t3/x", needsMove: true, stackBookmarks: ["t3/x"] });
+    expect(jjGitActionBlocker(result, "publish-stack")).toBe("no-stack");
+  });
+
+  it("names a new layer after the work's bookmark", () => {
+    expect(jjNextBookmarkName({ base: "t3/x", taken: ["t3/x"] })).toBe("t3/x-2");
+    expect(jjNextBookmarkName({ base: "t3/x-2", taken: ["t3/x", "t3/x-2", "t3/x-3"] })).toBe(
+      "t3/x-4",
+    );
   });
 });

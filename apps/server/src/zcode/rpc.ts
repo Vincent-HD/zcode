@@ -19,4 +19,5 @@ export const ZCODE_RPC_AGGREGATES = {
   [ZCODE_WS_METHODS.jjDescribe]: "jj",
   [ZCODE_WS_METHODS.jjRevertOperation]: "jj",
   [ZCODE_WS_METHODS.jjGenerateCommitMessage]: "jj",
+  [ZCODE_WS_METHODS.jjStackLink]: "jj",
 } as const;

@@ -28,6 +28,8 @@ import {
   JjForgePublishResult,
   JjForgeStatusInput,
   JjForgeStatusResult,
+  JjStackLinkInput,
+  JjStackLinkResult,
 } from "./jj-forge.ts";
 
 export const ZCODE_WS_METHODS = {
@@ -41,6 +43,7 @@ export const ZCODE_WS_METHODS = {
   jjDescribe: "jj.describe",
   jjRevertOperation: "jj.revertOperation",
   jjGenerateCommitMessage: "jj.generateCommitMessage",
+  jjStackLink: "jj.stackLink",
 } as const;
 
 const JjPanelRpcError = Schema.Union([JjPanelError, EnvironmentAuthorizationError]);
@@ -97,6 +100,11 @@ export const ZCODE_WS_RPCS = [
     success: JjGenerateCommitMessageResult,
     error: JjPanelRpcError,
   }),
+  Rpc.make(ZCODE_WS_METHODS.jjStackLink, {
+    payload: JjStackLinkInput,
+    success: JjStackLinkResult,
+    error: JjPanelRpcError,
+  }),
 ] as const;
 
 export const ZCODE_CLIENT_GUARDED_RPC_SCOPES = {
@@ -107,4 +115,5 @@ export const ZCODE_CLIENT_GUARDED_RPC_SCOPES = {
   [ZCODE_WS_METHODS.jjRevertOperation]: AuthSourceControlWriteScope,
   // Generation runs the writer model, which spends the user's provider quota.
   [ZCODE_WS_METHODS.jjGenerateCommitMessage]: AuthSourceControlWriteScope,
+  [ZCODE_WS_METHODS.jjStackLink]: AuthSourceControlWriteScope,
 } as const;

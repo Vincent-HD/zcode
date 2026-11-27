@@ -88,6 +88,16 @@ export const JjForgeStatusResult = Schema.Struct({
   truncated: Schema.Boolean,
 });
 export type JjForgeStatusResult = typeof JjForgeStatusResult.Type;
+/** Bookmarks bottom to top; the pattern keeps every name from reading as a gh flag. */
+export const JjStackLinkInput = Schema.Struct({
+  cwd: Schema.String,
+  remote: JjForgeBookmark,
+  baseBookmark: JjForgeBookmark,
+  bookmarks: Schema.Array(JjForgeBookmark).check(Schema.isMinLength(2), Schema.isMaxLength(32)),
+});
+export type JjStackLinkInput = typeof JjStackLinkInput.Type;
+export const JjStackLinkResult = Schema.Struct({ output: Schema.String });
+export type JjStackLinkResult = typeof JjStackLinkResult.Type;
 export class JjForgeError extends Schema.TaggedError<JjForgeError>()("JjForgeError", {
   reason: Schema.Literals([
     "unavailable",

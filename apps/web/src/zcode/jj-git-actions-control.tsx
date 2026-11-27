@@ -3,14 +3,21 @@ import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime"
 import {
   AuthOrchestrationReadScope,
   type EnvironmentId,
+  type JjLogRow,
   type JjPanelReady,
   type JjRunAction,
+  type PullRequestState,
   type ProjectId,
   type ScopedThreadRef,
 } from "@t3tools/contracts";
 import * as AsyncResult from "effect/reactivity/AsyncResult";
 import { useGT } from "gt-react";
-import { ChevronDownIcon, CloudUploadIcon, GitCommitHorizontalIcon } from "lucide-react";
+import {
+  BookmarkPlusIcon,
+  ChevronDownIcon,
+  CloudUploadIcon,
+  GitCommitHorizontalIcon,
+} from "lucide-react";
 import { useEffect, useEffectEvent, useRef, useState, type ReactNode } from "react";
 
 import { useOpenLink } from "../browser/useOpenLink";
@@ -27,6 +34,7 @@ import { JjActionDialog } from "../components/jj/jj-action-dialog";
 import { jjForgeFailureMessage } from "../components/jj/jj-forge-state";
 import { jjRefreshInput, mergeJjSnapshot } from "../components/jj/jj-log-state";
 import { formatJjPanelError } from "../components/jj/jj-panel-state";
+import { Button } from "../components/ui/button";
 import { Menu, MenuItem, MenuItemLabel, MenuPopup, MenuTrigger } from "../components/ui/menu";
 import { stackedThreadToast, toastManager } from "../components/ui/toast";
 import { cn } from "../lib/utils";
@@ -40,6 +48,7 @@ import {
   JJ_GIT_ACTIONS_VIEW,
   jjGitActionBlocker,
   jjGitActionsState,
+  jjNextBookmarkName,
   jjQuickAction,
   jjRemoteBookmarkView,
   type JjGitAction,
@@ -51,7 +60,30 @@ const ICONS = {
   push: CloudUploadIcon,
   "create-pr": PullRequestGlyph.pullRequest,
   "view-pr": PullRequestGlyph.link,
+  "publish-stack": PullRequestGlyph.stack,
 } as const;
+
+interface BookmarkPullRequest {
+  readonly url: string;
+  readonly number: number;
+  readonly state: PullRequestState;
+}
+
+/** Where each of the stack's bookmarks sits now, before Push moves the work's own up. */
+const bookmarkPlacements = (state: ReturnType<typeof jjGitActionsState>) =>
+  state.stack.flatMap((entry) =>
+    entry.bookmark === null
+      ? []
+      : [
+          {
+            bookmark: entry.bookmark,
+            commitId:
+              entry.bookmark === state.bookmark && state.bookmarkCommitId
+                ? state.bookmarkCommitId
+                : entry.row.commitId,
+          },
+        ],
+  );
 
 /**
  * Git's actions see a jj workspace as a detached HEAD with nothing to push. In one, this row
@@ -95,6 +127,7 @@ const WorkspaceJjGitActions = (
   const forgePreview = useAtomCommand(jjEnvironment.forgePreview, COMMAND_OPTIONS);
   const forgePublish = useAtomCommand(jjEnvironment.forgePublish, COMMAND_OPTIONS);
   const forgeStatus = useAtomCommand(jjEnvironment.forgeStatus, COMMAND_OPTIONS);
+  const stackLink = useAtomCommand(jjEnvironment.stackLink, COMMAND_OPTIONS);
   const generateCommitMessage = useAtomCommand(
     jjEnvironment.generateCommitMessage,
     COMMAND_OPTIONS,
@@ -114,13 +147,16 @@ const WorkspaceJjGitActions = (
     readonly bookmark: string;
     readonly commitId: string | null;
   } | null>(null);
-  const [pullRequest, setPullRequest] = useState<{
-    readonly key: string;
-    readonly url: string;
-    readonly number: number;
-  } | null>(null);
-  // The bookmark placement last asked about, so a refresh does not query the forge again.
+  const [pullRequests, setPullRequests] = useState<ReadonlyMap<string, BookmarkPullRequest>>(
+    new Map(),
+  );
+  // The bookmark placements last asked about, so a refresh does not query the forge again.
   const pullRequestKey = useRef<string | null>(null);
+  const [bookmarking, setBookmarking] = useState<{
+    readonly revision: JjLogRow;
+    readonly suggestedName: string;
+  } | null>(null);
+  const [bookmarkError, setBookmarkError] = useState<string | null>(null);
   const [running, setRunning] = useState<JjGitAction | null>(null);
   const [committing, setCommitting] = useState(false);
   const [commitError, setCommitError] = useState<string | null>(null);
@@ -152,18 +188,19 @@ const WorkspaceJjGitActions = (
     if (merge.type === "reload" && !reload) return refresh(true);
     // A push moves only the remote bookmark, which the unchanged snapshot does not show.
     if (panelRef.current) await readRemoteHead(panelRef.current, request);
-    if (panelRef.current) await readPullRequest(panelRef.current);
+    if (panelRef.current) await readPullRequests(panelRef.current);
   };
-  /** Finds the bookmark's open pull request once per bookmark placement. */
-  const readPullRequest = async (next: JjPanelReady) => {
-    const { bookmark, remote, bookmarkCommitId } = jjGitActionsState({
+  /** Finds each stack bookmark's pull request once per bookmark placement. */
+  const readPullRequests = async (next: JjPanelReady) => {
+    const nextState = jjGitActionsState({
       rows: next.rows,
       workingCopyCommitId: next.workingCopyCommitId,
       remotes: next.remotes,
     });
-    if (capabilities?.jjPanelForge !== true || projectId === null) return;
-    if (!bookmark || !remote || !bookmarkCommitId) return;
-    const key = `${bookmarkCommitId}\0${bookmark}`;
+    if (capabilities?.jjPanelForge !== true || projectId === null || !nextState.remote) return;
+    const placements = bookmarkPlacements(nextState);
+    if (placements.length === 0) return;
+    const key = JSON.stringify(placements);
     if (pullRequestKey.current === key) return;
     pullRequestKey.current = key;
     const result = await forgeStatus({
@@ -173,8 +210,11 @@ const WorkspaceJjGitActions = (
         workspaceIdentity: next.workspaceIdentity,
         expectedOperationId: next.operationId,
         projectId,
-        remote,
-        revisionCommitIds: [bookmarkCommitId],
+        remote: nextState.remote,
+        revisionCommitIds: [...new Set(placements.map((placement) => placement.commitId))].slice(
+          0,
+          32,
+        ),
       },
     });
     if (result._tag !== "Success") {
@@ -182,11 +222,17 @@ const WorkspaceJjGitActions = (
       if (pullRequestKey.current === key) pullRequestKey.current = null;
       return;
     }
-    const open = result.value.revisions.find(
-      (revision) => revision.bookmark === bookmark && revision.summary.state === "open",
-    );
-    setPullRequest(
-      open ? { key: bookmark, url: open.summary.url, number: open.summary.number } : null,
+    setPullRequests(
+      new Map(
+        result.value.revisions.map((revision) => [
+          revision.bookmark,
+          {
+            url: revision.summary.url,
+            number: revision.summary.number,
+            state: revision.summary.state,
+          },
+        ]),
+      ),
     );
   };
   const readRemoteHead = async (next: JjPanelReady, request: number) => {
@@ -232,21 +278,28 @@ const WorkspaceJjGitActions = (
   const canCreatePullRequest =
     capabilities.jjPanelForge === true && canPublish && projectId !== null;
   // Kept per bookmark name: committing and pushing move the bookmark, not the pull request.
-  const openPullRequest =
-    pullRequest !== null && pullRequest.key === state.bookmark ? pullRequest : null;
+  const topPullRequest = state.bookmark ? pullRequests.get(state.bookmark) : undefined;
+  const openPullRequest = topPullRequest?.state === "open" ? topPullRequest : null;
+  const stackPublished = state.stackBookmarks.every(
+    (name) => pullRequests.get(name)?.state === "open",
+  );
   const quickAction = jjQuickAction({
     state,
     canCreatePullRequest,
     hasPullRequest: openPullRequest !== null,
+    stackPublished,
   });
   const labels: Record<JjGitAction, string> = {
     commit: gt("Commit"),
     push: gt("Push"),
     "create-pr": gt("Create PR"),
     "view-pr": openPullRequest ? gt("View PR #{number}", { number: openPullRequest.number }) : "",
+    "publish-stack": gt("Publish stack"),
   };
   const blockerText = (action: JjGitAction) => {
     if (action === "view-pr") return null;
+    if (action === "publish-stack" && !canCreatePullRequest)
+      return gt("Pull requests need a GitHub or GitLab remote and permission to publish.");
     if (action === "create-pr" && !canCreatePullRequest)
       return gt("Pull requests need a GitHub or GitLab remote and permission to publish.");
     switch (jjGitActionBlocker(state, action)) {
@@ -262,6 +315,8 @@ const WorkspaceJjGitActions = (
         return gt("The remote bookmark is already up to date.");
       case "no-base":
         return gt("Trunk has no bookmark on the remote to target.");
+      case "no-stack":
+        return gt("Bookmark at least two changes to publish them as a stack.");
       case null:
         return null;
     }
@@ -334,7 +389,13 @@ const WorkspaceJjGitActions = (
       throw new Error(jjForgeFailureMessage(squashAtomCommandFailure(published)));
     const layer = published.value.layers[0];
     if (!layer) return;
-    setPullRequest({ key: bookmark, url: layer.url, number: layer.reference.number });
+    setPullRequests(
+      (current) =>
+        new Map([
+          ...current,
+          [bookmark, { url: layer.url, number: layer.reference.number, state: "open" }],
+        ]),
+    );
     toastManager.add(
       stackedThreadToast({
         type: "success",
@@ -343,6 +404,27 @@ const WorkspaceJjGitActions = (
       }),
     );
     void openLink(layer.url).catch(() => undefined);
+  };
+
+  /** Pushes every layer's bookmark, then links them into one GitHub stack of pull requests. */
+  const publishStack = async () => {
+    const { remote, baseBookmark, stackBookmarks } = state;
+    if (!remote || !baseBookmark || stackBookmarks.length < 2) return;
+    const current = await placeBookmark();
+    await run({ type: "push", bookmarkNames: [...stackBookmarks], remote }, current);
+    const result = await stackLink({
+      environmentId,
+      input: { cwd, remote, baseBookmark, bookmarks: [...stackBookmarks] },
+    });
+    if (result._tag !== "Success") throw new Error(formatJjPanelError(result.cause));
+    pullRequestKey.current = null;
+    toastManager.add(
+      stackedThreadToast({
+        type: "success",
+        title: gt("Stack published"),
+        description: result.value.output || stackBookmarks.join(" → "),
+      }),
+    );
   };
 
   const start = async (action: JjGitAction) => {
@@ -358,10 +440,18 @@ const WorkspaceJjGitActions = (
     if (running) return;
     setRunning(action);
     try {
-      await (action === "push" ? push() : createPullRequest());
+      await (action === "push"
+        ? push()
+        : action === "publish-stack"
+          ? publishStack()
+          : createPullRequest());
     } catch (error) {
       toastError(
-        action === "push" ? gt("Push failed") : gt("Pull request failed"),
+        action === "push"
+          ? gt("Push failed")
+          : action === "publish-stack"
+            ? gt("Stack publication failed")
+            : gt("Pull request failed"),
         error instanceof Error ? error.message : String(error),
       );
     } finally {
@@ -417,23 +507,28 @@ const WorkspaceJjGitActions = (
               <ChevronDownIcon aria-hidden className={THREAD_DETAILS_PANEL_CHEVRON_CLASS} />
             </MenuTrigger>
             <MenuPopup align="end" anchor={anchorRef} className="w-(--anchor-width)">
-              {(["commit", "push", openPullRequest ? "view-pr" : "create-pr"] as const).map(
-                (action) => {
-                  const Icon = ICONS[action];
-                  const blocker = blockerText(action);
-                  return (
-                    <MenuItem
-                      key={action}
-                      disabled={!canRun || blocker !== null}
-                      title={blocker ?? undefined}
-                      onClick={() => void start(action)}
-                    >
-                      <Icon aria-hidden />
-                      <MenuItemLabel>{labels[action]}</MenuItemLabel>
-                    </MenuItem>
-                  );
-                },
-              )}
+              {(
+                [
+                  "commit",
+                  "push",
+                  ...(state.stack.length > 1 ? (["publish-stack"] as const) : []),
+                  openPullRequest ? "view-pr" : "create-pr",
+                ] as const
+              ).map((action) => {
+                const Icon = ICONS[action];
+                const blocker = blockerText(action);
+                return (
+                  <MenuItem
+                    key={action}
+                    disabled={!canRun || blocker !== null}
+                    title={blocker ?? undefined}
+                    onClick={() => void start(action)}
+                  >
+                    <Icon aria-hidden />
+                    <MenuItemLabel>{labels[action]}</MenuItemLabel>
+                  </MenuItem>
+                );
+              })}
               {state.bookmark ? (
                 <p className="px-2 py-1.5 text-muted-foreground text-xs">
                   {state.target === null
@@ -451,6 +546,86 @@ const WorkspaceJjGitActions = (
           </Menu>
         </div>
       )}
+      {!hidden && state.stack.length > 1 ? (
+        <section aria-label={gt("Stack")} className="flex flex-col py-1 text-xs">
+          <span className="px-2.5 pb-0.5 text-muted-foreground">{gt("Stack")}</span>
+          <ol className="flex flex-col">
+            {state.stack.toReversed().map((entry) => {
+              const pullRequest = entry.bookmark ? pullRequests.get(entry.bookmark) : undefined;
+              return (
+                <li
+                  key={entry.row.commitId}
+                  className="flex h-7 min-w-0 items-center gap-1.5 ps-2.5 pe-1"
+                >
+                  <span className="min-w-0 flex-1 truncate">{entry.row.summary}</span>
+                  {entry.bookmark ? (
+                    <span className="max-w-28 shrink-0 truncate font-mono text-muted-foreground">
+                      {entry.bookmark}
+                    </span>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      disabled={!canRun || running !== null}
+                      onClick={() => {
+                        setBookmarkError(null);
+                        setBookmarking({
+                          revision: entry.row,
+                          suggestedName: jjNextBookmarkName({
+                            base: state.bookmark ?? state.stackBookmarks[0] ?? "stack",
+                            taken: panel.rows.flatMap((row) => row.bookmarks ?? []),
+                          }),
+                        });
+                      }}
+                    >
+                      <BookmarkPlusIcon aria-hidden />
+                      {gt("Bookmark")}
+                    </Button>
+                  )}
+                  {pullRequest ? (
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      title={pullRequest.url}
+                      onClick={() => void openLink(pullRequest.url).catch(() => undefined)}
+                    >
+                      {pullRequest.state === "open"
+                        ? gt("#{number}", { number: pullRequest.number })
+                        : pullRequest.state === "merged"
+                          ? gt("#{number} merged", { number: pullRequest.number })
+                          : gt("#{number} closed", { number: pullRequest.number })}
+                    </Button>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ol>
+        </section>
+      ) : null}
+      {bookmarking ? (
+        <JjActionDialog
+          request={{
+            kind: "bookmark",
+            mode: "set",
+            revision: bookmarking.revision,
+            suggestedName: bookmarking.suggestedName,
+          }}
+          environmentId={environmentId}
+          cwd={cwd}
+          rows={panel.rows}
+          remotes={panel.remotes}
+          busy={running !== null}
+          error={bookmarkError}
+          onCancel={() => setBookmarking(null)}
+          onConfirm={(action) => {
+            void run(action, panel)
+              .then(() => setBookmarking(null))
+              .catch((error: unknown) =>
+                setBookmarkError(error instanceof Error ? error.message : String(error)),
+              );
+          }}
+        />
+      ) : null}
       {committing && state.workingCopy ? (
         <JjActionDialog
           request={{ kind: "commit", revision: state.workingCopy }}

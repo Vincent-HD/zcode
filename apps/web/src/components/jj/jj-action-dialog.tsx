@@ -137,7 +137,7 @@ export const JjActionDialog = (props: {
   const [targetCommitId, setTargetCommitId] = useState<string | null>(null);
   const [bookmarkName, setBookmarkName] = useState(() =>
     request.kind === "bookmark" && request.mode === "set"
-      ? (request.revision.bookmarks?.[0] ?? "")
+      ? (request.suggestedName ?? request.revision.bookmarks?.[0] ?? "")
       : request.kind === "bookmark"
         ? (ancestorBookmarks({ revision: request.revision, rows: props.rows })[0] ?? "")
         : "",

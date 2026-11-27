@@ -13,7 +13,14 @@ export const jjRemoteBookmarkView = (input: { bookmark: string; remote: string }
   limit: 2,
 });
 
-export type JjGitAction = "commit" | "push" | "create-pr" | "view-pr";
+export type JjGitAction = "commit" | "push" | "create-pr" | "view-pr" | "publish-stack";
+
+/** One described revision of the work, bottom to top, with the bookmark that publishes it. */
+export interface JjStackEntry {
+  readonly row: JjLogRow;
+  /** After the work's bookmark moves onto the target, as Push and publishing place it. */
+  readonly bookmark: string | null;
+}
 
 export interface JjGitActionsState {
   readonly workingCopy: JjLogRow | null;
@@ -32,6 +39,10 @@ export interface JjGitActionsState {
   readonly needsMove: boolean;
   /** The remote bookmark already points at the target. */
   readonly pushed: boolean;
+  /** The described revisions from trunk up to the target. */
+  readonly stack: ReadonlyArray<JjStackEntry>;
+  /** The stack's bookmarks bottom to top; two or more make a stack of pull requests. */
+  readonly stackBookmarks: ReadonlyArray<string>;
 }
 
 export const jjGitActionsState = (input: {
@@ -57,13 +68,21 @@ export const jjGitActionsState = (input: {
     (row.bookmarks ?? []).filter(
       (name) => !(row.immutable && (name === baseBookmark || onRemote(row, name))),
     );
+  // The worktree's bookmark left on trunk claims the newest work before one placed on a lower
+  // revision, so bookmarks set on a stack's lower layers stay where they were put.
   const bookmarkRow = [
     ...(target ? [target] : []),
-    ...mutable.filter((row) => row !== target),
     ...(trunk ? [trunk] : []),
+    ...mutable.filter((row) => row !== target),
   ].find((row) => ownBookmarks(row).length > 0);
   const bookmark = bookmarkRow ? (ownBookmarks(bookmarkRow)[0] ?? null) : null;
   const needsMove = target !== null && bookmarkRow !== undefined && bookmarkRow !== target;
+  const described = mutable.filter((row) => !row.empty && row.summary.trim() !== "");
+  const stack = (target ? described.toReversed() : []).map((row): JjStackEntry => {
+    if (row === target && bookmark !== null) return { row, bookmark };
+    const own = ownBookmarks(row).filter((name) => !(needsMove && name === bookmark));
+    return { row, bookmark: own[0] ?? null };
+  });
   return {
     workingCopy,
     canCommit: workingCopy !== null && !workingCopy.empty && !workingCopy.immutable,
@@ -79,19 +98,41 @@ export const jjGitActionsState = (input: {
       !needsMove &&
       (onRemote(target, bookmark) ||
         (input.remoteHead?.bookmark === bookmark && input.remoteHead.commitId === target.commitId)),
+    stack,
+    stackBookmarks: stack.flatMap((entry) => (entry.bookmark ? [entry.bookmark] : [])),
   };
+};
+
+/** A free name for a new layer's bookmark, numbered after the work's own: `t3/x` gives `t3/x-2`. */
+export const jjNextBookmarkName = (input: {
+  readonly base: string;
+  readonly taken: ReadonlyArray<string>;
+}): string => {
+  const stem = input.base.replace(/-\d+$/, "");
+  let index = 2;
+  while (input.taken.includes(`${stem}-${index}`)) index++;
+  return `${stem}-${index}`;
 };
 
 /** Why an action cannot run now, or null when it can. */
 export const jjGitActionBlocker = (
   state: JjGitActionsState,
   action: JjGitAction,
-): "clean" | "no-target" | "no-bookmark" | "no-remote" | "pushed" | "no-base" | null => {
+):
+  | "clean"
+  | "no-target"
+  | "no-bookmark"
+  | "no-remote"
+  | "pushed"
+  | "no-base"
+  | "no-stack"
+  | null => {
   if (action === "commit") return state.canCommit ? null : "clean";
   if (state.target === null) return "no-target";
   if (state.bookmark === null) return "no-bookmark";
   if (state.remote === null) return "no-remote";
   if (action === "push") return state.pushed ? "pushed" : null;
+  if (action === "publish-stack") return state.stackBookmarks.length < 2 ? "no-stack" : null;
   return state.baseBookmark === null ? "no-base" : null;
 };
 
@@ -101,8 +142,17 @@ export const jjQuickAction = (input: {
   readonly canCreatePullRequest: boolean;
   /** An open pull request already exists for the bookmark. */
   readonly hasPullRequest: boolean;
+  /** Every layer of a stack already has an open pull request. */
+  readonly stackPublished?: boolean | undefined;
 }): JjGitAction | null => {
   if (jjGitActionBlocker(input.state, "commit") === null) return "commit";
+  if (
+    input.canCreatePullRequest &&
+    input.stackPublished !== true &&
+    jjGitActionBlocker(input.state, "publish-stack") === null &&
+    jjGitActionBlocker(input.state, "push") !== "no-target"
+  )
+    return "publish-stack";
   if (jjGitActionBlocker(input.state, "push") === null) return "push";
   if (input.hasPullRequest) return "view-pr";
   if (input.canCreatePullRequest && jjGitActionBlocker(input.state, "create-pr") === null)

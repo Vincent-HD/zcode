@@ -276,7 +276,13 @@ export type JjDialogRequest<R extends Row> =
       readonly action: JjRunAction;
     }
   | { readonly kind: "squash-ancestor"; readonly source: R; readonly paths?: ReadonlyArray<string> }
-  | { readonly kind: "bookmark"; readonly mode: "set" | "advance"; readonly revision: R }
+  | {
+      readonly kind: "bookmark";
+      readonly mode: "set" | "advance";
+      readonly revision: R;
+      /** Prefills a new bookmark's name, as the stack view does for a new layer. */
+      readonly suggestedName?: string;
+    }
   | { readonly kind: "push"; readonly revision: R }
   | { readonly kind: "commit"; readonly revision: R };
 

@@ -18,6 +18,7 @@ added_tests=(
   apps/server/src/jj/JjCommitMessageService.test.ts
   apps/server/src/jj/JjForgeService.test.ts
   apps/server/src/jj/JjPanelService.test.ts
+  apps/server/src/jj/JjStackService.test.ts
   apps/server/src/jj/JjWorktrees.test.ts
   apps/web/src/components/chat/composer-usage.logic.test.ts
   apps/web/src/components/chat/models-dev-pricing.test.ts

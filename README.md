@@ -47,6 +47,10 @@ upstream entry points to re-check after a rebase are in [`ZCODE.md`](./ZCODE.md)
   `t3/…` bookmark, even when it was left on trunk) up to the newest described change and pushes
   it. Create PR does the same, then opens or updates the GitHub/GitLab pull request against
   trunk's bookmark. Once pushed, an open pull request for the bookmark shows as **View PR #N**.
+  When the work spans several described changes, a **Stack** list shows each one with its bookmark
+  and pull request; **Bookmark** names a lower layer (`t3/x-2`…), and **Publish stack** pushes every
+  bookmark and links them into a GitHub stacked pull request with `gh stack link` (the `gh-stack`
+  extension; jj has no GitHub integration of its own). New pull requests open as drafts.
 - **VS Code tasks:** A project's `.vscode/tasks.json` tasks appear in the thread details panel's
   action menu next to its actions and run in the same terminal. Shell, process and npm tasks are
   supported (npm tasks run with bun, pnpm, yarn or npm, picked from the nearest lockfile), with `args` quoting, `options.cwd` and `options.env`, Linux and macOS overrides, and

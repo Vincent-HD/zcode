@@ -415,7 +415,16 @@
     "3e010214ffbca162": "Committe zuerst die Arbeitskopie; Push verschiebt {bookmark} dann dorthin.",
     "d632fa90d3c01cc8": "Wird generiert…",
     "9b27f7cfe5a1602d": "Generieren",
-    "7fd6c35a8c2ab0b8": "PR #{number} anzeigen"
+    "7fd6c35a8c2ab0b8": "PR #{number} anzeigen",
+    "c0e576ab524282ab": "Stack veröffentlichen",
+    "73a97fcedc2fd672": "Setze auf mindestens zwei Änderungen ein Bookmark, um sie als Stack zu veröffentlichen.",
+    "7999d9e463678849": "Stack veröffentlicht",
+    "f74bc1d33ec4e450": "Stack-Veröffentlichung fehlgeschlagen",
+    "c00f29a4f42024de": "Stack",
+    "b540e0c52f268eb3": "Bookmark",
+    "8482ad570e5ed6af": "#{number}",
+    "ffba4647394a50f9": "#{number} gemergt",
+    "d70a6fe8a3e2af99": "#{number} geschlossen"
   },
   "es": {
     "570dce16bab8e386": "Disponible desde un hilo de proyecto.",
@@ -831,7 +840,16 @@
     "3e010214ffbca162": "Haz commit de la copia de trabajo primero; luego Push moverá {bookmark} a ella.",
     "d632fa90d3c01cc8": "Generando…",
     "9b27f7cfe5a1602d": "Generar",
-    "7fd6c35a8c2ab0b8": "Ver PR #{number}"
+    "7fd6c35a8c2ab0b8": "Ver PR #{number}",
+    "c0e576ab524282ab": "Publicar stack",
+    "73a97fcedc2fd672": "Añade un bookmark a al menos dos cambios para publicarlos como stack.",
+    "7999d9e463678849": "Stack publicado",
+    "f74bc1d33ec4e450": "Error al publicar el stack",
+    "c00f29a4f42024de": "Stack",
+    "b540e0c52f268eb3": "Bookmark",
+    "8482ad570e5ed6af": "#{number}",
+    "ffba4647394a50f9": "#{number} fusionada",
+    "d70a6fe8a3e2af99": "#{number} cerrada"
   },
   "fr": {
     "570dce16bab8e386": "Disponible depuis un fil de projet.",
@@ -1249,7 +1267,16 @@
     "3e010214ffbca162": "Commitez d’abord la copie de travail ; Push y déplacera ensuite {bookmark}.",
     "d632fa90d3c01cc8": "Génération…",
     "9b27f7cfe5a1602d": "Générer",
-    "7fd6c35a8c2ab0b8": "Voir la PR #{number}"
+    "7fd6c35a8c2ab0b8": "Voir la PR #{number}",
+    "c0e576ab524282ab": "Publier la stack",
+    "73a97fcedc2fd672": "Ajoutez un bookmark sur au moins deux changements pour les publier en stack.",
+    "7999d9e463678849": "Stack publiée",
+    "f74bc1d33ec4e450": "Échec de la publication de la stack",
+    "c00f29a4f42024de": "Stack",
+    "b540e0c52f268eb3": "Bookmark",
+    "8482ad570e5ed6af": "#{number}",
+    "ffba4647394a50f9": "#{number} mergée",
+    "d70a6fe8a3e2af99": "#{number} fermée"
   },
   "ja": {
     "570dce16bab8e386": "プロジェクトのスレッドから利用できます。",
@@ -1667,7 +1694,16 @@
     "3e010214ffbca162": "まず作業コピーをコミットしてください。その後プッシュで {bookmark} をそこへ移動します。",
     "d632fa90d3c01cc8": "生成中…",
     "9b27f7cfe5a1602d": "生成",
-    "7fd6c35a8c2ab0b8": "PR #{number} を表示"
+    "7fd6c35a8c2ab0b8": "PR #{number} を表示",
+    "c0e576ab524282ab": "スタックを公開",
+    "73a97fcedc2fd672": "スタックとして公開するには、少なくとも 2 つの変更にブックマークを付けてください。",
+    "7999d9e463678849": "スタックを公開しました",
+    "f74bc1d33ec4e450": "スタックの公開に失敗しました",
+    "c00f29a4f42024de": "スタック",
+    "b540e0c52f268eb3": "ブックマーク",
+    "8482ad570e5ed6af": "#{number}",
+    "ffba4647394a50f9": "#{number} マージ済み",
+    "d70a6fe8a3e2af99": "#{number} クローズ済み"
   },
   "ko": {
     "570dce16bab8e386": "프로젝트 스레드에서 사용할 수 있습니다.",
@@ -2085,7 +2121,16 @@
     "3e010214ffbca162": "먼저 작업 사본을 커밋하세요. 그러면 푸시가 {bookmark}을(를) 그곳으로 옮깁니다.",
     "d632fa90d3c01cc8": "생성 중…",
     "9b27f7cfe5a1602d": "생성",
-    "7fd6c35a8c2ab0b8": "PR #{number} 보기"
+    "7fd6c35a8c2ab0b8": "PR #{number} 보기",
+    "c0e576ab524282ab": "스택 게시",
+    "73a97fcedc2fd672": "스택으로 게시하려면 최소 두 개의 변경에 북마크를 지정하세요.",
+    "7999d9e463678849": "스택을 게시했습니다",
+    "f74bc1d33ec4e450": "스택 게시 실패",
+    "c00f29a4f42024de": "스택",
+    "b540e0c52f268eb3": "북마크",
+    "8482ad570e5ed6af": "#{number}",
+    "ffba4647394a50f9": "#{number} 병합됨",
+    "d70a6fe8a3e2af99": "#{number} 닫힘"
   },
   "pt-BR": {
     "570dce16bab8e386": "Disponível a partir de uma thread de projeto.",
@@ -2501,7 +2546,16 @@
     "3e010214ffbca162": "Faça commit da cópia de trabalho primeiro; depois o Push move {bookmark} para ela.",
     "d632fa90d3c01cc8": "Gerando…",
     "9b27f7cfe5a1602d": "Gerar",
-    "7fd6c35a8c2ab0b8": "Ver PR #{number}"
+    "7fd6c35a8c2ab0b8": "Ver PR #{number}",
+    "c0e576ab524282ab": "Publicar stack",
+    "73a97fcedc2fd672": "Adicione um bookmark a pelo menos duas alterações para publicá-las como stack.",
+    "7999d9e463678849": "Stack publicada",
+    "f74bc1d33ec4e450": "Falha ao publicar a stack",
+    "c00f29a4f42024de": "Stack",
+    "b540e0c52f268eb3": "Bookmark",
+    "8482ad570e5ed6af": "#{number}",
+    "ffba4647394a50f9": "#{number} mesclada",
+    "d70a6fe8a3e2af99": "#{number} fechada"
   },
   "ru": {
     "570dce16bab8e386": "Доступно из треда проекта.",
@@ -2920,7 +2974,16 @@
     "3e010214ffbca162": "Сначала закоммитьте рабочую копию; затем Push переместит туда {bookmark}.",
     "d632fa90d3c01cc8": "Генерация…",
     "9b27f7cfe5a1602d": "Сгенерировать",
-    "7fd6c35a8c2ab0b8": "Открыть PR #{number}"
+    "7fd6c35a8c2ab0b8": "Открыть PR #{number}",
+    "c0e576ab524282ab": "Опубликовать стек",
+    "73a97fcedc2fd672": "Поставьте закладки хотя бы на два изменения, чтобы опубликовать их стеком.",
+    "7999d9e463678849": "Стек опубликован",
+    "f74bc1d33ec4e450": "Не удалось опубликовать стек",
+    "c00f29a4f42024de": "Стек",
+    "b540e0c52f268eb3": "Закладка",
+    "8482ad570e5ed6af": "#{number}",
+    "ffba4647394a50f9": "#{number} влит",
+    "d70a6fe8a3e2af99": "#{number} закрыт"
   },
   "sv": {
     "570dce16bab8e386": "Tillgängligt från en projekttråd.",
@@ -3338,7 +3401,16 @@
     "3e010214ffbca162": "Committa arbetskopian först; sedan flyttar Push {bookmark} dit.",
     "d632fa90d3c01cc8": "Genererar…",
     "9b27f7cfe5a1602d": "Generera",
-    "7fd6c35a8c2ab0b8": "Visa PR #{number}"
+    "7fd6c35a8c2ab0b8": "Visa PR #{number}",
+    "c0e576ab524282ab": "Publicera stack",
+    "73a97fcedc2fd672": "Sätt bokmärken på minst två ändringar för att publicera dem som en stack.",
+    "7999d9e463678849": "Stack publicerad",
+    "f74bc1d33ec4e450": "Publiceringen av stacken misslyckades",
+    "c00f29a4f42024de": "Stack",
+    "b540e0c52f268eb3": "Bokmärke",
+    "8482ad570e5ed6af": "#{number}",
+    "ffba4647394a50f9": "#{number} sammanslagen",
+    "d70a6fe8a3e2af99": "#{number} stängd"
   },
   "zh": {
     "570dce16bab8e386": "可在项目会话中使用。",
@@ -3756,6 +3828,15 @@
     "3e010214ffbca162": "请先提交工作副本；之后推送会将 {bookmark} 移到其上。",
     "d632fa90d3c01cc8": "正在生成…",
     "9b27f7cfe5a1602d": "生成",
-    "7fd6c35a8c2ab0b8": "查看 PR #{number}"
+    "7fd6c35a8c2ab0b8": "查看 PR #{number}",
+    "c0e576ab524282ab": "发布堆栈",
+    "73a97fcedc2fd672": "至少为两个更改设置书签才能将其作为堆栈发布。",
+    "7999d9e463678849": "堆栈已发布",
+    "f74bc1d33ec4e450": "堆栈发布失败",
+    "c00f29a4f42024de": "堆栈",
+    "b540e0c52f268eb3": "书签",
+    "8482ad570e5ed6af": "#{number}",
+    "ffba4647394a50f9": "#{number} 已合并",
+    "d70a6fe8a3e2af99": "#{number} 已关闭"
   }
 }

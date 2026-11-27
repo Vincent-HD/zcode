@@ -39,6 +39,10 @@ export const jjEnvironment = {
     label: "environment-data:jj:generate-commit-message",
     tag: WS_METHODS.jjGenerateCommitMessage,
   }),
+  stackLink: createEnvironmentRpcCommand(connectionAtomRuntime, {
+    label: "environment-data:jj:stack-link",
+    tag: WS_METHODS.jjStackLink,
+  }),
   revertOperation: createEnvironmentRpcCommand(connectionAtomRuntime, {
     label: "environment-data:jj:revert-operation",
     tag: WS_METHODS.jjRevertOperation,

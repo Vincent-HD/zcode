@@ -40,6 +40,12 @@ upstream entry points to re-check after a rebase are in [`ZCODE.md`](./ZCODE.md)
   worktree also forgets its jj workspace; if it had uncommitted edits, its working copy stays in
   the log until **Abandon orphaned revisions…** in the panel's menu clears such undescribed heads
   (the **Orphaned revisions** revset preset lists them first).
+- **Jujutsu Git actions:** In a jj workspace, the thread details panel's Commit / Push / Create PR
+  button runs through jj instead of Git, which only sees a detached HEAD there. Commit describes
+  the working copy and starts a new change. Push moves the work's bookmark (the worktree's
+  `t3/…` bookmark, even when it was left on trunk) up to the newest described change and pushes
+  it. Create PR does the same, then opens or updates the GitHub/GitLab pull request against
+  trunk's bookmark.
 - **VS Code tasks:** A project's `.vscode/tasks.json` tasks appear in the thread details panel's
   action menu next to its actions and run in the same terminal. Shell, process and npm tasks are
   supported (npm tasks run with bun, pnpm, yarn or npm, picked from the nearest lockfile), with `args` quoting, `options.cwd` and `options.env`, Linux and macOS overrides, and

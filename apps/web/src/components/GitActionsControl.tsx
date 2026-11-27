@@ -136,6 +136,7 @@ import { scopeProjectRef } from "@t3tools/client-runtime/environment";
 import { formatDiffCount } from "@t3tools/client-runtime/diff-count";
 import { ChangeBreakdownGrid } from "./pullRequest/ChangeBreakdownGrid";
 import { useOpenLink } from "~/browser/useOpenLink";
+import { JjGitActionsControl } from "~/zcode/jj-git-actions-control";
 
 /** The folder a Git actions control acts on: a thread's own folder or a tracked repository. */
 export interface GitActionsTarget {
@@ -1002,7 +1003,13 @@ export const GitActionsControl = memo(function GitActionsControl(props: GitActio
     props.target?.key ?? null,
     props.target?.cwd ?? null,
   ]);
-  return <CheckoutGitActionsControl key={checkoutKey} {...props} />;
+  return (
+    <JjGitActionsControl
+      key={checkoutKey}
+      {...props}
+      render={(showActions) => <CheckoutGitActionsControl {...props} showActions={showActions} />}
+    />
+  );
 });
 
 function CheckoutGitActionsControl({

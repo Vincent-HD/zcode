@@ -33,6 +33,7 @@ added_tests=(
   apps/web/src/zcode/jj-diff-selection.test.ts
   apps/web/src/zcode/right-panel.test.ts
   apps/web/src/zcode/vscode-tasks.test.ts
+  apps/web/src/zcode/jj-git-actions.test.ts
   packages/client-runtime/src/state/zcode-command-permissions.test.ts
   packages/contracts/src/jj-forge.test.ts
   packages/contracts/src/jj.test.ts

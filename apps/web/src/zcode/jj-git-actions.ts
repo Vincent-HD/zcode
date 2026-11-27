@@ -13,7 +13,7 @@ export const jjRemoteBookmarkView = (input: { bookmark: string; remote: string }
   limit: 2,
 });
 
-export type JjGitAction = "commit" | "push" | "create-pr";
+export type JjGitAction = "commit" | "push" | "create-pr" | "view-pr";
 
 export interface JjGitActionsState {
   readonly workingCopy: JjLogRow | null;
@@ -26,6 +26,8 @@ export interface JjGitActionsState {
   readonly target: JjLogRow | null;
   /** The work's own bookmark, wherever it sits between the target and trunk. */
   readonly bookmark: string | null;
+  /** The commit the bookmark sits on now, which a pull request lookup matches. */
+  readonly bookmarkCommitId: string | null;
   /** The bookmark sits below the target and has to move up before publishing. */
   readonly needsMove: boolean;
   /** The remote bookmark already points at the target. */
@@ -69,6 +71,7 @@ export const jjGitActionsState = (input: {
     baseBookmark,
     target,
     bookmark,
+    bookmarkCommitId: bookmarkRow?.commitId ?? null,
     needsMove,
     pushed:
       target !== null &&
@@ -92,13 +95,16 @@ export const jjGitActionBlocker = (
   return state.baseBookmark === null ? "no-base" : null;
 };
 
-/** The primary button: commit pending changes, then push them, then open a pull request. */
+/** The primary button: commit pending changes, push them, then open or view the pull request. */
 export const jjQuickAction = (input: {
   readonly state: JjGitActionsState;
   readonly canCreatePullRequest: boolean;
+  /** An open pull request already exists for the bookmark. */
+  readonly hasPullRequest: boolean;
 }): JjGitAction | null => {
   if (jjGitActionBlocker(input.state, "commit") === null) return "commit";
   if (jjGitActionBlocker(input.state, "push") === null) return "push";
+  if (input.hasPullRequest) return "view-pr";
   if (input.canCreatePullRequest && jjGitActionBlocker(input.state, "create-pr") === null)
     return "create-pr";
   return null;

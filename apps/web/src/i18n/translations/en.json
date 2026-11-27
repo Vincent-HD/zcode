@@ -3120,6 +3120,7 @@
   "1646c7dfdff5defd": "Commit",
   "fd0b66778fa161a9": "Push",
   "0a7a67697452b580": "Create PR",
+  "7fd6c35a8c2ab0b8": "View PR #{number}",
   "0137b74c7f376e2f": "Pull requests need a GitHub or GitLab remote and permission to publish.",
   "0d0c0a0016d3d776": "The working copy has no changes to commit.",
   "2ed66abd7db07811": "Nothing to publish: commit or describe a change first.",

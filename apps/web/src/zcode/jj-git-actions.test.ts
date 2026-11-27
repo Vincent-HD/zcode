@@ -38,13 +38,17 @@ describe("jjGitActionsState", () => {
       baseBookmark: "main",
       remote: "origin",
     });
-    expect(jjQuickAction({ state: result, canCreatePullRequest: true })).toBe("push");
+    expect(
+      jjQuickAction({ state: result, canCreatePullRequest: true, hasPullRequest: false }),
+    ).toBe("push");
   });
 
   it("commits first, then pushes, then offers the pull request", () => {
     const dirty = state([row("a"), row("b", { summary: "fix", bookmarks: ["t3/x"] }), trunk([])]);
     expect(dirty.target?.summary).toBe("fix");
-    expect(jjQuickAction({ state: dirty, canCreatePullRequest: true })).toBe("commit");
+    expect(jjQuickAction({ state: dirty, canCreatePullRequest: true, hasPullRequest: false })).toBe(
+      "commit",
+    );
 
     const pushed = state([
       row("a", { empty: true }),
@@ -53,8 +57,19 @@ describe("jjGitActionsState", () => {
     ]);
     expect(pushed).toMatchObject({ needsMove: false, pushed: true });
     expect(jjGitActionBlocker(pushed, "push")).toBe("pushed");
-    expect(jjQuickAction({ state: pushed, canCreatePullRequest: true })).toBe("create-pr");
-    expect(jjQuickAction({ state: pushed, canCreatePullRequest: false })).toBeNull();
+    expect(
+      jjQuickAction({ state: pushed, canCreatePullRequest: true, hasPullRequest: false }),
+    ).toBe("create-pr");
+    expect(
+      jjQuickAction({ state: pushed, canCreatePullRequest: false, hasPullRequest: false }),
+    ).toBeNull();
+    expect(jjQuickAction({ state: pushed, canCreatePullRequest: true, hasPullRequest: true })).toBe(
+      "view-pr",
+    );
+    // Unpushed commits still push first, which also updates the open pull request.
+    expect(jjQuickAction({ state: dirty, canCreatePullRequest: true, hasPullRequest: true })).toBe(
+      "commit",
+    );
   });
 
   it("publishes a described working copy and skips undescribed changes", () => {

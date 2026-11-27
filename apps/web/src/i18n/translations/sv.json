@@ -3120,6 +3120,7 @@
   "1646c7dfdff5defd": "Commit",
   "fd0b66778fa161a9": "Push",
   "0a7a67697452b580": "Skapa PR",
+  "7fd6c35a8c2ab0b8": "Visa PR #{number}",
   "0137b74c7f376e2f": "Pull requests kräver en GitHub- eller GitLab-remote och behörighet att publicera.",
   "0d0c0a0016d3d776": "Arbetskopian har inga ändringar att committa.",
   "2ed66abd7db07811": "Inget att publicera: committa eller beskriv en ändring först.",

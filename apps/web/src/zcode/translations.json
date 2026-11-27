@@ -414,7 +414,8 @@
     "f27b469dfb3debaa": "Veröffentlicht das Bookmark {bookmark}.",
     "3e010214ffbca162": "Committe zuerst die Arbeitskopie; Push verschiebt {bookmark} dann dorthin.",
     "d632fa90d3c01cc8": "Wird generiert…",
-    "9b27f7cfe5a1602d": "Generieren"
+    "9b27f7cfe5a1602d": "Generieren",
+    "7fd6c35a8c2ab0b8": "PR #{number} anzeigen"
   },
   "es": {
     "570dce16bab8e386": "Disponible desde un hilo de proyecto.",
@@ -829,7 +830,8 @@
     "f27b469dfb3debaa": "Publica el bookmark {bookmark}.",
     "3e010214ffbca162": "Haz commit de la copia de trabajo primero; luego Push moverá {bookmark} a ella.",
     "d632fa90d3c01cc8": "Generando…",
-    "9b27f7cfe5a1602d": "Generar"
+    "9b27f7cfe5a1602d": "Generar",
+    "7fd6c35a8c2ab0b8": "Ver PR #{number}"
   },
   "fr": {
     "570dce16bab8e386": "Disponible depuis un fil de projet.",
@@ -1246,7 +1248,8 @@
     "f27b469dfb3debaa": "Publie le bookmark {bookmark}.",
     "3e010214ffbca162": "Commitez d’abord la copie de travail ; Push y déplacera ensuite {bookmark}.",
     "d632fa90d3c01cc8": "Génération…",
-    "9b27f7cfe5a1602d": "Générer"
+    "9b27f7cfe5a1602d": "Générer",
+    "7fd6c35a8c2ab0b8": "Voir la PR #{number}"
   },
   "ja": {
     "570dce16bab8e386": "プロジェクトのスレッドから利用できます。",
@@ -1663,7 +1666,8 @@
     "f27b469dfb3debaa": "ブックマーク {bookmark} を公開します。",
     "3e010214ffbca162": "まず作業コピーをコミットしてください。その後プッシュで {bookmark} をそこへ移動します。",
     "d632fa90d3c01cc8": "生成中…",
-    "9b27f7cfe5a1602d": "生成"
+    "9b27f7cfe5a1602d": "生成",
+    "7fd6c35a8c2ab0b8": "PR #{number} を表示"
   },
   "ko": {
     "570dce16bab8e386": "프로젝트 스레드에서 사용할 수 있습니다.",
@@ -2080,7 +2084,8 @@
     "f27b469dfb3debaa": "북마크 {bookmark}을(를) 게시합니다.",
     "3e010214ffbca162": "먼저 작업 사본을 커밋하세요. 그러면 푸시가 {bookmark}을(를) 그곳으로 옮깁니다.",
     "d632fa90d3c01cc8": "생성 중…",
-    "9b27f7cfe5a1602d": "생성"
+    "9b27f7cfe5a1602d": "생성",
+    "7fd6c35a8c2ab0b8": "PR #{number} 보기"
   },
   "pt-BR": {
     "570dce16bab8e386": "Disponível a partir de uma thread de projeto.",
@@ -2495,7 +2500,8 @@
     "f27b469dfb3debaa": "Publica o bookmark {bookmark}.",
     "3e010214ffbca162": "Faça commit da cópia de trabalho primeiro; depois o Push move {bookmark} para ela.",
     "d632fa90d3c01cc8": "Gerando…",
-    "9b27f7cfe5a1602d": "Gerar"
+    "9b27f7cfe5a1602d": "Gerar",
+    "7fd6c35a8c2ab0b8": "Ver PR #{number}"
   },
   "ru": {
     "570dce16bab8e386": "Доступно из треда проекта.",
@@ -2913,7 +2919,8 @@
     "f27b469dfb3debaa": "Публикует закладку {bookmark}.",
     "3e010214ffbca162": "Сначала закоммитьте рабочую копию; затем Push переместит туда {bookmark}.",
     "d632fa90d3c01cc8": "Генерация…",
-    "9b27f7cfe5a1602d": "Сгенерировать"
+    "9b27f7cfe5a1602d": "Сгенерировать",
+    "7fd6c35a8c2ab0b8": "Открыть PR #{number}"
   },
   "sv": {
     "570dce16bab8e386": "Tillgängligt från en projekttråd.",
@@ -3330,7 +3337,8 @@
     "f27b469dfb3debaa": "Publicerar bokmärket {bookmark}.",
     "3e010214ffbca162": "Committa arbetskopian först; sedan flyttar Push {bookmark} dit.",
     "d632fa90d3c01cc8": "Genererar…",
-    "9b27f7cfe5a1602d": "Generera"
+    "9b27f7cfe5a1602d": "Generera",
+    "7fd6c35a8c2ab0b8": "Visa PR #{number}"
   },
   "zh": {
     "570dce16bab8e386": "可在项目会话中使用。",
@@ -3747,6 +3755,7 @@
     "f27b469dfb3debaa": "发布书签 {bookmark}。",
     "3e010214ffbca162": "请先提交工作副本；之后推送会将 {bookmark} 移到其上。",
     "d632fa90d3c01cc8": "正在生成…",
-    "9b27f7cfe5a1602d": "生成"
+    "9b27f7cfe5a1602d": "生成",
+    "7fd6c35a8c2ab0b8": "查看 PR #{number}"
   }
 }

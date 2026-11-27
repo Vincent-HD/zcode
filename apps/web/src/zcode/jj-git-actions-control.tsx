@@ -50,6 +50,7 @@ const ICONS = {
   commit: GitCommitHorizontalIcon,
   push: CloudUploadIcon,
   "create-pr": PullRequestGlyph.pullRequest,
+  "view-pr": PullRequestGlyph.link,
 } as const;
 
 /**
@@ -93,6 +94,7 @@ const WorkspaceJjGitActions = (
   const runAction = useAtomCommand(jjEnvironment.runAction, COMMAND_OPTIONS);
   const forgePreview = useAtomCommand(jjEnvironment.forgePreview, COMMAND_OPTIONS);
   const forgePublish = useAtomCommand(jjEnvironment.forgePublish, COMMAND_OPTIONS);
+  const forgeStatus = useAtomCommand(jjEnvironment.forgeStatus, COMMAND_OPTIONS);
   const generateCommitMessage = useAtomCommand(
     jjEnvironment.generateCommitMessage,
     COMMAND_OPTIONS,
@@ -112,6 +114,13 @@ const WorkspaceJjGitActions = (
     readonly bookmark: string;
     readonly commitId: string | null;
   } | null>(null);
+  const [pullRequest, setPullRequest] = useState<{
+    readonly key: string;
+    readonly url: string;
+    readonly number: number;
+  } | null>(null);
+  // The bookmark placement last asked about, so a refresh does not query the forge again.
+  const pullRequestKey = useRef<string | null>(null);
   const [running, setRunning] = useState<JjGitAction | null>(null);
   const [committing, setCommitting] = useState(false);
   const [commitError, setCommitError] = useState<string | null>(null);
@@ -143,6 +152,42 @@ const WorkspaceJjGitActions = (
     if (merge.type === "reload" && !reload) return refresh(true);
     // A push moves only the remote bookmark, which the unchanged snapshot does not show.
     if (panelRef.current) await readRemoteHead(panelRef.current, request);
+    if (panelRef.current) await readPullRequest(panelRef.current);
+  };
+  /** Finds the bookmark's open pull request once per bookmark placement. */
+  const readPullRequest = async (next: JjPanelReady) => {
+    const { bookmark, remote, bookmarkCommitId } = jjGitActionsState({
+      rows: next.rows,
+      workingCopyCommitId: next.workingCopyCommitId,
+      remotes: next.remotes,
+    });
+    if (capabilities?.jjPanelForge !== true || projectId === null) return;
+    if (!bookmark || !remote || !bookmarkCommitId) return;
+    const key = `${bookmarkCommitId}\0${bookmark}`;
+    if (pullRequestKey.current === key) return;
+    pullRequestKey.current = key;
+    const result = await forgeStatus({
+      environmentId,
+      input: {
+        cwd,
+        workspaceIdentity: next.workspaceIdentity,
+        expectedOperationId: next.operationId,
+        projectId,
+        remote,
+        revisionCommitIds: [bookmarkCommitId],
+      },
+    });
+    if (result._tag !== "Success") {
+      // A workspace that moved mid-request is asked again on the next refresh.
+      if (pullRequestKey.current === key) pullRequestKey.current = null;
+      return;
+    }
+    const open = result.value.revisions.find(
+      (revision) => revision.bookmark === bookmark && revision.summary.state === "open",
+    );
+    setPullRequest(
+      open ? { key: bookmark, url: open.summary.url, number: open.summary.number } : null,
+    );
   };
   const readRemoteHead = async (next: JjPanelReady, request: number) => {
     const { bookmark, remote } = jjGitActionsState({
@@ -186,13 +231,22 @@ const WorkspaceJjGitActions = (
   });
   const canCreatePullRequest =
     capabilities.jjPanelForge === true && canPublish && projectId !== null;
-  const quickAction = jjQuickAction({ state, canCreatePullRequest });
+  // Kept per bookmark name: committing and pushing move the bookmark, not the pull request.
+  const openPullRequest =
+    pullRequest !== null && pullRequest.key === state.bookmark ? pullRequest : null;
+  const quickAction = jjQuickAction({
+    state,
+    canCreatePullRequest,
+    hasPullRequest: openPullRequest !== null,
+  });
   const labels: Record<JjGitAction, string> = {
     commit: gt("Commit"),
     push: gt("Push"),
     "create-pr": gt("Create PR"),
+    "view-pr": openPullRequest ? gt("View PR #{number}", { number: openPullRequest.number }) : "",
   };
   const blockerText = (action: JjGitAction) => {
+    if (action === "view-pr") return null;
     if (action === "create-pr" && !canCreatePullRequest)
       return gt("Pull requests need a GitHub or GitLab remote and permission to publish.");
     switch (jjGitActionBlocker(state, action)) {
@@ -280,6 +334,7 @@ const WorkspaceJjGitActions = (
       throw new Error(jjForgeFailureMessage(squashAtomCommandFailure(published)));
     const layer = published.value.layers[0];
     if (!layer) return;
+    setPullRequest({ key: bookmark, url: layer.url, number: layer.reference.number });
     toastManager.add(
       stackedThreadToast({
         type: "success",
@@ -294,6 +349,10 @@ const WorkspaceJjGitActions = (
     if (action === "commit") {
       setCommitError(null);
       setCommitting(true);
+      return;
+    }
+    if (action === "view-pr") {
+      if (openPullRequest) void openLink(openPullRequest.url).catch(() => undefined);
       return;
     }
     if (running) return;
@@ -358,21 +417,23 @@ const WorkspaceJjGitActions = (
               <ChevronDownIcon aria-hidden className={THREAD_DETAILS_PANEL_CHEVRON_CLASS} />
             </MenuTrigger>
             <MenuPopup align="end" anchor={anchorRef} className="w-(--anchor-width)">
-              {(["commit", "push", "create-pr"] as const).map((action) => {
-                const Icon = ICONS[action];
-                const blocker = blockerText(action);
-                return (
-                  <MenuItem
-                    key={action}
-                    disabled={!canRun || blocker !== null}
-                    title={blocker ?? undefined}
-                    onClick={() => void start(action)}
-                  >
-                    <Icon aria-hidden />
-                    <MenuItemLabel>{labels[action]}</MenuItemLabel>
-                  </MenuItem>
-                );
-              })}
+              {(["commit", "push", openPullRequest ? "view-pr" : "create-pr"] as const).map(
+                (action) => {
+                  const Icon = ICONS[action];
+                  const blocker = blockerText(action);
+                  return (
+                    <MenuItem
+                      key={action}
+                      disabled={!canRun || blocker !== null}
+                      title={blocker ?? undefined}
+                      onClick={() => void start(action)}
+                    >
+                      <Icon aria-hidden />
+                      <MenuItemLabel>{labels[action]}</MenuItemLabel>
+                    </MenuItem>
+                  );
+                },
+              )}
               {state.bookmark ? (
                 <p className="px-2 py-1.5 text-muted-foreground text-xs">
                   {state.target === null

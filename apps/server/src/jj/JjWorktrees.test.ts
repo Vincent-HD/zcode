@@ -66,6 +66,13 @@ describe("JjWorktrees", () => {
       assert.equal(yield* f.exec("git", branchedPath, ["branch", "--show-current"]), "t3/one");
       assert.equal(yield* f.fs.readFileString(f.path.join(branchedPath, "a.txt")), "a\n");
       assert.include(yield* f.workspaces(repo), `${f.path.basename(branchedPath)}=${branchedPath}`);
+      // Restoring a thread's worktree matches Git's links as absolute paths.
+      const gitDir = yield* f.exec("git", branchedPath, ["rev-parse", "--git-dir"]);
+      assert.isTrue(f.path.isAbsolute(gitDir));
+      assert.equal(
+        (yield* f.fs.readFileString(f.path.join(gitDir, "gitdir"))).trim(),
+        f.path.join(branchedPath, ".git"),
+      );
 
       // A commit-ish other than a local branch checks out detached, as `git worktree add` does.
       const detachedPath = f.path.join(f.temp, "nested", "detached");

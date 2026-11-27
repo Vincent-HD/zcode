@@ -156,6 +156,8 @@ export const makeJjWorktrees = Effect.gen(function* () {
       args: ["workspace", "add", "--colocate", "--name", name, "--revision", commit, "--", target],
     });
     yield* Effect.gen(function* () {
+      // jj links the Git worktree with relative paths; T3 checks Git's default absolute ones.
+      yield* checked({ command: "git", cwd: input.cwd, args: ["worktree", "repair", target] });
       if (branch)
         yield* checked({ command: "git", cwd: target, args: ["switch", "--quiet", input.refName] });
       // `git worktree add` runs this hook; jj does not.

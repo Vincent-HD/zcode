@@ -69,13 +69,14 @@ export const makeJjWorktrees = Effect.gen(function* () {
   /** The jj workspace root holding `cwd` when it is colocated with Git, else null. */
   const colocatedRoot = Effect.fn("JjWorktrees.colocatedRoot")(
     function* (cwd: string) {
+      // Stop at the first `.git`: a plain repository nested in a jj one is not jj's.
       let directory = yield* fileSystem.realPath(cwd);
-      while (!(yield* fileSystem.exists(path.join(directory, ".jj")))) {
+      while (!(yield* fileSystem.exists(path.join(directory, ".git")))) {
         const parent = path.dirname(directory);
         if (parent === directory) return null;
         directory = parent;
       }
-      return (yield* fileSystem.exists(path.join(directory, ".git"))) ? directory : null;
+      return (yield* fileSystem.exists(path.join(directory, ".jj"))) ? directory : null;
     },
     Effect.orElseSucceed(() => null),
   );

@@ -112,6 +112,8 @@ describe("JjWorktrees", () => {
   it.live("keeps plain Git worktrees outside jj", () =>
     Effect.gen(function* () {
       const f = yield* fixture;
+      // A plain repository nested in a jj one (a cloned dependency, say) is not jj's.
+      yield* f.exec("jj", f.temp, ["git", "init", "--colocate", f.temp]);
       const repo = f.path.join(f.temp, "plain");
       yield* f.exec("git", f.temp, ["init", "--initial-branch=main", repo]);
       yield* f.exec("git", repo, ["commit", "--allow-empty", "-m", "base"]);

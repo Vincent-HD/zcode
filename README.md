@@ -43,8 +43,9 @@ upstream entry points to re-check after a rebase are in [`ZCODE.md`](./ZCODE.md)
 - **VS Code tasks:** A project's `.vscode/tasks.json` tasks appear in the thread details panel's
   action menu next to its actions and run in the same terminal. Shell, process and npm tasks are
   supported (npm tasks run with bun, pnpm, yarn or npm, picked from the nearest lockfile), with `args` quoting, `options.cwd` and `options.env`, Linux and macOS overrides, and
-  `dependsOn`. Tasks that use editor or prompt variables (`${file}`, `${input:…}`,
-  `${config:…}`), extension task types, `hide: true`, or a Windows environment are left out.
+  `dependsOn`. `${input:…}` prompts are asked in the terminal before the task runs, with their
+  default on Enter. Tasks that use editor or settings variables (`${file}`, `${config:…}`), command
+  inputs, extension task types, `hide: true`, or a Windows environment are left out.
   Editing a task saves it as a T3 Code action, which then replaces it in the menu.
 
 ## Fork-specific CI

@@ -130,11 +130,39 @@ describe("vscodeTaskScripts", () => {
     expect(commands([])[1]).toBe("npm run 'build'");
   });
 
+  it("prompts in the terminal for inputs, once per task", () => {
+    expect(
+      scripts(`{
+        "inputs": [
+          { "id": "pr", "type": "promptString", "description": "PR number" },
+          { "id": "port", "type": "promptString", "description": "Port", "default": "5433" },
+          { "id": "env", "type": "pickString", "options": ["dev", { "label": "Prod", "value": "prod" }] }
+        ],
+        "tasks": [
+          { "label": "db", "command": "forward pr-\${input:pr} db \${input:port}", "hide": true },
+          { "label": "both", "dependsOn": "db", "command": "echo", "args": ["\${input:pr}", "\${input:env}"] }
+        ]
+      }`),
+    ).toEqual([
+      {
+        name: "both",
+        command:
+          "printf '%s: ' 'PR number' && read -r vscode_input_pr" +
+          " && printf '%s: ' 'Port [5433]' && read -r vscode_input_port" +
+          " && vscode_input_port=${vscode_input_port:-'5433'}" +
+          " && printf '%s: ' 'env (dev, prod)' && read -r vscode_input_env" +
+          " && forward pr-${vscode_input_pr} db ${vscode_input_port}" +
+          ' && echo "${vscode_input_pr}" "${vscode_input_env}"',
+        icon: "play",
+      },
+    ]);
+  });
+
   it("skips tasks it cannot run faithfully and keeps the rest", () => {
     expect(
       scripts(`{ "tasks": [
         { "label": "file", "command": "eslint \${file}" },
-        { "label": "input", "command": "deploy \${input:target}" },
+        { "label": "input", "command": "deploy \${input:pick}" },
         { "label": "gulp", "type": "gulp", "task": "build" },
         { "label": "cycle", "dependsOn": "cycle" },
         { "label": "missing", "dependsOn": "nope" },

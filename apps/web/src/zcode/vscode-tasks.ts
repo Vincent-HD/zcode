@@ -57,11 +57,23 @@ const Task = Schema.Struct({
 });
 type Task = typeof Task.Type;
 
+const Input = Schema.Struct({
+  id: Schema.String,
+  type: Schema.String,
+  description: Schema.optional(Schema.String),
+  default: Schema.optional(Schema.String),
+  options: Schema.optional(
+    Schema.Array(Schema.Union([Schema.String, Schema.Struct({ value: Schema.String })])),
+  ),
+});
+type Input = typeof Input.Type;
+
 // Tasks decode one by one so a single unsupported entry does not hide the rest.
 const TasksFile = fromLenientJson(
   Schema.Struct({
     ...Runnable.fields,
     tasks: Schema.optional(Schema.Array(Schema.Unknown)),
+    inputs: Schema.optional(Schema.Array(Schema.Unknown)),
     windows: Schema.optional(Runnable),
     osx: Schema.optional(Runnable),
     linux: Schema.optional(Runnable),
@@ -71,6 +83,7 @@ type TasksFile = typeof TasksFile.Type;
 
 const decodeTasksFile = Schema.decodeUnknownExit(TasksFile);
 const decodeTask = Schema.decodeUnknownExit(Task);
+const decodeInput = Schema.decodeUnknownExit(Input);
 
 type Segment = { readonly literal: string } | { readonly env: string };
 
@@ -78,6 +91,9 @@ interface Context {
   readonly workspaceFolder: string;
   /** Lockfile paths known to exist, from `packageManagerProbePaths`. */
   readonly existingPaths: ReadonlySet<string>;
+  readonly inputs: ReadonlyMap<string, Input>;
+  /** Inputs the task references, prompted for in the terminal before it runs. */
+  readonly usedInputs: Set<Input>;
 }
 
 // Nearest folder wins; within one folder, the first match (same order as preferred-pm).
@@ -109,6 +125,9 @@ class UnsupportedTask extends Schema.TaggedError<UnsupportedTask>()("Unsupported
 
 const isUnsupportedTask = Schema.is(UnsupportedTask);
 
+const inputVariable = (input: Input) =>
+  `vscode_input_${input.id.replaceAll(/[^A-Za-z0-9_]/g, "_")}`;
+
 const VARIABLE = /\$\{([^}]+)\}/g;
 
 const resolveVariables = (text: string, context: Context): ReadonlyArray<Segment> => {
@@ -129,6 +148,16 @@ const resolveVariables = (text: string, context: Context): ReadonlyArray<Segment
       push({ env: name.slice("env:".length) });
       continue;
     }
+    if (name.startsWith("input:")) {
+      const input = context.inputs.get(name.slice("input:".length));
+      // `command` inputs run a VS Code command, which T3 cannot do.
+      if (input?.type !== "promptString" && input?.type !== "pickString") {
+        throw new UnsupportedTask({ reason: name });
+      }
+      context.usedInputs.add(input);
+      push({ env: inputVariable(input) });
+      continue;
+    }
     switch (name) {
       case "workspaceFolder":
       case "workspaceRoot":
@@ -146,7 +175,7 @@ const resolveVariables = (text: string, context: Context): ReadonlyArray<Segment
         push({ literal: "/" });
         break;
       default:
-        // Editor state (${file}), prompts (${input:…}) and settings have no T3 equivalent.
+        // Editor state (${file}), settings and commands have no T3 equivalent.
         throw new UnsupportedTask({ reason: name });
     }
   }
@@ -200,6 +229,24 @@ const commandText = (
   if (typeof value !== "string" && value.quoting) return quoteSegments(segments, value.quoting);
   if (defaultQuoting === "auto" && needsQuotes(segments)) return quoteSegments(segments, "strong");
   return quoteSegments(segments, "raw");
+};
+
+const promptCommand = (input: Input) => {
+  const variable = inputVariable(input);
+  const choices = (input.options ?? []).map((option) =>
+    typeof option === "string" ? option : option.value,
+  );
+  const label = [
+    input.description ?? input.id,
+    input.type === "pickString" && choices.length > 0 ? `(${choices.join(", ")})` : "",
+    input.default === undefined ? "" : `[${input.default}]`,
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const read = `printf '%s: ' ${strongQuote(label)} && read -r ${variable}`;
+  return input.default === undefined
+    ? read
+    : `${read} && ${variable}=\${${variable}:-${strongQuote(input.default)}}`;
 };
 
 const mergeRunnable = (...layers: ReadonlyArray<Runnable | undefined>): Runnable => {
@@ -333,24 +380,29 @@ export const vscodeTaskScripts = (input: {
   const decoded = decodeTasks(input.contents);
   if (decoded === null) return [];
   const { file, tasks } = decoded;
+  const inputs = new Map(
+    (file.inputs ?? []).flatMap((raw) => {
+      const input = decodeInput(raw);
+      return Exit.isSuccess(input) ? [[input.value.id, input.value] as const] : [];
+    }),
+  );
   const byLabel = new Map(
     tasks.flatMap((task) => {
       const label = taskLabel(task);
       return label === undefined ? [] : [[label, task] as const];
     }),
   );
-  const context: Context = {
-    workspaceFolder: input.workspaceFolder,
-    existingPaths: input.existingPaths,
-  };
-
-  const fullCommand = (task: Task, visiting: ReadonlySet<Task>): string | null => {
+  const fullCommand = (
+    task: Task,
+    context: Context,
+    visiting: ReadonlySet<Task>,
+  ): string | null => {
     if (visiting.has(task)) throw new UnsupportedTask({ reason: "dependsOn cycle" });
     const nextVisiting = new Set([...visiting, task]);
     const dependencies = dependencyLabels(task).map((label) => {
       const dependency = byLabel.get(label);
       if (dependency === undefined) throw new UnsupportedTask({ reason: label });
-      return fullCommand(dependency, nextVisiting);
+      return fullCommand(dependency, context, nextVisiting);
     });
     const runnableDependencies = dependencies.filter((command) => command !== null);
     const sequence = task.dependsOrder === "sequence" || runnableDependencies.length < 2;
@@ -366,8 +418,15 @@ export const vscodeTaskScripts = (input: {
     const label = taskLabel(task)?.trim();
     if (task.hide === true || !label) return [];
     try {
-      const command = fullCommand(task, new Set())?.trim();
-      if (!command) return [];
+      const context: Context = {
+        workspaceFolder: input.workspaceFolder,
+        existingPaths: input.existingPaths,
+        inputs,
+        usedInputs: new Set(),
+      };
+      const taskCommand = fullCommand(task, context, new Set())?.trim();
+      if (!taskCommand) return [];
+      const command = [...[...context.usedInputs].map(promptCommand), taskCommand].join(" && ");
       return [
         {
           id: `${SCRIPT_ID_PREFIX}${label}`,
